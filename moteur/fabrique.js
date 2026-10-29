@@ -476,10 +476,15 @@ ${FORMAT}`;
     const duree = o.duree || Math.max(8, Math.ceil(Number(p.duree) || 8));
     const mouvement = { calme: 'very slow, subtle, almost still motion', moyen: 'gentle, graceful motion', vivant: 'lively but elegant motion' }[o.mouvement || 'calme'];
     const ref = o.reference;
+    const autre = o.mode === 'autre' && o.inspiration;
+    const suivreInv = o.suivre === 'invitation';
     const lignesEn = calques.map((x, i) => `  ${i + 1}. ${TYPES_EN[x.c.type] || x.c.type}${x.c.texte ? ` "${String(x.c.texte).replace(/\s*\n\s*/g, ' ')}"` : ''}${x.c.police ? `, ${/Vibes|Parisienne|Dancing/.test(x.c.police) ? 'elegant script' : 'classic serif'} font` : ''}${x.c.couleur ? ` in ${x.c.couleur}` : ''} — ${zoneMots(x.b, true)}`).join('\n');
     const lignesFr = calques.map((x, i) => `  ${i + 1}. ${TYPES_FR[x.c.type] || x.c.type}${x.c.texte ? ` « ${String(x.c.texte).replace(/\s*\n\s*/g, ' ')} »` : ''}${x.c.police ? ` (police ${x.c.police}${x.c.couleur ? ', couleur ' + x.c.couleur : ''})` : ''} — ${zoneMots(x.b, false)}`).join('\n');
     const zoneTxt = occupe ? `Keep a clean, soft, low-detail empty area from ${Math.max(0, occupe.haut - 3)}% to ${Math.min(100, occupe.bas + 3)}% of the frame height and from ${Math.max(0, occupe.gauche - 3)}% to ${Math.min(100, occupe.droite + 3)}% of the width, so the layers below stay perfectly readable.` : 'Keep the central area (20% to 75% of the height) clean, soft and empty.';
-    const video = `${ref ? `Use the attached reference video "${ref}" (the current background of this scene) as the base: keep its visual style, palette, textures and decoration, and create a new variation adapted to the layers listed below.\n` : ''}Vertical 9:16 video background, 1080x1920, ${duree} seconds, seamless loop (the last frame matches the first).
+    const introEn = autre
+      ? `Attached file "${o.inspiration}" is an INSPIRATION only (its subject, composition or motion idea): it does not match the invitation. Recreate it as a new background and fully restyle it to follow ${suivreInv ? 'the visual theme of the whole invitation' : `the style of the reference video "${ref}" (current background of this scene, also attached)`}: same base colors first of all (warm ivory and cream, ${palette(projet).join(', ')}, soft antique gold), same kind of decoration, textures and light. Leave room for the layers listed below.\n`
+      : (ref ? `Create a NEW background in the same theme as the attached reference video "${ref}" (the current background of this scene): a different scene or variation, but do not stray far from its decoration style, palette, textures and light. Leave room for the layers listed below.\n` : '');
+    const video = `${introEn}Vertical 9:16 video background, 1080x1920, ${duree} seconds, seamless loop (the last frame matches the first).
 Event: ${f.type || 'celebration'} — "${f.titre || ''}". This is the ${NOMS_ROLE[p.role] || 'scene'} (${index + 1} of ${projet.plans.length}) of an animated digital invitation.
 Layers that will be placed on top of this background later (do NOT draw them, only leave room for them):
 ${lignesEn || '  (none)'}
@@ -489,8 +494,8 @@ Motion: ${mouvement}; static camera${o.mouvement === 'vivant' ? ' or very slow p
 Strictly no text, no letters, no numbers, no logo, no watermark, no people, no faces. High detail, no flicker, no cuts.`;
     if (o.cible === 'video') return video;
     return `Tu es directeur artistique et expert en génération de vidéos par IA (Sora, Veo, Kling, Runway, Hailuo, Pika).
-J'ai besoin d'un nouveau fond vidéo vierge (sans texte) pour le plan ${index + 1} / ${projet.plans.length} (${p.role}) d'une invitation vidéo verticale « ${f.titre || ''} ». Le studio posera ensuite les calques ci-dessous par-dessus.
-${ref ? `\nVidéo jointe : « ${ref} » = le fond actuel de ce plan. Sers-t'en comme référence : garde son style, ses couleurs, ses matières et son décor, et fais-en une nouvelle version adaptée aux calques.\n` : ''}
+J'ai besoin d'un autre fond vidéo vierge (sans texte), du même thème que l'invitation, pour le plan ${index + 1} / ${projet.plans.length} (${p.role}) d'une invitation vidéo verticale « ${f.titre || ''} ». Le studio posera ensuite les calques ci-dessous par-dessus.
+${autre ? `\nFichier joint « ${o.inspiration} » = une inspiration seulement (sujet, composition ou mouvement) ; il ne correspond pas au thème. Recrée-le comme nouveau fond en le transformant entièrement pour suivre ${suivreInv ? 'le thème de toute l\'invitation' : `le style de la vidéo « ${ref} » (le fond actuel de ce plan, jointe aussi)`} : d'abord les mêmes couleurs de base (${palette(projet).join(', ')}, ivoire, or ancien), puis le même genre de décor, de matières et de lumière. Laisse de la place aux calques.\n` : (ref ? `\nVidéo jointe : « ${ref} » = le fond actuel de ce plan. Crée un AUTRE fond, dans le même thème : une scène ou une variante différente, mais qui ne s'écarte pas trop du style de son décor, de ses couleurs, de ses matières et de sa lumière. Laisse de la place aux calques.\n` : '')}
 Calques qui seront posés sur ce fond (ne pas les dessiner, seulement leur laisser la place et un fond lisible derrière eux) :
 ${lignesFr || '  (aucun)'}
 Zone à laisser calme et dégagée : ${occupe ? `de ${occupe.haut} % à ${occupe.bas} % de la hauteur, de ${occupe.gauche} % à ${occupe.droite} % de la largeur` : 'le centre de l\'image'}.

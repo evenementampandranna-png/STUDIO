@@ -177,3 +177,5 @@ details.bloc:not([open]) > summary { margin-bottom: 0; }
 .calque-ia .ci-nom { font-size: 13px; }
 .calque-ia .ci-zone { grid-column: 2 / -1; font-size: 12px; }
 #fi-calques { max-height: 260px; overflow: auto; }
+.depart .cases { align-items: flex-start; gap: 8px; font-size: 13.5px; flex-wrap: nowrap; cursor: pointer; }
+.depart .cases input { margin-top: 3px; }
