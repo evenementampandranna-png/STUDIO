@@ -1,0 +1,671 @@
+{
+ "id": "w79mhqd2",
+ "slug": "demo-jobily",
+ "version": 1,
+ "cree": "2026-10-29T12:58:01.518Z",
+ "modifie": "2026-10-29T12:58:01.518Z",
+ "fiche": {
+  "titre": "Jobily faha-10 taona mariazy — Batemy",
+  "type": "Jobily mariazy + Batemy",
+  "langue": "mg",
+  "hotes": [
+   {
+    "nom_complet": "Hery Rakotomalala",
+    "surnom": "Hery"
+   },
+   {
+    "nom_complet": "Fanja Rasoanirina",
+    "surnom": "Fanja"
+   }
+  ],
+  "celebres": [
+   {
+    "nom_complet": "RAKOTOMALALA Kanto Nirina",
+    "occasion": "Batemy"
+   }
+  ],
+  "date": "2027-06-05",
+  "heure": "08:00",
+  "lieux": [
+   {
+    "nom": "Ekar Kristy Mpanjaka Manjakaray",
+    "adresse": "",
+    "role": "ceremonie",
+    "maps": "https://www.google.com/maps/search/?api=1&query=Ekar%20Kristy%20Mpanjaka%20Manjakaray%20Antananarivo"
+   },
+   {
+    "nom": "Espace Fenitra, By Pass",
+    "adresse": "",
+    "role": "reception",
+    "maps": "https://www.google.com/maps/search/?api=1&query=Espace%20Fenitra%2C%20By%20Pass%20Antananarivo"
+   }
+  ],
+  "date_limite": "2027-05-30",
+  "contacts": [
+   {
+    "nom": "Hery",
+    "telephone": "034 00 000 01"
+   },
+   {
+    "nom": "Fanja",
+    "telephone": "034 00 000 02"
+   }
+  ],
+  "phrases": [
+   "Hery Rakotomalala sy Fanja Rasoanirina dia faly manasa anareo hanotrona ny fanamasinana ny jobily faha-folo taonan'ny mariazinay, sy ny Batemin'ny zanakay RAKOTOMALALA Kanto Nirina.",
+   "Hatao ny Sabotsy 5 Jona 2027, amin'ny 8 ora maraina, ao amin'ny Ekar Kristy Mpanjaka Manjakaray.",
+   "Aorian'izay, dia mahafaly anay ny manasa olona {places} avy aminareo hiara-hikorana sy hizara hafaliana aminay ao amin'ny Espace Fenitra, By Pass.",
+   "Raha misy tsy fahafahana, iangaviana mba hampandre mialohan'ny 30 Mey 2027."
+  ],
+  "remerciement": "Misaotra betsaka noho ny fitiavanareo",
+  "a_verifier": []
+ },
+ "style": {
+  "police_titre": "Great Vibes",
+  "police_texte": "Cormorant Garamond",
+  "couleur": "#7a1f2b",
+  "couleur2": "#9c6b3f"
+ },
+ "musique": null,
+ "mise_en_page": false,
+ "plans": [
+  {
+   "id": "x2nffsnp",
+   "role": "ouverture",
+   "duree": 4.5,
+   "fond": {
+    "media": "fonds/fond_1.mp4",
+    "boucle": true,
+    "assombrir": 0,
+    "eclaircir": 0
+   },
+   "transition": {
+    "type": "aucune",
+    "duree": 0.8
+   },
+   "calques": [
+    {
+     "id": "5p6fu6ce",
+     "type": "bouton",
+     "texte": "Dingano ›",
+     "action": "passer",
+     "x": 84,
+     "y": 4,
+     "largeur": 26,
+     "taille": 2,
+     "couleur": "#7a1f2b",
+     "style": "lien",
+     "debut": 0
+    }
+   ]
+  },
+  {
+   "id": "mfg53pdp",
+   "role": "intermediaire",
+   "duree": 6,
+   "fond": {
+    "media": "fonds/fond_2.mp4",
+    "boucle": true,
+    "assombrir": 0,
+    "eclaircir": 0
+   },
+   "transition": {
+    "type": "fondu",
+    "duree": 0.8
+   },
+   "calques": [
+    {
+     "id": "6376e3zt",
+     "type": "texte",
+     "texte": "Jobily faha-10 taona mariazy",
+     "x": 50,
+     "y": 46.6,
+     "largeur": 68,
+     "police": "Great Vibes",
+     "taille": 5.2,
+     "couleur": "#7a1f2b",
+     "gras": false,
+     "align": "center",
+     "ombre": true,
+     "debut": 0.3,
+     "fin": "",
+     "animation": "ecriture"
+    },
+    {
+     "id": "m7caajok",
+     "type": "texte",
+     "texte": "Batemy",
+     "x": 50,
+     "y": 57.8,
+     "largeur": 60,
+     "police": "Cormorant Garamond",
+     "taille": 3.4,
+     "couleur": "#9c6b3f",
+     "gras": false,
+     "align": "center",
+     "ombre": true,
+     "debut": 2.2,
+     "fin": "",
+     "animation": "fondu-montee",
+     "majuscules": true
+    }
+   ]
+  },
+  {
+   "id": "hjd0y08n",
+   "role": "intermediaire",
+   "duree": 6.5,
+   "fond": {
+    "media": "fonds/fond_2.mp4",
+    "boucle": true,
+    "assombrir": 0,
+    "eclaircir": 0
+   },
+   "transition": {
+    "type": "fondu",
+    "duree": 0.8
+   },
+   "calques": [
+    {
+     "id": "qfwnktro",
+     "type": "texte",
+     "texte": "Hery Rakotomalala\nsy\nFanja Rasoanirina",
+     "x": 50,
+     "y": 34,
+     "largeur": 60,
+     "police": "Cormorant Garamond",
+     "taille": 3,
+     "couleur": "#7a1f2b",
+     "gras": true,
+     "align": "center",
+     "ombre": true,
+     "debut": 0.3,
+     "fin": "",
+     "animation": "fondu-montee",
+     "interligne": 1.3
+    },
+    {
+     "id": "ksptrc9t",
+     "type": "texte",
+     "texte": "dia faly manasa anareo hanotrona ny fanamasinana ny jobily faha-folo taonan'ny mariazinay,",
+     "x": 50,
+     "y": 57.6,
+     "largeur": 60,
+     "police": "Cormorant Garamond",
+     "taille": 3.8,
+     "couleur": "#7a1f2b",
+     "gras": false,
+     "align": "center",
+     "ombre": true,
+     "debut": 1.6,
+     "fin": "",
+     "animation": "fondu-montee"
+    }
+   ]
+  },
+  {
+   "id": "o8bcr37u",
+   "role": "intermediaire",
+   "duree": 4.5,
+   "fond": {
+    "media": "fonds/fond_3.mp4",
+    "boucle": true,
+    "assombrir": 0,
+    "eclaircir": 0
+   },
+   "transition": {
+    "type": "fondu",
+    "duree": 0.8
+   },
+   "calques": [
+    {
+     "id": "xoxtseg9",
+     "type": "texte",
+     "texte": "sy ny Batemin'ny zanakay",
+     "x": 56,
+     "y": 40.8,
+     "largeur": 60,
+     "police": "Cormorant Garamond",
+     "taille": 4,
+     "couleur": "#7a1f2b",
+     "gras": false,
+     "align": "center",
+     "ombre": true,
+     "debut": 0.3,
+     "fin": "",
+     "animation": "fondu-montee"
+    },
+    {
+     "id": "2h0im7ju",
+     "type": "texte",
+     "texte": "RAKOTOMALALA Kanto Nirina",
+     "x": 56,
+     "y": 56.8,
+     "largeur": 66,
+     "police": "Great Vibes",
+     "taille": 6,
+     "couleur": "#7a1f2b",
+     "gras": false,
+     "align": "center",
+     "ombre": true,
+     "debut": 1.3,
+     "fin": "",
+     "animation": "ecriture"
+    }
+   ]
+  },
+  {
+   "id": "59j0d7kv",
+   "role": "intermediaire",
+   "duree": 6.5,
+   "fond": {
+    "media": "fonds/fond_3.mp4",
+    "boucle": true,
+    "assombrir": 0,
+    "eclaircir": 0
+   },
+   "transition": {
+    "type": "fondu",
+    "duree": 0.8
+   },
+   "calques": [
+    {
+     "id": "6drirl5s",
+     "type": "texte",
+     "texte": "Hatao ny Sabotsy 5 Jona 2027, amin'ny 8 ora maraina, ao amin'ny Ekar Kristy Mpanjaka Manjakaray.",
+     "x": 56,
+     "y": 50,
+     "largeur": 60,
+     "police": "Cormorant Garamond",
+     "taille": 3.5,
+     "couleur": "#7a1f2b",
+     "gras": false,
+     "align": "center",
+     "ombre": true,
+     "debut": 0.4,
+     "fin": "",
+     "animation": "fondu-montee"
+    }
+   ]
+  },
+  {
+   "id": "13sox028",
+   "role": "intermediaire",
+   "duree": 7.5,
+   "fond": {
+    "media": "fonds/fond_4.mp4",
+    "boucle": true,
+    "assombrir": 0,
+    "eclaircir": 0
+   },
+   "transition": {
+    "type": "fondu",
+    "duree": 0.8
+   },
+   "calques": [
+    {
+     "id": "lo4sgfyb",
+     "type": "texte",
+     "texte": "Aorian'izay, dia mahafaly anay ny manasa olona {places} avy aminareo hiara-hikorana sy hizara hafaliana aminay ao amin'ny Espace Fenitra, By Pass.",
+     "x": 52,
+     "y": 44,
+     "largeur": 70,
+     "police": "Cormorant Garamond",
+     "taille": 3.5,
+     "couleur": "#7a1f2b",
+     "gras": false,
+     "align": "center",
+     "ombre": true,
+     "debut": 0.4,
+     "fin": "",
+     "animation": "fondu-montee"
+    }
+   ]
+  },
+  {
+   "id": "iulyebgm",
+   "role": "confirmation",
+   "duree": 0,
+   "fond": {
+    "media": "fonds/fond_4.mp4",
+    "boucle": true,
+    "assombrir": 0,
+    "eclaircir": 0
+   },
+   "transition": {
+    "type": "fondu",
+    "duree": 0.8
+   },
+   "calques": [
+    {
+     "id": "uk3dw4d5",
+     "type": "texte",
+     "texte": "Ho an'i {famille}",
+     "x": 52,
+     "y": 11.3,
+     "largeur": 78,
+     "police": "Great Vibes",
+     "taille": 4.2,
+     "couleur": "#7a1f2b",
+     "gras": false,
+     "align": "center",
+     "ombre": true,
+     "debut": 0.2,
+     "fin": "",
+     "animation": "fondu-montee",
+     "condition": "famille"
+    },
+    {
+     "id": "8ubpoi0y",
+     "type": "texte",
+     "texte": "Manasa olona {places}",
+     "x": 52,
+     "y": 20,
+     "largeur": 72,
+     "police": "Cormorant Garamond",
+     "taille": 3,
+     "couleur": "#7a1f2b",
+     "gras": true,
+     "align": "center",
+     "ombre": true,
+     "debut": 0.4,
+     "fin": "",
+     "animation": "fondu-montee",
+     "condition": "famille"
+    },
+    {
+     "id": "nf9oa3y8",
+     "type": "texte",
+     "texte": "Raha misy tsy fahafahana, iangaviana mba hampandre mialohan'ny 30 Mey 2027.",
+     "x": 52,
+     "y": 28.5,
+     "largeur": 70,
+     "police": "Cormorant Garamond",
+     "taille": 2.7,
+     "couleur": "#7a1f2b",
+     "gras": false,
+     "align": "center",
+     "ombre": true,
+     "debut": 0.6,
+     "fin": "",
+     "animation": "fondu-montee"
+    },
+    {
+     "id": "ipd03e1c",
+     "type": "texte",
+     "texte": "Andro sisa",
+     "x": 52,
+     "y": 36.7,
+     "largeur": 70,
+     "police": "Cormorant Garamond",
+     "taille": 2.4,
+     "couleur": "#9c6b3f",
+     "gras": false,
+     "align": "center",
+     "ombre": true,
+     "debut": 0.8,
+     "fin": "",
+     "animation": "fondu-montee",
+     "majuscules": true
+    },
+    {
+     "id": "fbwbsb3n",
+     "type": "texte",
+     "texte": "{compte_a_rebours}",
+     "x": 52,
+     "y": 41.4,
+     "largeur": 78,
+     "police": "Cormorant Garamond",
+     "taille": 2.6,
+     "couleur": "#7a1f2b",
+     "gras": true,
+     "align": "center",
+     "ombre": true,
+     "debut": 0.8,
+     "fin": "",
+     "animation": "fondu"
+    },
+    {
+     "id": "7wig1j26",
+     "type": "compteur",
+     "texte": "Olon-dehibe",
+     "action": "",
+     "x": 52,
+     "y": 48.62500000000001,
+     "largeur": 66,
+     "taille": 2.3,
+     "couleur": "#7a1f2b",
+     "style": "plein",
+     "debut": 0,
+     "condition": "famille",
+     "champ": "adultes",
+     "min": 0,
+     "defaut": 1
+    },
+    {
+     "id": "xovnugpt",
+     "type": "compteur",
+     "texte": "Ankizy",
+     "action": "",
+     "x": 52,
+     "y": 55.12500000000001,
+     "largeur": 66,
+     "taille": 2.3,
+     "couleur": "#7a1f2b",
+     "style": "plein",
+     "debut": 0,
+     "condition": "famille",
+     "champ": "enfants",
+     "min": 0,
+     "defaut": 0
+    },
+    {
+     "id": "dgcnp31r",
+     "type": "bouton",
+     "texte": "Ho tonga izahay",
+     "action": "confirmer",
+     "x": 52,
+     "y": 62.62500000000001,
+     "largeur": 66,
+     "taille": 2.4,
+     "couleur": "#7a1f2b",
+     "style": "plein",
+     "debut": 0,
+     "condition": "famille"
+    },
+    {
+     "id": "hakhdv5e",
+     "type": "bouton",
+     "texte": "Tsy ho afaka izahay",
+     "action": "refuser",
+     "x": 52,
+     "y": 69.125,
+     "largeur": 66,
+     "taille": 2.1,
+     "couleur": "#7a1f2b",
+     "style": "contour",
+     "debut": 0,
+     "condition": "famille"
+    },
+    {
+     "id": "r9hcfs5k",
+     "type": "bouton",
+     "texte": "Hamaly amin'ny WhatsApp",
+     "action": "whatsapp",
+     "x": 52,
+     "y": 53.62500000000001,
+     "largeur": 66,
+     "taille": 2.4,
+     "couleur": "#7a1f2b",
+     "style": "plein",
+     "debut": 0,
+     "condition": "general",
+     "cible": 0
+    },
+    {
+     "id": "3dc4waep",
+     "type": "bouton",
+     "texte": "Sarintany · Ekar Kristy",
+     "action": "map",
+     "x": 35,
+     "y": 76.625,
+     "largeur": 33,
+     "taille": 1.8,
+     "couleur": "#7a1f2b",
+     "style": "contour",
+     "debut": 0,
+     "cible": 0
+    },
+    {
+     "id": "nmyacyip",
+     "type": "bouton",
+     "texte": "Sarintany · Espace Fenitra",
+     "action": "map",
+     "x": 69,
+     "y": 76.625,
+     "largeur": 33,
+     "taille": 1.8,
+     "couleur": "#7a1f2b",
+     "style": "contour",
+     "debut": 0,
+     "cible": 1
+    },
+    {
+     "id": "k1ur6ywh",
+     "type": "bouton",
+     "texte": "Antsoy Hery",
+     "action": "appeler",
+     "x": 35,
+     "y": 83.125,
+     "largeur": 33,
+     "taille": 1.8,
+     "couleur": "#7a1f2b",
+     "style": "contour",
+     "debut": 0,
+     "cible": 0
+    },
+    {
+     "id": "auyf5lza",
+     "type": "bouton",
+     "texte": "Antsoy Fanja",
+     "action": "appeler",
+     "x": 69,
+     "y": 83.125,
+     "largeur": 33,
+     "taille": 1.8,
+     "couleur": "#7a1f2b",
+     "style": "contour",
+     "debut": 0,
+     "cible": 1
+    }
+   ]
+  },
+  {
+   "id": "3hoyq5og",
+   "role": "remerciement",
+   "duree": 6,
+   "fond": {
+    "media": "fonds/fond_2.mp4",
+    "boucle": true,
+    "assombrir": 0,
+    "eclaircir": 0
+   },
+   "transition": {
+    "type": "fondu",
+    "duree": 0.8
+   },
+   "calques": [
+    {
+     "id": "soe42sct",
+     "type": "texte",
+     "texte": "Misaotra betsaka",
+     "x": 50,
+     "y": 35.9,
+     "largeur": 64,
+     "police": "Great Vibes",
+     "taille": 7,
+     "couleur": "#7a1f2b",
+     "gras": false,
+     "align": "center",
+     "ombre": true,
+     "debut": 0.3,
+     "fin": "",
+     "animation": "ecriture"
+    },
+    {
+     "id": "e3yy5bol",
+     "type": "texte",
+     "texte": "Misaotra betsaka noho ny fitiavanareo",
+     "x": 50,
+     "y": 51.6,
+     "largeur": 60,
+     "police": "Cormorant Garamond",
+     "taille": 3.6,
+     "couleur": "#7a1f2b",
+     "gras": false,
+     "align": "center",
+     "ombre": true,
+     "debut": 1.6,
+     "fin": "",
+     "animation": "fondu-montee"
+    },
+    {
+     "id": "1ultoqnz",
+     "type": "texte",
+     "texte": "Hery sy Fanja",
+     "x": 50,
+     "y": 61.8,
+     "largeur": 60,
+     "police": "Great Vibes",
+     "taille": 5,
+     "couleur": "#7a1f2b",
+     "gras": false,
+     "align": "center",
+     "ombre": true,
+     "debut": 2.6,
+     "fin": "",
+     "animation": "fondu-montee"
+    },
+    {
+     "id": "qldel190",
+     "type": "bouton",
+     "texte": "Zarao",
+     "action": "partager",
+     "x": 50,
+     "y": 74,
+     "largeur": 52,
+     "taille": 2.4,
+     "couleur": "#7a1f2b",
+     "style": "plein",
+     "debut": 0
+    },
+    {
+     "id": "cmdh5kg1",
+     "type": "bouton",
+     "texte": "Jereo indray",
+     "action": "revoir",
+     "x": 50,
+     "y": 81,
+     "largeur": 52,
+     "taille": 2.1,
+     "couleur": "#7a1f2b",
+     "style": "contour",
+     "debut": 0
+    }
+   ]
+  }
+ ],
+ "liens": {
+  "DEMO": {
+   "nom": "Fianakaviana Rakoto",
+   "places": 4,
+   "adultes": 2,
+   "enfants": 2
+  }
+ },
+ "demo": true,
+ "publication": {
+  "date": "2026-10-29T12:58:01.521Z",
+  "firebase": null
+ }
+}

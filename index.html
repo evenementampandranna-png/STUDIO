@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Invitations vidéo interactives</title>
+<meta name="description" content="Invitations vidéo et électroniques pour mariages, baptêmes et anniversaires, avec confirmation de présence, plan et gestion des invités.">
+<meta property="og:title" content="Invitations vidéo interactives">
+<meta property="og:image" content="fonds/fond_2.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Dancing+Script:wght@400;700&family=Great+Vibes&family=Inter:wght@400;500;600&family=Montserrat:wght@400;600&family=Parisienne&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  :root { --vin: #7a1f2b; --creme: #f7f1e8; --encre: #2b2222; --gris: #6f6464; --ligne: #e6dccf; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--creme); color: var(--encre); font: 16px/1.55 Inter, system-ui, sans-serif; }
+  header { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; max-width: 1150px; margin: 0 auto; }
+  .logo { font: 700 22px "Cormorant Garamond", serif; color: var(--encre); text-decoration: none; }
+  .logo em { color: var(--vin); }
+  header a.studio { font-size: 14px; color: var(--gris); text-decoration: none; }
+  .hero { max-width: 1150px; margin: 0 auto; padding: 30px 20px 50px; display: grid; grid-template-columns: 1.1fr .9fr; gap: 40px; align-items: center; }
+  .hero h1 { font: 700 clamp(38px, 6vw, 60px)/1.05 "Cormorant Garamond", serif; margin: 0 0 16px; }
+  .hero h1 span { font-family: "Great Vibes", cursive; color: var(--vin); font-weight: 400; }
+  .hero p { color: var(--gris); font-size: 18px; max-width: 520px; }
+  .cta { display: inline-block; background: var(--vin); color: #fff; padding: 13px 26px; border-radius: 999px; text-decoration: none; font-weight: 600; margin-top: 10px; }
+  .cta.contour { background: none; color: var(--vin); border: 1.5px solid var(--vin); margin-left: 8px; }
+  .telephone { justify-self: center; width: min(300px, 80vw); aspect-ratio: 9/16; border-radius: 28px; overflow: hidden; border: 8px solid #2b2222; box-shadow: 0 30px 60px rgba(60,20,20,.3); background: #eee; }
+  .telephone { position: relative; cursor: pointer; }
+  .telephone .mt-racine, .lecteur .mt-racine { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .voir { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 3; background: rgba(122,31,43,.92); color: #fff; border: 0; border-radius: 999px; padding: 10px 18px; font: 600 15px Inter, sans-serif; cursor: pointer; white-space: nowrap; }
+  .modele { cursor: pointer; position: relative; }
+  .modele .lire { position: absolute; top: 12px; right: 12px; width: 48px; height: 48px; font-size: 18px !important; border-radius: 50%; background: rgba(122,31,43,.9); color: #fff; display: grid; place-items: center; font-size: 24px; box-shadow: 0 6px 20px rgba(0,0,0,.3); padding: 0 !important; }
+  .modele .liens { display: flex; gap: 8px; padding: 0 14px 14px; }
+  .modele .liens a, .modele .liens button { flex: 1; text-align: center; font: 600 13px Inter, sans-serif; padding: 8px; border-radius: 999px; border: 1.5px solid var(--vin); color: var(--vin); background: #fff; text-decoration: none; cursor: pointer; }
+  .modele .liens button { background: var(--vin); color: #fff; }
+  #boite { position: fixed; inset: 0; z-index: 50; background: rgba(20,10,10,.82); display: none; align-items: center; justify-content: center; flex-direction: column; gap: 12px; padding: 14px; }
+  #boite.ouvert { display: flex; }
+  .lecteur { position: relative; height: min(82vh, 820px); max-width: 92vw; aspect-ratio: 9/16; border-radius: 18px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.5); background: #000; }
+  .barre-lecture { width: min(460px, 92vw); height: 5px; background: rgba(255,255,255,.25); border-radius: 9px; overflow: hidden; }
+  .barre-lecture div { height: 100%; width: 0; background: #fff; }
+  .fin-film { position: absolute; inset: 0; z-index: 4; display: none; flex-direction: column; gap: 12px; align-items: center; justify-content: center; background: rgba(30,12,12,.55); }
+  .fin-film.vu { display: flex; }
+  .fin-film a, .fin-film button { font: 600 16px Inter, sans-serif; padding: 12px 22px; border-radius: 999px; border: 0; background: #fff; color: var(--vin); text-decoration: none; cursor: pointer; min-width: 230px; text-align: center; }
+  .fin-film a { background: var(--vin); color: #fff; }
+  #fermer { position: absolute; top: 12px; right: 16px; background: none; border: 0; color: #fff; font-size: 34px; cursor: pointer; }
+  section { max-width: 1150px; margin: 0 auto; padding: 40px 20px; }
+  h2 { font: 700 34px "Cormorant Garamond", serif; margin: 0 0 18px; }
+  .etapes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .etape { background: #fffdf9; border: 1px solid var(--ligne); border-radius: 14px; padding: 18px; }
+  .etape b { display: block; font: 700 30px "Cormorant Garamond", serif; color: var(--vin); }
+  .modeles { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 18px; }
+  .modele { background: #fffdf9; border: 1px solid var(--ligne); border-radius: 14px; overflow: hidden; text-decoration: none; color: inherit; transition: transform .15s; }
+  .modele:hover { transform: translateY(-3px); }
+  .modele .vignette { position: relative; width: 100%; aspect-ratio: 9/16; overflow: hidden; }
+  .modele .vignette .mt-racine { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .modele div { padding: 12px 14px; }
+  .modele span { font-size: 13px; color: var(--gris); }
+  .formules { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .formule { background: #fffdf9; border: 1px solid var(--ligne); border-radius: 14px; padding: 20px; }
+  .formule h3 { font: 700 24px "Cormorant Garamond", serif; margin: 0 0 8px; color: var(--vin); }
+  .formule ul { padding-left: 18px; margin: 0; color: var(--gris); }
+  footer { text-align: center; padding: 30px 20px 50px; color: var(--gris); font-size: 14px; }
+  @media (max-width: 800px) { .hero { grid-template-columns: 1fr; } .etapes, .formules { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 520px) { .etapes, .formules { grid-template-columns: 1fr; } .cta.contour { margin: 10px 0 0; } }
+</style>
+</head>
+<body>
+<header><a class="logo" href="./">Invitations <em>vidéo</em></a><a class="studio" href="studio/">Studio ›</a></header>
+<div class="hero">
+  <div>
+    <h1>Votre invitation, <span>en film</span> et en lien à partager</h1>
+    <p>Un film élégant à envoyer sur WhatsApp et Facebook, et une page où chaque famille confirme sa présence, indique le nombre de personnes et ouvre le plan des lieux.</p>
+    <a class="cta" id="devis" href="#contact">Demander un devis</a><a class="cta contour" href="#modeles">Voir les modèles</a>
+  </div>
+  <div class="telephone" id="hero"><button class="voir" id="hero-voir">▶ Regarder le film en entier</button></div>
+</div>
+<section><h2>Comment ça marche</h2>
+  <div class="etapes">
+    <div class="etape"><b>1</b>Vous envoyez le texte de l'invitation, vos photos et la liste des invités.</div>
+    <div class="etape"><b>2</b>Nous montons le film plan par plan sur un fond animé de votre choix.</div>
+    <div class="etape"><b>3</b>Vous validez l'aperçu sur votre téléphone.</div>
+    <div class="etape"><b>4</b>Vous recevez le film, le lien général et un lien personnel par famille.</div>
+  </div>
+</section>
+<section id="modeles"><h2>Modèles à essayer</h2><div class="modeles" id="liste"><p style="color:var(--gris)">Chargement…</p></div></section>
+<section><h2>Formules</h2>
+  <div class="formules">
+    <div class="formule"><h3>Film</h3><ul><li>Film vertical avec musique</li><li>Format WhatsApp, Facebook, TikTok</li></ul></div>
+    <div class="formule"><h3>Film + invitation</h3><ul><li>Tout le film</li><li>Page interactive : confirmation, nombre de personnes, plan, appel</li><li>Lien personnel par famille</li></ul></div>
+    <div class="formule"><h3>Complète</h3><ul><li>Tout le reste</li><li>Gestion des invités et des réponses</li><li>Plan de tables, export Excel</li></ul></div>
+  </div>
+</section>
+<section id="contact"><h2>Contact</h2><p id="contact-texte" style="color:var(--gris)">Écrivez-nous pour un devis.</p></section>
+<footer>Invitations vidéo interactives</footer>
+<div id="boite"><button id="fermer" aria-label="Fermer">×</button><div class="lecteur" id="lecteur"><div class="fin-film" id="fin"><button id="revoir">↺ Revoir le film</button><a id="essayer" target="_blank">Essayer l'invitation interactive</a></div></div><div class="barre-lecture"><div id="progression"></div></div></div>
+<script src="config.js"></script>
+<script src="moteur/moteur.js"></script>
+<script src="moteur/fabrique.js"></script>
+<script src="vitrine/index.js"></script>
+<script>
+(async function () {
+  const $ = s => document.querySelector(s);
+  const c = (window.STUDIO_CONFIG && window.STUDIO_CONFIG.contact) || {};
+  if (c.whatsapp) {
+    const n = c.whatsapp.replace(/\D/g, '').replace(/^0/, '261');
+    const lien = 'https://wa.me/' + n + '?text=' + encodeURIComponent('Bonjour, je souhaite un devis pour une invitation vidéo.');
+    $('#devis').href = lien;
+    $('#contact-texte').innerHTML = `WhatsApp : <a href="${lien}">${c.whatsapp}</a>`;
+  }
+  const charger = src => new Promise(ok => { const sc = document.createElement('script'); sc.src = src; sc.onload = ok; sc.onerror = ok; document.head.appendChild(sc); });
+  let liste = window.VITRINE || [];
+  if (!liste.length) { try { const r = await fetch('vitrine/index.json?v=' + Date.now()); if (r.ok) liste = await r.json(); } catch (e) {} }
+  await Promise.all(liste.map(m => charger('projets/' + encodeURIComponent(m.slug) + '.js?v=' + Date.now())));
+  const projets = window.PROJETS || {};
+  liste = liste.filter(m => projets[m.slug]);
+  const box = $('#liste');
+  if (!liste.length) { box.innerHTML = '<p style="color:var(--gris)">Les premiers modèles arrivent bientôt.</p>'; return; }
+  const familleDe = p => { const l = p.liens || {}; const k = Object.keys(l)[0]; return k ? Object.assign({ code: k }, l[k]) : null; };
+  const clone = p => JSON.parse(JSON.stringify(p));
+
+  box.innerHTML = liste.map((m, i) => `<div class="modele" data-i="${i}"><div class="vignette" id="v${i}"></div><span class="lire">▶</span><div><b>${m.titre}</b><br><span>${m.type || ''}</span></div>
+    <div class="liens"><button data-voir="${i}">▶ Regarder le film</button><a href="i/?p=${encodeURIComponent(m.slug)}&f=DEMO" target="_blank" onclick="event.stopPropagation()">Essayer</a></div></div>`).join('');
+
+  /* Vignettes : la page titre de chaque modèle */
+  liste.forEach(async (m, i) => {
+    const p = clone(projets[m.slug]);
+    const v = new Moteur($('#v' + i), { mode: 'edition', famille: familleDe(p) });
+    v.masquerHTML = true;
+    await v.setProjet(p);
+    const k = Math.max(0, p.plans.findIndex(x => x.role === 'intermediaire'));
+    v.afficherPlan(k, 3);
+  });
+
+  /* Film en boucle sur le téléphone de l'accueil */
+  const p0 = clone(projets[liste[0].slug]);
+  const hero = new Moteur($('#hero'), { mode: 'rendu', famille: familleDe(p0) });
+  hero.masquerHTML = true;
+  await hero.setProjet(p0);
+  hero.onFin = () => hero.jouer(hero.plansFilm(), 0);
+  hero.jouer(hero.plansFilm(), 0);
+  $('#hero').onclick = () => ouvrir(0);
+
+  /* Lecteur plein écran : le film du modèle, du début à la fin */
+  let lecteur = null;
+  async function ouvrir(i) {
+    const m = liste[i]; const p = clone(projets[m.slug]);
+    $('#boite').classList.add('ouvert'); $('#fin').classList.remove('vu'); $('#progression').style.width = '0';
+    $('#essayer').href = 'i/?p=' + encodeURIComponent(m.slug) + '&f=DEMO';
+    if (lecteur) lecteur.detruire();
+    const zone = document.createElement('div'); zone.style.cssText = 'position:absolute;inset:0';
+    $('#lecteur').querySelectorAll('.mt-zone').forEach(e => e.remove());
+    zone.className = 'mt-zone'; $('#lecteur').prepend(zone);
+    lecteur = new Moteur(zone, { mode: 'rendu', famille: familleDe(p) });
+    lecteur.masquerHTML = true;
+    await lecteur.setProjet(p);
+    const seq = lecteur.plansFilm();
+    const total = seq.reduce((s, k) => s + (Number(p.plans[k].duree) || 4), 0);
+    const avant = seq.map((k, n) => seq.slice(0, n).reduce((s, j) => s + (Number(p.plans[j].duree) || 4), 0));
+    lecteur.onTemps = (t, pos) => { $('#progression').style.width = Math.min(100, (avant[pos] + t) / total * 100) + '%'; };
+    lecteur.onFin = () => { $('#progression').style.width = '100%'; $('#fin').classList.add('vu'); };
+    lecteur.jouer(seq, 0);
+    $('#revoir').onclick = () => { $('#fin').classList.remove('vu'); lecteur.jouer(seq, 0); };
+  }
+  function fermer() { $('#boite').classList.remove('ouvert'); if (lecteur) { lecteur.detruire(); lecteur = null; } }
+  $('#fermer').onclick = fermer;
+  $('#boite').onclick = e => { if (e.target.id === 'boite') fermer(); };
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') fermer(); });
+  box.querySelectorAll('.modele').forEach(el => el.onclick = () => ouvrir(Number(el.dataset.i)));
+})();
+</script>
+</body>
+</html>

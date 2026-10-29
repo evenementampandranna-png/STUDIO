@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Studio d'invitations</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Dancing+Script:wght@400;700&family=Great+Vibes&family=Inter:wght@400;500;600;700&family=Montserrat:wght@400;600&family=Parisienne&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="studio.css">
+</head>
+<body>
+<header class="barre">
+  <a class="logo" href="#/"><span class="logo-sceau">S</span><span>Studio <em>d'invitations</em></span></a>
+  <nav>
+    <a href="#/" data-nav="accueil">Événements</a>
+    <a href="#/bibliotheque" data-nav="bibliotheque">Bibliothèque</a>
+    <a href="#/reglages" data-nav="reglages">Réglages</a>
+    <a href="#/guide" data-nav="guide">Mode d'emploi</a>
+  </nav>
+</header>
+<main id="app"></main>
+<div id="modale" class="modale" hidden><div class="modale-boite"><button class="modale-fermer" aria-label="Fermer">×</button><div class="modale-contenu"></div></div></div>
+<div id="toast"></div>
+<script src="../config.js"></script>
+<script src="../moteur/moteur.js"></script>
+<script src="../moteur/fabrique.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+<script src="studio.js"></script>
+</body>
+</html>
