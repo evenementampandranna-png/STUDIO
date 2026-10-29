@@ -644,31 +644,44 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
   function modaleFondIA(E) {
     const p = E.p, k = E.i, pl = p.plans[k];
     const h = pl.fond_ia || {};
-    const zones = (pl.calques || []).filter(c => !c.masque).map(c => E.eng.bbox[c.id]).filter(Boolean);
     const role = pl.role;
     const usage = { ouverture: 'ouverture', confirmation: 'confirmation', remerciement: 'remerciement' }[role] || 'programme';
+    const exclus = new Set(h.exclus || []);
+    const nomRef = () => { const f = tousFonds().find(x => x.src === pl.fond.media); return ((f && f.nom) || 'fond').replace(/[^\w\-]+/g, '-').toLowerCase() + '-reference-plan-' + (k + 1) + '.mp4'; };
+    const lignesCalques = () => (pl.calques || []).filter(c => !c.masque).map(c => {
+      const b = E.eng.bbox[c.id];
+      const editable = c.type === 'texte' || c.type === 'bouton' || c.type === 'compteur';
+      const zone = b ? `${Math.round(b.y)}–${Math.round(b.y + b.h)} % de la hauteur` : 'non visible sur ce lien';
+      return `<div class="calque-ia ${exclus.has(c.id) ? 'off' : ''}" data-id="${c.id}">
+        <input type="checkbox" ${exclus.has(c.id) ? '' : 'checked'} title="Inclure dans le prompt">
+        <span class="badge">${esc(NOMS_TYPE[c.type] || c.type)}</span>
+        ${editable ? `<input type="text" class="ci-texte" value="${esc(c.texte || '')}">` : `<span class="ci-nom">${esc(nomMedia(c.media) || '(photo ou vidéo)')}</span>`}
+        <span class="muet ci-zone">${esc(zone)}</span></div>`;
+    }).join('');
     modale(`<h2>Créer un fond vidéo sur mesure — plan ${k + 1}</h2>
-      <p class="muet">Le studio connaît déjà le thème de l'invitation (couleurs, décor des autres fonds) et la place des textes et boutons de ce plan. Ajoutez votre idée, générez le prompt, envoyez-le, puis importez la vidéo obtenue.</p>
+      <p class="muet">Le prompt part des calques de ce plan et de son fond actuel. Le studio y ajoute le thème de l'invitation (couleurs, décor des autres fonds) et la zone à laisser libre.</p>
       <div class="ia-grille">
         <div class="pile">
-          <p class="ia-etape">1. Votre idée pour ce plan</p>
-          <textarea id="fi-idee" rows="3" style="width:100%" placeholder="Ex. : l'église au petit matin, lumière dorée, quelques roses sur les côtés">${esc(h.idee || '')}</textarea>
+          <p class="ia-etape">1. Les calques de ce plan</p>
+          <p class="muet" style="margin:0">Ce que le nouveau fond doit accueillir. Corrigez un texte ici si besoin, ou décochez un calque à ne pas mentionner. Pour en ajouter ou en déplacer, fermez cette fenêtre et utilisez le panneau du plan.</p>
+          <div id="fi-calques" class="pile">${lignesCalques() || '<p class="muet">Aucun calque sur ce plan.</p>'}</div>
+          <p class="ia-etape" style="margin-top:6px">2. Votre idée <span class="muet" style="font-weight:400">(facultatif)</span></p>
+          <textarea id="fi-idee" rows="2" style="width:100%" placeholder="Ex. : plus de lumière dorée, des bougies sur les côtés…">${esc(h.idee || '')}</textarea>
           <div class="ligne" style="gap:6px">${(IDEES[role] || IDEES.intermediaire).map(t => `<button class="btn petit" data-idee="${esc(t)}">${esc(t)}</button>`).join('')}</div>
           <div class="deux"><label class="champ">Mouvement<select id="fi-mvt">${['calme', 'moyen', 'vivant'].map(m => `<option ${h.mouvement === m ? 'selected' : ''}>${m}</option>`).join('')}</select></label>
             <label class="champ">Durée de la vidéo (s)<input type="number" id="fi-duree" min="5" max="15" value="${h.duree || Math.max(8, Math.ceil(Number(pl.duree) || 8))}"></label></div>
-          <button class="btn plein" id="fi-generer">${h.prompt ? 'Régénérer le prompt' : 'Générer le prompt'}</button>
-          <p class="ia-etape" style="margin-top:6px">2. Copier le prompt et l'image</p>
-          <div class="onglets" style="margin:0"><a href="#" data-cible="ia" class="actif">Pour ChatGPT ou Claude</a><a href="#" data-cible="video">Directement pour Sora, Veo, Kling, Runway</a></div>
-          <textarea class="prompt-zone" id="fi-prompt" readonly></textarea>
-          <div class="ligne"><button class="btn plein" id="fi-copier">Copier le prompt</button><button class="btn" id="fi-image">Télécharger l'image de mise en page</button></div>
-          <p class="muet">ChatGPT peut créer la vidéo s'il a accès à la génération vidéo ; sinon il vous rend un prompt anglais amélioré, à coller dans un générateur de vidéo. Claude écrit le prompt mais ne crée pas de vidéo.</p>
+          <button class="btn plein" id="fi-generer">Régénérer le prompt</button>
         </div>
         <div class="pile">
-          <p class="ia-etape">3. Importer la vidéo obtenue</p>
-          <label class="btn plein" style="align-self:flex-start">Choisir la vidéo<input type="file" id="fi-fichier" accept="video/*" hidden></label>
-          <div id="fi-apercu" class="muet">Vidéo verticale 9:16, de préférence 1080 × 1920, sans texte.</div>
-          <label class="champ">Nom du fond<input type="text" id="fi-nom" value="${esc('Fond plan ' + (k + 1) + ' — ' + (p.fiche.titre || '').slice(0, 30))}"></label>
-          <label class="champ">Usage<select id="fi-usage">${['ouverture', 'titre', 'programme', 'confirmation', 'remerciement'].map(u => `<option ${u === usage ? 'selected' : ''}>${u}</option>`).join('')}</select></label>
+          <p class="ia-etape">3. Copier le prompt et télécharger la vidéo de référence</p>
+          <div class="onglets" style="margin:0"><a href="#" data-cible="ia" class="actif">Pour ChatGPT ou Claude</a><a href="#" data-cible="video">Directement pour Sora, Veo, Kling, Runway</a></div>
+          <textarea class="prompt-zone" id="fi-prompt" readonly></textarea>
+          <div class="ligne"><button class="btn plein" id="fi-copier">Copier le prompt</button><button class="btn plein" id="fi-video">Télécharger la vidéo de fond actuelle</button><button class="btn petit" id="fi-image">ou l'image</button></div>
+          <p class="muet" style="margin:0">Envoyez le prompt avec la vidéo de fond actuelle jointe : l'IA s'en sert comme modèle pour créer la nouvelle vidéo. ChatGPT peut créer la vidéo s'il a accès à la génération vidéo ; sinon il rend un prompt anglais amélioré pour un générateur de vidéo. Claude écrit le prompt mais ne crée pas de vidéo.</p>
+          <p class="ia-etape" style="margin-top:6px">4. Importer la nouvelle vidéo</p>
+          <div class="ligne"><label class="btn plein">Choisir la vidéo<input type="file" id="fi-fichier" accept="video/*" hidden></label><span id="fi-apercu" class="muet">Verticale 9:16, de préférence 1080 × 1920, sans texte.</span></div>
+          <div class="deux"><label class="champ">Nom du fond<input type="text" id="fi-nom" value="${esc('Fond plan ' + (k + 1) + ' — ' + (p.fiche.titre || '').slice(0, 30))}"></label>
+          <label class="champ">Usage<select id="fi-usage">${['ouverture', 'titre', 'programme', 'confirmation', 'remerciement'].map(u => `<option ${u === usage ? 'selected' : ''}>${u}</option>`).join('')}</select></label></div>
           <div class="cases"><label><input type="checkbox" id="fi-autres"> Remplacer aussi dans les autres plans qui utilisent le fond actuel</label></div>
           <button class="btn plein" id="fi-utiliser" disabled>Utiliser ce fond pour le plan ${k + 1}</button>
         </div>
@@ -677,29 +690,45 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       const lire = () => ({ idee: $('#fi-idee', box).value.trim(), mouvement: $('#fi-mvt', box).value, duree: Number($('#fi-duree', box).value) || 8 });
       const generer = () => {
         const o = lire();
-        const texte = Fabrique.promptFond(p, k, Object.assign({ zones, fonds: tousFonds(), cible }, o));
+        const calques = (pl.calques || []).filter(c => !c.masque && !exclus.has(c.id)).map(c => ({ c, b: E.eng.bbox[c.id] }));
+        const texte = Fabrique.promptFond(p, k, Object.assign({ calques, fonds: tousFonds(), cible, reference: nomRef() }, o));
         $('#fi-prompt', box).value = texte;
-        pl.fond_ia = Object.assign({}, o, { prompt: texte, date: new Date().toISOString() });
+        pl.fond_ia = Object.assign({}, pl.fond_ia || {}, o, { exclus: [...exclus], prompt: texte, date: new Date().toISOString() });
         enregistrer(p);
-        $('#fi-generer', box).textContent = 'Régénérer le prompt';
       };
       generer();
+      $$('.calque-ia', box).forEach(l => {
+        const id = l.dataset.id, c = pl.calques.find(x => x.id === id);
+        $('input[type=checkbox]', l).onchange = e => { if (e.target.checked) exclus.delete(id); else exclus.add(id); l.classList.toggle('off', !e.target.checked); generer(); };
+        const t = $('.ci-texte', l);
+        if (t) t.oninput = () => { E.modif(); c.texte = t.value; E.rafraichir(); generer(); };
+      });
       $$('[data-idee]', box).forEach(b => b.onclick = () => { const t = $('#fi-idee', box); t.value = (t.value ? t.value.replace(/[.\s]*$/, '') + '. ' : '') + b.dataset.idee; generer(); });
-      $('#fi-generer', box).onclick = generer;
+      $('#fi-idee', box).oninput = () => { clearTimeout(box._t); box._t = setTimeout(generer, 500); };
+      $('#fi-mvt', box).onchange = generer; $('#fi-duree', box).oninput = generer;
+      $('#fi-generer', box).onclick = () => { generer(); toast('Prompt régénéré'); };
       $$('[data-cible]', box).forEach(a => a.onclick = e => { e.preventDefault(); cible = a.dataset.cible; $$('[data-cible]', box).forEach(x => x.classList.toggle('actif', x === a)); generer(); });
       $('#fi-copier', box).onclick = () => copier($('#fi-prompt', box).value);
+      $('#fi-video', box).onclick = async () => {
+        try {
+          const src = pl.fond.media;
+          let blob = /^idb:/.test(src) ? await IDB.lire(src) : await (await fetch(await resoudre(src))).blob();
+          if (!blob) throw new Error('fichier introuvable');
+          telecharger(nomRef(), blob);
+        } catch (e) { toast('Téléchargement impossible : ' + e.message); }
+      };
       $('#fi-image', box).onclick = () => { try { telecharger(`mise-en-page-plan-${k + 1}.jpg`, dataURLversBlob(E.eng.imageTest())); } catch (e) { toast(e.message); } };
       $('#fi-fichier', box).onchange = e => {
         fichier = e.target.files[0]; if (!fichier) return;
         const u = URL.createObjectURL(fichier);
-        $('#fi-apercu', box).innerHTML = `<video src="${u}" autoplay muted loop playsinline style="width:160px;aspect-ratio:9/16;object-fit:cover;border-radius:10px;box-shadow:var(--ombre)"></video><div>${esc(fichier.name)}</div>`;
+        $('#fi-apercu', box).innerHTML = `<video src="${u}" autoplay muted loop playsinline style="width:90px;aspect-ratio:9/16;object-fit:cover;border-radius:8px;vertical-align:middle"></video> ${esc(fichier.name)}`;
         $('#fi-utiliser', box).disabled = false;
       };
       $('#fi-utiliser', box).onclick = async () => {
         if (!fichier) return;
         const m = await importerFichier(fichier, 'fond');
         const o = lire();
-        Object.assign(m, { nom: $('#fi-nom', box).value.trim() || m.nom, usage: $('#fi-usage', box).value, description: o.idee || 'Fond créé avec l\'IA pour le plan ' + (k + 1), description_en: '', zone_texte: zones.length ? 'voir la mise en page du plan ' + (k + 1) : 'centre', origine: 'ia' });
+        Object.assign(m, { nom: $('#fi-nom', box).value.trim() || m.nom, usage: $('#fi-usage', box).value, description: o.idee || 'Fond créé avec l\'IA pour le plan ' + (k + 1), description_en: '', zone_texte: 'voir la mise en page du plan ' + (k + 1), origine: 'ia' });
         sauverMedias();
         E.modif(true);
         const ancien = pl.fond.media;
@@ -1152,7 +1181,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <p class="muet">Textes variables : {famille}, {places}, {date}, {heure}, {date_limite}, {compte_a_rebours} sont remplacés automatiquement.</p>`)}
       ${etape('3b', 'Fond, photos et animations d\'un plan', `
         <ul><li><b>Fond vidéo</b> (en haut à droite) : choisissez un fond de la bibliothèque, ou <b>Importer un fond</b> directement depuis le plan. Le studio indique combien de plans utilisent déjà ce fond.</li>
-        <li><b>✨ Créer un fond sur mesure (IA)</b> : quand il vous manque un fond, ou qu'un même fond revient trop souvent. Écrivez votre idée (ou cliquez une idée proposée), choisissez le mouvement et la durée, puis <b>Générer le prompt</b>. Le prompt reprend tout seul le thème de l'invitation (couleurs, roses, colonnes…) et la place des textes et boutons du plan, pour que le fond leur laisse de l'espace. Copiez-le avec l'image de mise en page dans ChatGPT (ou directement dans Sora, Veo, Kling, Runway). Importez ensuite la vidéo obtenue : elle remplace le fond du plan et rejoint la bibliothèque. Vous pouvez modifier votre idée et <b>Régénérer le prompt</b> autant de fois que nécessaire.</li>
+        <li><b>✨ Créer un fond sur mesure (IA)</b> : quand il vous manque un fond, ou qu'un même fond revient trop souvent. La fenêtre montre d'abord <b>les calques du plan</b> (textes, boutons, photos) avec leur contenu et leur place : ils sont décrits un par un dans le prompt, pour que le nouveau fond leur laisse de l'espace. Corrigez un texte ou décochez un calque si besoin. Votre idée est <b>facultative</b>. Copiez le prompt, cliquez <b>Télécharger la vidéo de fond actuelle</b> et joignez-la au prompt dans ChatGPT (ou Sora, Veo, Kling, Runway) : l'IA s'en sert comme modèle. Importez ensuite la nouvelle vidéo : elle remplace le fond du plan et rejoint la bibliothèque. Le prompt se régénère à chaque changement.</li>
         <li><b>+ Photo / vidéo</b> : choisissez un fichier sur l'ordinateur ou le téléphone ; il est posé tout de suite sur le plan. Réglez sa taille, sa forme (ronde, arrondie), sa bordure.</li>
         <li><b>Animation</b> d'un texte ou d'une photo : un effet d'<b>entrée</b> (fondu, lettre par lettre, mot par mot, zoom, rebond, flou, glissement…) et un effet de <b>sortie</b>, chacun avec son moment et sa durée. <b>▶ Voir l'animation</b> pour vérifier.</li>
         <li><b>Éviter les chevauchements de textes</b> : remet les textes du plan les uns sous les autres, sans qu'ils se touchent.</li></ul>`)}

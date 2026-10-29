@@ -454,41 +454,50 @@ ${FORMAT}`;
     const srcs = new Set((projet.plans || []).map(p => p.fond && p.fond.media));
     return (fonds || FONDS).filter(f => srcs.has(f.src) && (f.description_en || f.description)).map(f => f.description_en || f.description);
   }
+  const TYPES_EN = { texte: 'text', bouton: 'button', compteur: 'counter with − / + buttons', champ: 'input field', image: 'photo', video: 'video clip' };
+  const TYPES_FR = { texte: 'texte', bouton: 'bouton', compteur: 'compteur − / +', champ: 'champ à remplir', image: 'photo', video: 'vidéo' };
+  const zoneMots = (b, en) => {
+    const v = b.y + b.h / 2, hzt = b.x + b.w / 2;
+    const vert = v < 34 ? (en ? 'upper part' : 'haut') : v > 66 ? (en ? 'lower part' : 'bas') : (en ? 'middle' : 'milieu');
+    const hor = hzt < 38 ? (en ? 'left' : 'gauche') : hzt > 62 ? (en ? 'right' : 'droite') : (en ? 'centre' : 'centre');
+    return en ? `${vert}, ${hor} (from ${Math.round(b.y)}% to ${Math.round(b.y + b.h)}% of the height, ${Math.round(b.x)}% to ${Math.round(b.x + b.w)}% of the width)`
+      : `${vert}, ${hor} (de ${Math.round(b.y)} % à ${Math.round(b.y + b.h)} % de la hauteur, de ${Math.round(b.x)} % à ${Math.round(b.x + b.w)} % de la largeur)`;
+  };
   function promptFond(projet, index, o) {
     o = o || {};
     const p = projet.plans[index];
     const f = projet.fiche || {};
-    const zones = o.zones || [];
-    const occupe = zones.length ? { haut: Math.round(Math.min(...zones.map(z => z.y))), bas: Math.round(Math.max(...zones.map(z => z.y + z.h))), gauche: Math.round(Math.min(...zones.map(z => z.x))), droite: Math.round(Math.max(...zones.map(z => z.x + z.w))) } : null;
-    const textes = (p.calques || []).filter(c => c.type === 'texte').map(c => c.texte).join(' / ');
-    const boutons = (p.calques || []).filter(c => c.type === 'bouton' || c.type === 'compteur').length;
-    const medias = (p.calques || []).filter(c => c.type === 'image' || c.type === 'video').length;
+    // calques retenus, avec leur cadre mesuré par le moteur
+    const calques = (o.calques || []).filter(x => x.c && x.b);
+    const z = calques.map(x => x.b);
+    const occupe = z.length ? { haut: Math.round(Math.min(...z.map(b => b.y))), bas: Math.round(Math.max(...z.map(b => b.y + b.h))), gauche: Math.round(Math.min(...z.map(b => b.x))), droite: Math.round(Math.max(...z.map(b => b.x + b.w))) } : null;
     const pal = palette(projet).join(', ');
     const decor = decorDe(projet, o.fonds);
     const duree = o.duree || Math.max(8, Math.ceil(Number(p.duree) || 8));
     const mouvement = { calme: 'very slow, subtle, almost still motion', moyen: 'gentle, graceful motion', vivant: 'lively but elegant motion' }[o.mouvement || 'calme'];
-    const zoneTxt = occupe ? `Keep a clean, soft, low-detail empty area from ${Math.max(0, occupe.haut - 3)}% to ${Math.min(100, occupe.bas + 3)}% of the frame height and from ${Math.max(0, occupe.gauche - 3)}% to ${Math.min(100, occupe.droite + 3)}% of the width: text${boutons ? ', buttons' : ''}${medias ? ' and photos' : ''} will be added there later.` : 'Keep the central area (20% to 75% of the height) clean, soft and empty: text will be added there later.';
-    const video = `Vertical 9:16 video background, 1080x1920, ${duree} seconds, seamless loop (the last frame matches the first).
+    const ref = o.reference;
+    const lignesEn = calques.map((x, i) => `  ${i + 1}. ${TYPES_EN[x.c.type] || x.c.type}${x.c.texte ? ` "${String(x.c.texte).replace(/\s*\n\s*/g, ' ')}"` : ''}${x.c.police ? `, ${/Vibes|Parisienne|Dancing/.test(x.c.police) ? 'elegant script' : 'classic serif'} font` : ''}${x.c.couleur ? ` in ${x.c.couleur}` : ''} — ${zoneMots(x.b, true)}`).join('\n');
+    const lignesFr = calques.map((x, i) => `  ${i + 1}. ${TYPES_FR[x.c.type] || x.c.type}${x.c.texte ? ` « ${String(x.c.texte).replace(/\s*\n\s*/g, ' ')} »` : ''}${x.c.police ? ` (police ${x.c.police}${x.c.couleur ? ', couleur ' + x.c.couleur : ''})` : ''} — ${zoneMots(x.b, false)}`).join('\n');
+    const zoneTxt = occupe ? `Keep a clean, soft, low-detail empty area from ${Math.max(0, occupe.haut - 3)}% to ${Math.min(100, occupe.bas + 3)}% of the frame height and from ${Math.max(0, occupe.gauche - 3)}% to ${Math.min(100, occupe.droite + 3)}% of the width, so the layers below stay perfectly readable.` : 'Keep the central area (20% to 75% of the height) clean, soft and empty.';
+    const video = `${ref ? `Use the attached reference video "${ref}" (the current background of this scene) as the base: keep its visual style, palette, textures and decoration, and create a new variation adapted to the layers listed below.\n` : ''}Vertical 9:16 video background, 1080x1920, ${duree} seconds, seamless loop (the last frame matches the first).
 Event: ${f.type || 'celebration'} — "${f.titre || ''}". This is the ${NOMS_ROLE[p.role] || 'scene'} (${index + 1} of ${projet.plans.length}) of an animated digital invitation.
-Scene idea: ${o.idee ? o.idee : 'an elegant decorative background in the same style as the other scenes.'}
-Visual identity to match exactly: ${decor.length ? decor.join('; ') : 'romantic vintage style, ivory paper, burgundy roses, soft gold accents'}. Color palette: warm ivory and cream background, ${pal} accents, soft antique gold. Romantic, refined, luxurious, soft natural light, delicate paper and floral textures, painterly illustration quality.
-Composition: decoration placed on the edges and corners only. ${zoneTxt}
-Motion: ${mouvement}; static camera${o.mouvement === 'vivant' ? ' or very slow push-in' : ''}; elements such as petals, leaves, light, birds or water move softly in the decoration only.
+Layers that will be placed on top of this background later (do NOT draw them, only leave room for them):
+${lignesEn || '  (none)'}
+${o.idee ? `Extra wish for this scene: ${o.idee}\n` : ''}Visual identity to match exactly: ${decor.length ? decor.join('; ') : 'romantic vintage style, ivory paper, burgundy roses, soft gold accents'}. Color palette: warm ivory and cream background, ${pal} accents, soft antique gold. Romantic, refined, luxurious, soft natural light, delicate paper and floral textures, painterly illustration quality. The background must make the layers stand out (good contrast behind the text).
+Composition: decoration on the edges and corners only. ${zoneTxt}
+Motion: ${mouvement}; static camera${o.mouvement === 'vivant' ? ' or very slow push-in' : ''}; petals, leaves, light, birds or water move softly in the decoration only, never behind the text areas.
 Strictly no text, no letters, no numbers, no logo, no watermark, no people, no faces. High detail, no flicker, no cuts.`;
     if (o.cible === 'video') return video;
     return `Tu es directeur artistique et expert en génération de vidéos par IA (Sora, Veo, Kling, Runway, Hailuo, Pika).
-J'ai besoin d'un fond vidéo vierge (sans texte) pour un plan d'une invitation vidéo verticale. Le studio y ajoutera ensuite les textes et les boutons.
-
-Plan ${index + 1} / ${projet.plans.length} — rôle : ${p.role}.
-Ce que je veux pour ce plan : ${o.idee || '(rien de plus : reste dans le style des autres plans)'}
-Textes qui seront posés sur ce fond : ${textes || 'aucun'}
-Boutons ou compteurs posés sur ce fond : ${boutons} ; photos ou vidéos posées : ${medias}.
-Zone à laisser libre : ${occupe ? `de ${occupe.haut} % à ${occupe.bas} % de la hauteur, de ${occupe.gauche} % à ${occupe.droite} % de la largeur` : 'le centre de l\'image'}.
-Style des autres plans (à respecter) : ${decor.join(' ; ') || 'roses bordeaux, papier ivoire, touches dorées'}. Couleurs : ${pal}, ivoire, or ancien.
-L'image jointe montre la mise en page actuelle du plan (textes et boutons sur l'ancien fond).
+J'ai besoin d'un nouveau fond vidéo vierge (sans texte) pour le plan ${index + 1} / ${projet.plans.length} (${p.role}) d'une invitation vidéo verticale « ${f.titre || ''} ». Le studio posera ensuite les calques ci-dessous par-dessus.
+${ref ? `\nVidéo jointe : « ${ref} » = le fond actuel de ce plan. Sers-t'en comme référence : garde son style, ses couleurs, ses matières et son décor, et fais-en une nouvelle version adaptée aux calques.\n` : ''}
+Calques qui seront posés sur ce fond (ne pas les dessiner, seulement leur laisser la place et un fond lisible derrière eux) :
+${lignesFr || '  (aucun)'}
+Zone à laisser calme et dégagée : ${occupe ? `de ${occupe.haut} % à ${occupe.bas} % de la hauteur, de ${occupe.gauche} % à ${occupe.droite} % de la largeur` : 'le centre de l\'image'}.
+${o.idee ? `Souhait particulier pour ce plan : ${o.idee}\n` : ''}Style commun à toute l'invitation (à respecter) : ${decor.join(' ; ') || 'roses bordeaux, papier ivoire, touches dorées'}. Couleurs : ${pal}, ivoire, or ancien.
 
 1. Si tu sais générer des vidéos, génère directement la vidéo : verticale 9:16, ${duree} secondes, en boucle parfaite, mouvement ${o.mouvement || 'calme'}, aucune lettre ni texte, aucun personnage.
-2. Sinon, écris-moi le meilleur prompt en anglais pour un générateur de vidéo, en partant de celui-ci et en l'améliorant :
+2. Sinon, écris-moi le meilleur prompt en anglais pour un générateur de vidéo (qui accepte la vidéo jointe comme référence), en partant de celui-ci et en l'améliorant :
 
 ${video}`;
   }
