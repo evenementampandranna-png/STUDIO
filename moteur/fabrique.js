@@ -507,5 +507,37 @@ ${o.idee ? `Souhait particulier pour ce plan : ${o.idee}\n` : ''}Style commun à
 ${video}`;
   }
 
-  global.Fabrique = { promptFond, nettoyerJSON, lireJSON, FONDS, analyserTexte, genererPlans, nouveauProjet, validerPlan, prompt0, prompt1, prompt3, prompt4, LIB, STYLE, uid };
+  /* ---------- 6. Prompt : recolorer une vidéo dans la palette d'une autre (étalonnage) ---------- */
+  function promptEtalonnage(o) {
+    o = o || {};
+    const v1 = o.video1 || '[nom-video-1.mp4]', v2 = o.video2 || '[nom-video-2.mp4]';
+    const pal = (o.palette || []).length ? `\nPour t'aider, voici la palette déjà mesurée par le studio sur la vidéo 1 (à vérifier et compléter) :
+Rôle | Code hex | Part de l'image
+${o.palette.map(x => `${x.role} | ${x.hex} | ${x.part} %`).join('\n')}\n` : '';
+    const zone = o.zone ? `La zone réservée au texte (de ${o.zone.haut} % à ${o.zone.bas} % de la hauteur) doit rester claire, calme et lisible.` : 'La zone centrale réservée au texte doit rester claire, calme et lisible.';
+    return `Tu es directeur artistique et étalonneur vidéo (color grading).
+Je joins deux vidéos :
+- VIDÉO 1 (référence couleur) : « ${v1} »
+- VIDÉO 2 (à modifier) : « ${v2} »
+
+Étape 1 — Analyse de la palette de la vidéo 1
+Analyse la vidéo 1 et extrais sa palette de couleurs réelle (mesurée sur les images, pas devinée). Présente-la sous forme de tableau :
+Rôle de la couleur (fond, ombres, élément principal, feuillage, contours, accents…) | Nom de la couleur | Code hex approximatif | Part de l'image en %.
+Décris en 2–3 phrases l'ambiance de cette palette (chaude/froide, saturée ou non, contraste).
+${pal}
+Étape 2 — Recoloration de la vidéo 2
+Recolore la vidéo 2 pour qu'elle adopte exactement la palette de la vidéo 1, élément par élément :
+- le fond de la vidéo 2 prend la couleur du fond de la vidéo 1 ;
+- les éléments principaux (ex. fleurs) prennent la couleur d'accent principale de la vidéo 1 ;
+- le feuillage / éléments secondaires prennent la couleur secondaire ;
+- les ombres, contours et filets prennent les tons sombres de la palette.
+${o.correspondances ? `Correspondances particulières demandées : ${o.correspondances}\n` : ''}
+À conserver strictement de la vidéo 2 : composition, cadrage, mouvement, durée, résolution, son. Ne rien ajouter ni supprimer, seulement changer les couleurs.
+Garder les dégradés doux, pas de taches, pas de scintillement d'une image à l'autre.
+${zone}
+
+Livrable : la vidéo 2 recolorée en MP4 (H.264), ${o.format || 'même format que l\'original'}, plus un court récapitulatif des correspondances de couleurs appliquées (avant → après) et des éventuels défauts restants.`;
+  }
+
+  global.Fabrique = { promptEtalonnage, promptFond, nettoyerJSON, lireJSON, FONDS, analyserTexte, genererPlans, nouveauProjet, validerPlan, prompt0, prompt1, prompt3, prompt4, LIB, STYLE, uid };
 })(window);
