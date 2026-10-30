@@ -340,6 +340,7 @@
       const vars = variablesDe(this.projet, this.famille, this.form);
       (p.calques || []).forEach(c => {
         if (c.masque || (c.condition === 'famille' && !this.famille) || (c.condition === 'general' && this.famille)) { if (mesurer) delete this.bbox[c.id]; return; }
+        if (c._edition && c.type === 'texte') return;   // en cours d'écriture dans l'éditeur : garder le cadre, ne pas dessiner
         if (TYPES_HTML.includes(c.type)) { if (mesurer) this._bboxHTML(c); return; }
         this._dessinerCalque(c, t, p, vars, alpha, mesurer);
       });

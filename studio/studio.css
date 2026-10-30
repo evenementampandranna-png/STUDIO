@@ -180,3 +180,26 @@ details.bloc:not([open]) > summary { margin-bottom: 0; }
 .depart .cases { align-items: flex-start; gap: 8px; font-size: 13.5px; flex-wrap: nowrap; cursor: pointer; }
 .depart .cases input { margin-top: 3px; }
 .pastille { display: inline-block; width: 18px; height: 18px; border-radius: 50%; border: 1px solid rgba(0,0,0,.15); margin: 0 2px -4px; }
+
+/* Édition directe sur l'aperçu */
+.apercu-cadre:focus { outline: none; }
+.poignee .h { position: absolute; width: 11px; height: 11px; background: #fff; border: 1.5px solid #c33a4c; border-radius: 3px; z-index: 2; }
+.poignee .h-nw { left: -7px; top: -7px; cursor: nwse-resize; } .poignee .h-se { right: -7px; bottom: -7px; cursor: nwse-resize; }
+.poignee .h-ne { right: -7px; top: -7px; cursor: nesw-resize; } .poignee .h-sw { left: -7px; bottom: -7px; cursor: nesw-resize; }
+.poignee .h-e { right: -7px; top: calc(50% - 6px); cursor: ew-resize; border-radius: 6px; height: 14px; } .poignee .h-w { left: -7px; top: calc(50% - 6px); cursor: ew-resize; border-radius: 6px; height: 14px; }
+.poignee .h-n { top: -7px; left: calc(50% - 6px); cursor: ns-resize; border-radius: 6px; width: 14px; } .poignee .h-s { bottom: -7px; left: calc(50% - 6px); cursor: ns-resize; border-radius: 6px; width: 14px; }
+.poignees.aimant::after { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; border-left: 1px dashed #c33a4c; pointer-events: none; }
+textarea.edition-directe { position: absolute; z-index: 8; resize: none; overflow: hidden; padding: 2px 4px; margin: 0; box-sizing: border-box; border: 1.5px dashed #c33a4c; border-radius: 4px; background: rgba(255,255,255,.55); outline: none; }
+.barre-sel { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; justify-content: center; min-height: 38px; background: #fff; border: 1px solid var(--ligne); border-radius: 12px; padding: 4px 6px; max-width: 100%; box-shadow: var(--ombre); }
+.barre-sel .btn.icone { width: 28px; height: 28px; }
+.barre-sel .type-sel { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--vin); margin-right: 4px; }
+.barre-sel .btn.on { background: #f1e5d6; border-color: var(--vin); }
+.barre-sel input[type=color] { width: 30px; height: 30px; padding: 1px; }
+.barre-sel .sep { width: 1px; height: 22px; background: var(--ligne); margin: 0 4px; }
+.astuce { font-size: 11.5px; color: var(--gris); text-align: center; max-width: 520px; line-height: 1.4; }
+.col-apercu { position: sticky; }
+.menu-ctx { position: absolute; z-index: 40; background: #fff; border: 1px solid var(--ligne); border-radius: 10px; box-shadow: 0 10px 30px rgba(40,20,20,.18); padding: 5px; display: flex; flex-direction: column; min-width: 210px; }
+.menu-ctx button { border: 0; background: none; text-align: left; padding: 7px 10px; border-radius: 6px; cursor: pointer; font-size: 13.5px; white-space: pre; }
+.menu-ctx button:hover:not(:disabled) { background: #f6eee4; color: var(--vin); }
+.menu-ctx button:disabled { color: #bbb; cursor: default; }
+@media (max-width: 760px) { .astuce { display: none; } .poignee .h { width: 16px; height: 16px; } }

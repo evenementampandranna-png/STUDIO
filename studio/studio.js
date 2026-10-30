@@ -84,7 +84,9 @@
 
   /* ================= Routeur ================= */
   let moteurCourant = null;
-  function nettoyer() { if (moteurCourant) { moteurCourant.detruire(); moteurCourant = null; } if (boucleUI) { cancelAnimationFrame(boucleUI); boucleUI = null; } }
+  let nettoyeurs = [];
+  function nettoyer() { if (moteurCourant) { moteurCourant.detruire(); moteurCourant = null; } if (boucleUI) { cancelAnimationFrame(boucleUI); boucleUI = null; } nettoyeurs.forEach(f => f()); nettoyeurs = []; }
+  function ecouter(cible, ev, fn) { cible.addEventListener(ev, fn); nettoyeurs.push(() => cible.removeEventListener(ev, fn)); }
   function route() {
     nettoyer();
     const h = location.hash.replace(/^#\/?/, '').split('/');
@@ -300,7 +302,9 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     $('#onglet').innerHTML = `<div class="editeur">
         <div class="col-plans" id="col-plans"></div>
         <div class="col-apercu">
-          <div class="apercu-cadre" id="cadre"><div id="scene"></div><div class="poignees" id="poignees"></div></div>
+          <div class="barre-sel" id="barre-sel"></div>
+          <div class="apercu-cadre" id="cadre" tabindex="0"><div id="scene"></div><div class="poignees" id="poignees"></div></div>
+          <div class="astuce">Double-clic : écrire dans le texte · Coins : agrandir · Côtés : élargir · Ctrl+C / Ctrl+V : copier-coller (aussi entre plans) · Ctrl+D : dupliquer · Suppr : supprimer · Flèches : déplacer · Clic droit : menu</div>
           <div class="temps"><span id="t-aff">0,0 s</span><input type="range" id="t-curseur" min="0" max="6" step="0.05" value="0"><span id="t-dur"></span></div>
           <div class="commandes">
             <button class="btn petit" id="jouer-plan">▶ Plan</button><button class="btn petit" id="jouer-tout">▶ Toute l'invitation</button><button class="btn petit" id="stop">■</button>
@@ -353,40 +357,245 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     $('#img-test').onclick = () => { try { telecharger(`plan-${E.i + 1}.jpg`, dataURLversBlob(eng.imageTest())); } catch (e) { toast(e.message); } };
     $('#finaliser').onclick = () => modaleFinaliser(E);
 
-    // Poignées de déplacement
+    // ===== Édition directe sur l'aperçu (sélection, déplacement, poignées, double-clic, copier-coller) =====
     const zone = $('#poignees');
-    let drag = null;
+    const cadre = $('#cadre');
+    let drag = null, editeur = null;
+    const POIGNEES = { texte: ['nw', 'ne', 'sw', 'se', 'e', 'w'], bouton: ['nw', 'ne', 'sw', 'se', 'e', 'w'], compteur: ['e', 'w'], champ: ['e', 'w'], image: ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'], video: ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] };
+    function calqueSel() { return (plan().calques || []).find(x => x.id === E.sel); }
     function rendrePoignees() {
-      if (eng.lecture) { zone.innerHTML = ''; return; }
+      if (eng.lecture) { if (zone._html) { zone.innerHTML = ''; zone._html = ''; } return; }
       const pl = plan();
-      const html = (pl.calques || []).filter(c => eng.bbox[c.id] && !c.masque).map(c => {
-        const b = eng.bbox[c.id];
-        return `<div class="poignee ${E.sel === c.id ? 'actif' : ''}" data-id="${c.id}" style="left:${b.x}%;top:${b.y}%;width:${b.w}%;height:${b.h}%"><span class="nom">${esc(NOMS_TYPE[c.type])}</span></div>`;
+      const html = (pl.calques || []).filter(c => eng.bbox[c.id] && !c.masque && !c._edition).map(c => {
+        const b = eng.bbox[c.id], actif = E.sel === c.id;
+        const hs = actif ? (POIGNEES[c.type] || []).map(h => `<i class="h h-${h}" data-h="${h}"></i>`).join('') : '';
+        return `<div class="poignee ${actif ? 'actif' : ''}" data-id="${c.id}" style="left:${b.x}%;top:${b.y}%;width:${b.w}%;height:${b.h}%"><span class="nom">${esc(NOMS_TYPE[c.type])}</span>${hs}</div>`;
       }).join('');
       if (zone._html !== html) { zone.innerHTML = html; zone._html = html; }
     }
     function tick() { rendrePoignees(); boucleUI = requestAnimationFrame(tick); }
     boucleUI = requestAnimationFrame(tick);
+    // calque sous le pointeur (le plus haut d'abord), par coordonnées : robuste aux redessins
+    function calqueA(e) {
+      const r = zone.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * 100, y = (e.clientY - r.top) / r.height * 100;
+      const cs = (plan().calques || []).filter(c => eng.bbox[c.id] && !c.masque);
+      for (let i = cs.length - 1; i >= 0; i--) { const b = eng.bbox[cs[i].id]; if (x >= b.x - 0.8 && x <= b.x + b.w + 0.8 && y >= b.y - 0.8 && y <= b.y + b.h + 0.8) return cs[i]; }
+      return null;
+    }
+    function choisir(id) { if (E.sel !== id) { E.sel = id; rendreReglages(); zone._html = ''; } }
     zone.addEventListener('pointerdown', e => {
-      const el = e.target.closest('.poignee');
-      if (!el) { E.sel = null; rendreReglages(); zone._html = ''; return; }
-      const c = plan().calques.find(x => x.id === el.dataset.id);
-      E.sel = c.id; rendreReglages(); zone._html = '';
+      if (e.button === 2) return;
+      fermerMenu();
+      if (editeur) terminerEdition();
+      cadre.focus({ preventScroll: true });
       const r = zone.getBoundingClientRect();
-      drag = { c, x0: e.clientX, y0: e.clientY, cx: Number(c.x), cy: Number(c.y), w: r.width, h: r.height, bouge: false };
+      const h = e.target.closest('.h');
+      if (h && calqueSel()) {
+        const c = calqueSel(), b = eng.bbox[c.id];
+        drag = { mode: 'taille', h: h.dataset.h, c, x0: e.clientX, y0: e.clientY, w: r.width, hz: r.height, b: Object.assign({}, b), v: { largeur: Number(c.largeur) || 60, taille: Number(c.taille) || 4, hauteur: Number(c.hauteur) || 22, x: Number(c.x), y: Number(c.y) }, bouge: false };
+        zone.setPointerCapture(e.pointerId); e.preventDefault(); return;
+      }
+      const c = calqueA(e);
+      if (!c) { choisir(null); return; }
+      choisir(c.id);
+      drag = { mode: 'deplacer', c, x0: e.clientX, y0: e.clientY, cx: Number(c.x), cy: Number(c.y), w: r.width, h: r.height, bouge: false };
       zone.setPointerCapture(e.pointerId);
     });
     zone.addEventListener('pointermove', e => {
       if (!drag) return;
-      const dx = (e.clientX - drag.x0) / drag.w * 100, dy = (e.clientY - drag.y0) / drag.h * 100;
-      if (!drag.bouge && Math.abs(dx) + Math.abs(dy) < 0.4) return;
+      const dxp = e.clientX - drag.x0, dyp = e.clientY - drag.y0;
+      if (!drag.bouge && Math.abs(dxp) + Math.abs(dyp) < 3) return;
       if (!drag.bouge) { snapshot(); drag.bouge = true; }
-      drag.c.x = Math.round(Math.max(0, Math.min(100, drag.cx + dx)) * 10) / 10;
-      drag.c.y = Math.round(Math.max(0, Math.min(100, drag.cy + dy)) * 10) / 10;
-      if (I.TYPES_HTML.includes(drag.c.type)) E.rafraichir();
-      const ix = $('#cx'), iy = $('#cy'); if (ix) ix.value = drag.c.x; if (iy) iy.value = drag.c.y;
+      const c = drag.c;
+      if (drag.mode === 'deplacer') {
+        let nx = drag.cx + dxp / drag.w * 100, ny = drag.cy + dyp / drag.h * 100;
+        // aimant au centre horizontal
+        if (Math.abs(nx - 50) < 1.2 && !e.shiftKey) nx = 50;
+        c.x = Math.round(Math.max(0, Math.min(100, nx)) * 10) / 10;
+        c.y = Math.round(Math.max(0, Math.min(100, ny)) * 10) / 10;
+        zone.classList.toggle('aimant', c.x === 50);
+      } else {
+        const H = drag.h, v = drag.v, b = drag.b;
+        const dx = dxp / drag.w * 100, dy = dyp / drag.hz * 100;
+        const sx = H.includes('e') ? 1 : H.includes('w') ? -1 : 0, sy = H.includes('s') ? 1 : H.includes('n') ? -1 : 0;
+        const coin = sx && sy;
+        if (coin) {
+          // agrandir proportionnellement depuis le centre
+          const f = Math.max(0.2, Math.min(5, (b.w + 2 * sx * dx) / b.w));
+          if (c.type === 'image' || c.type === 'video') { c.largeur = Math.round(Math.min(100, v.largeur * f) * 10) / 10; c.hauteur = Math.round(Math.min(100, v.hauteur * f) * 10) / 10; }
+          else { c.taille = Math.round(Math.max(1, Math.min(15, v.taille * f)) * 10) / 10; c.largeur = Math.round(Math.max(8, Math.min(100, v.largeur * f)) * 10) / 10; }
+        } else if (sx) {
+          c.largeur = Math.round(Math.max(8, Math.min(100, v.largeur + 2 * sx * dx)) * 10) / 10;
+        } else if (sy) {
+          c.hauteur = Math.round(Math.max(4, Math.min(100, v.hauteur + 2 * sy * dy)) * 10) / 10;
+        }
+      }
+      if (I.TYPES_HTML.includes(c.type)) E.rafraichir();
+      majChamps(c);
     });
-    zone.addEventListener('pointerup', () => { if (drag && drag.bouge) enregistrer(p); drag = null; });
+    zone.addEventListener('pointerup', () => { if (drag && drag.bouge) { enregistrer(p); if (drag.mode === 'taille') rendreReglages(); } drag = null; zone.classList.remove('aimant'); });
+    function majChamps(c) { ['x', 'y', 'largeur', 'taille', 'hauteur'].forEach(k => { const i = $(`#props [data-k="${k}"]`); if (i && document.activeElement !== i) i.value = c[k]; }); }
+
+    // Double-clic : écrire directement dans le texte
+    zone.addEventListener('dblclick', e => {
+      const c = calqueA(e);
+      if (c && (c.type === 'texte' || c.type === 'bouton' || c.type === 'compteur')) { e.preventDefault(); editer(c); }
+      else if (c && (c.type === 'image' || c.type === 'video')) { const inp = $('#props [data-remplacer]'); if (inp) inp.click(); }
+    });
+    function editer(c) {
+      if (editeur) terminerEdition();
+      choisir(c.id);
+      const b = eng.bbox[c.id]; if (!b) return;
+      snapshot();
+      const hz = cadre.clientHeight;
+      const ta = document.createElement('textarea');
+      ta.className = 'edition-directe';
+      ta.value = c.texte || '';
+      const texte = c.type === 'texte';
+      const taillePx = (Number(c.taille) || (texte ? 4 : 2.4)) / 100 * hz;
+      Object.assign(ta.style, {
+        left: (texte ? b.x : b.x) + '%', top: b.y + '%', width: b.w + '%', minHeight: Math.max(b.h, 4) + '%',
+        fontFamily: `"${c.police || 'Cormorant Garamond'}", serif`, fontSize: taillePx + 'px', lineHeight: String(Number(c.interligne) || 1.25),
+        color: texte ? (c.couleur || '#7a1f2b') : '#2b2222', textAlign: c.align || 'center', fontWeight: c.gras || !texte ? '700' : '400', fontStyle: c.italique ? 'italic' : 'normal',
+        textTransform: c.majuscules ? 'uppercase' : 'none'
+      });
+      cadre.appendChild(ta);
+      c._edition = true;
+      editeur = { c, ta };
+      const ajuster = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; };
+      ta.addEventListener('input', () => { c.texte = ta.value; ajuster(); const l = $(`.calque-ligne[data-id="${c.id}"] .t`); if (l) l.textContent = ta.value; const t2 = $('#props [data-k="texte"]'); if (t2) t2.value = ta.value; enregistrer(p); });
+      ta.addEventListener('keydown', ev => { ev.stopPropagation(); if (ev.key === 'Escape' || (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey || !texte))) { ev.preventDefault(); terminerEdition(); } });
+      ta.addEventListener('blur', () => setTimeout(() => { if (editeur && editeur.ta === ta) terminerEdition(); }, 50));
+      ajuster(); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+      E.rafraichir();
+    }
+    function terminerEdition() {
+      if (!editeur) return;
+      const { c, ta } = editeur; editeur = null;
+      delete c._edition; ta.remove();
+      enregistrer(p); E.rafraichir(); rendrePlans(); zone._html = '';
+    }
+    E.editer = editer;
+
+    // Presse-papiers : copier, coller, dupliquer (aussi entre plans et entre événements)
+    const MARQUE = '[[calque-studio]]';
+    function copierCalque(c, couper) {
+      if (!c) return;
+      const json = JSON.stringify(c, (k, v) => k === '_edition' ? undefined : v);
+      Stock.ecrire('studio.presse', json);
+      try { navigator.clipboard && navigator.clipboard.writeText(MARQUE + json).catch(() => {}); } catch (e) {}
+      if (couper) supprimerCalque(c); else toast('Calque copié');
+    }
+    function collerCalque(json) {
+      let c;
+      try { c = JSON.parse(json || Stock.lire('studio.presse', null)); if (typeof c === 'string') c = JSON.parse(c); } catch (e) { c = null; }
+      if (!c || !c.type) return toast('Rien à coller : copiez d\'abord un calque (Ctrl+C)');
+      E.modif(true);
+      c.id = uid();
+      const memePlan = plan().calques.some(x => Math.abs(Number(x.x) - Number(c.x)) < 0.5 && Math.abs(Number(x.y) - Number(c.y)) < 0.5);
+      if (memePlan) { c.x = Math.min(95, Number(c.x) + 2); c.y = Math.min(95, Number(c.y) + 2); }
+      plan().calques.push(c); E.sel = c.id;
+      eng.precharger().then(() => { E.rafraichir(); rendreReglages(); rendrePlans(); });
+      toast('Calque collé');
+    }
+    function dupliquerCalque(c) { if (!c) return; const d = JSON.parse(JSON.stringify(c)); delete d._edition; E.modif(true); d.id = uid(); d.x = Math.min(95, Number(d.x) + 2); d.y = Math.min(95, Number(d.y) + 2); plan().calques.push(d); E.sel = d.id; E.rafraichir(); rendreReglages(); rendrePlans(); }
+    function supprimerCalque(c) { if (!c) return; E.modif(true); const pl = plan(); pl.calques = pl.calques.filter(x => x.id !== c.id); E.sel = null; E.rafraichir(); rendreReglages(); rendrePlans(); }
+    function ordreCalque(c, sens) { if (!c) return; const pl = plan(); const k = pl.calques.indexOf(c); E.modif(true); pl.calques.splice(k, 1); if (sens === 'avant') pl.calques.push(c); else pl.calques.unshift(c); E.rafraichir(); rendreReglages(); }
+    E.copierCalque = copierCalque; E.collerCalque = collerCalque; E.dupliquerCalque = dupliquerCalque; E.supprimerCalque = supprimerCalque; E.ordreCalque = ordreCalque;
+
+    const dansChamp = el => el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable);
+    ecouter(document, 'keydown', e => {
+      if (!$('#cadre') || dansChamp(document.activeElement) || !$('#modale').hidden) return;
+      const c = calqueSel(), mod = e.ctrlKey || e.metaKey;
+      if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); (e.shiftKey ? $('#refaire') : $('#annuler')).click(); return; }
+      if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); $('#refaire').click(); return; }
+      if (mod && e.key.toLowerCase() === 'd' && c) { e.preventDefault(); dupliquerCalque(c); return; }
+      if (!c) return;
+      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); supprimerCalque(c); return; }
+      if (e.key === 'Enter' && (c.type === 'texte' || c.type === 'bouton' || c.type === 'compteur')) { e.preventDefault(); editer(c); return; }
+      if (e.key === 'Escape') { choisir(null); return; }
+      const pas = e.shiftKey ? 2 : 0.5;
+      const dep = { ArrowLeft: [-pas, 0], ArrowRight: [pas, 0], ArrowUp: [0, -pas], ArrowDown: [0, pas] }[e.key];
+      if (dep) { e.preventDefault(); E.modif(); c.x = Math.round(Math.max(0, Math.min(100, Number(c.x) + dep[0])) * 10) / 10; c.y = Math.round(Math.max(0, Math.min(100, Number(c.y) + dep[1])) * 10) / 10; if (I.TYPES_HTML.includes(c.type)) E.rafraichir(); majChamps(c); }
+    });
+    ecouter(document, 'copy', e => { if (dansChamp(document.activeElement) || !$('#modale').hidden) return; const c = calqueSel(); if (!c) return; e.preventDefault(); const json = JSON.stringify(c, (k, v) => k === '_edition' ? undefined : v); e.clipboardData.setData('text/plain', MARQUE + json); Stock.ecrire('studio.presse', json); toast('Calque copié'); });
+    ecouter(document, 'cut', e => { if (dansChamp(document.activeElement) || !$('#modale').hidden) return; const c = calqueSel(); if (!c) return; e.preventDefault(); const json = JSON.stringify(c, (k, v) => k === '_edition' ? undefined : v); e.clipboardData.setData('text/plain', MARQUE + json); Stock.ecrire('studio.presse', json); supprimerCalque(c); });
+    ecouter(document, 'paste', async e => {
+      if (dansChamp(document.activeElement) || !$('#modale').hidden || !$('#cadre')) return;
+      const dt = e.clipboardData; if (!dt) return;
+      const fichierColle = [...(dt.files || [])].find(f => /^(image|video)\//.test(f.type));
+      if (fichierColle) { e.preventDefault(); const m = await importerFichier(fichierColle, null); sauverMedias(); E.ajouterMedia(m); toast('Image collée'); return; }
+      const t = dt.getData('text/plain') || '';
+      e.preventDefault();
+      if (t.startsWith(MARQUE)) return collerCalque(t.slice(MARQUE.length));
+      if (t.trim()) { E.modif(true); const c = { id: uid(), type: 'texte', texte: t.trim().slice(0, 400), x: 50, y: 50, largeur: 62, police: 'Cormorant Garamond', taille: 4, couleur: p.style.couleur || '#7a1f2b', align: 'center', ombre: true, debut: 0.4, animation: 'fondu-montee', sortie: 'aucune' }; plan().calques.push(c); E.sel = c.id; E.rafraichir(); rendreReglages(); rendrePlans(); toast('Texte collé comme nouveau calque'); return; }
+      collerCalque(null);
+    });
+
+    // Menu du clic droit
+    let menu = null;
+    function fermerMenu() { if (menu) { menu.remove(); menu = null; } }
+    zone.addEventListener('contextmenu', e => {
+      e.preventDefault(); fermerMenu();
+      const c = calqueA(e); if (c) choisir(c.id);
+      const r = $('.col-apercu').getBoundingClientRect();
+      menu = document.createElement('div'); menu.className = 'menu-ctx';
+      const it = (a, t, ok) => `<button data-m="${a}" ${ok === false ? 'disabled' : ''}>${t}</button>`;
+      const ecr = c && (c.type === 'texte' || c.type === 'bouton' || c.type === 'compteur');
+      menu.innerHTML = (c ? it('editer', 'Modifier le texte', ecr) + it('copier', 'Copier  ·  Ctrl+C') + it('couper', 'Couper  ·  Ctrl+X') : '') + it('coller', 'Coller  ·  Ctrl+V', !!Stock.lire('studio.presse', null)) + (c ? it('dupliquer', 'Dupliquer  ·  Ctrl+D') + it('avant', 'Mettre au premier plan') + it('arriere', 'Mettre à l\'arrière-plan') + it('centrer', 'Centrer horizontalement') + it('suppr', 'Supprimer  ·  Suppr') : '');
+      menu.style.left = (e.clientX - r.left) + 'px'; menu.style.top = (e.clientY - r.top) + 'px';
+      $('.col-apercu').appendChild(menu);
+      menu.onclick = ev => {
+        const a = ev.target.dataset.m; if (!a) return; fermerMenu();
+        if (a === 'editer') editer(c); if (a === 'copier') copierCalque(c); if (a === 'couper') copierCalque(c, true); if (a === 'coller') collerCalque(null);
+        if (a === 'dupliquer') dupliquerCalque(c); if (a === 'avant' || a === 'arriere') ordreCalque(c, a); if (a === 'suppr') supprimerCalque(c);
+        if (a === 'centrer') { E.modif(true); c.x = 50; E.rafraichir(); majChamps(c); }
+      };
+    });
+    ecouter(document, 'pointerdown', e => { if (menu && !menu.contains(e.target)) fermerMenu(); });
+
+    // Barre d'outils du calque choisi (au-dessus de l'aperçu)
+    function rendreBarre() {
+      const bar = $('#barre-sel'); if (!bar) return;
+      const c = calqueSel();
+      if (!c) { bar.innerHTML = `<span class="muet">Cliquez un élément de l'aperçu pour le modifier</span>${Stock.lire('studio.presse', null) ? '<button class="btn petit" data-b="coller">Coller</button>' : ''}`; lierBarre(bar, c); return; }
+      const ecr = c.type === 'texte' || c.type === 'bouton' || c.type === 'compteur';
+      bar.innerHTML = `<b class="type-sel">${esc(NOMS_TYPE[c.type])}</b>
+        ${ecr ? '<button class="btn petit" data-b="editer" title="Modifier le texte (double-clic)">✎ Écrire</button>' : '<button class="btn petit" data-b="remplacer">Remplacer</button>'}
+        ${c.type !== 'image' && c.type !== 'video' ? `<button class="btn petit icone" data-b="moins" title="Plus petit">A−</button><button class="btn petit icone" data-b="plus" title="Plus grand">A+</button>` : `<button class="btn petit icone" data-b="moins" title="Plus petit">−</button><button class="btn petit icone" data-b="plus" title="Plus grand">+</button>`}
+        ${c.type === 'texte' || c.type === 'bouton' || c.type === 'compteur' ? `<input type="color" data-b="couleur" value="${c.couleur || '#7a1f2b'}" title="Couleur">` : ''}
+        ${c.type === 'texte' ? `<button class="btn petit icone ${c.gras ? 'on' : ''}" data-b="gras" title="Gras"><b>G</b></button><button class="btn petit icone ${c.italique ? 'on' : ''}" data-b="italique" title="Italique"><i>I</i></button><button class="btn petit icone" data-b="align" title="Alignement">${{ left: '⇤', right: '⇥' }[c.align] || '↔'}</button>` : ''}
+        <span class="sep"></span>
+        <button class="btn petit icone" data-b="copier" title="Copier (Ctrl+C)">⧉</button><button class="btn petit icone" data-b="coller" title="Coller (Ctrl+V)">📋</button><button class="btn petit icone" data-b="dupliquer" title="Dupliquer (Ctrl+D)">⊕</button>
+        <button class="btn petit icone" data-b="avant" title="Premier plan">⬆</button><button class="btn petit icone" data-b="arriere" title="Arrière-plan">⬇</button>
+        <button class="btn petit icone danger" data-b="suppr" title="Supprimer (Suppr)">🗑</button>`;
+      lierBarre(bar, c);
+    }
+    function lierBarre(bar, c) {
+      $$('[data-b]', bar).forEach(el => {
+        const a = el.dataset.b;
+        if (a === 'couleur') { el.oninput = () => { E.modif(); c.couleur = el.value; if (I.TYPES_HTML.includes(c.type)) E.rafraichir(); const i = $('#props [data-k="couleur"]'); if (i) i.value = el.value; }; return; }
+        el.onclick = () => {
+          if (a === 'coller') return collerCalque(null);
+          if (!c) return;
+          if (a === 'editer') editer(c);
+          if (a === 'remplacer') { const inp = $('#props [data-remplacer]'); if (inp) inp.click(); }
+          if (a === 'plus' || a === 'moins') {
+            E.modif(); const f = a === 'plus' ? 1.1 : 1 / 1.1;
+            if (c.type === 'image' || c.type === 'video') { c.largeur = Math.round(Math.min(100, (Number(c.largeur) || 40) * f) * 10) / 10; c.hauteur = Math.round(Math.min(100, (Number(c.hauteur) || 22) * f) * 10) / 10; }
+            else c.taille = Math.round(Math.max(1, Math.min(15, (Number(c.taille) || 3) * f)) * 10) / 10;
+            if (I.TYPES_HTML.includes(c.type)) E.rafraichir(); majChamps(c);
+          }
+          if (a === 'gras' || a === 'italique') { E.modif(true); c[a] = !c[a]; rendreReglages(); }
+          if (a === 'align') { E.modif(true); c.align = { center: 'left', left: 'right', right: 'center' }[c.align || 'center']; rendreReglages(); }
+          if (a === 'copier') copierCalque(c);
+          if (a === 'dupliquer') dupliquerCalque(c);
+          if (a === 'avant' || a === 'arriere') ordreCalque(c, a);
+          if (a === 'suppr') supprimerCalque(c);
+        };
+      });
+    }
+    E.rendreBarre = rendreBarre;
 
     /* Liste des plans */
     function rendrePlans() {
@@ -486,9 +695,11 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         E.sel = id; rendreReglages();
       });
       if (c) lierFormulaire(c);
+      if (E.rendreBarre) E.rendreBarre();
     }
     E.rendreReglages = rendreReglages;
 
+    E.ajouterMedia = m => ajouterCalque(m.type === 'video' ? 'video' : 'image', m);
     function ajouterCalque(type, media) {
       const pl = plan();
       E.modif(true);
@@ -1265,6 +1476,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       ${etape(3, 'Monter les plans', `
         <ul><li><b>À gauche</b>, la liste des plans. ▲ ▼ pour déplacer un plan intermédiaire, ⧉ pour le dupliquer, ✕ pour le supprimer, <b>+ Plan intermédiaire</b> pour en ajouter. L'ouverture, la confirmation et le remerciement restent à leur place.</li>
         <li><b>Au centre</b>, l'aperçu. Cliquez un texte ou un bouton pour le choisir, glissez-le pour le déplacer. Le curseur sous l'aperçu montre un instant précis du plan.</li>
+        <li><b>Directement sur l'aperçu</b>, comme dans Canva : <b>double-clic</b> sur un texte ou un bouton pour écrire dedans (Échap ou clic ailleurs pour valider) ; <b>coins</b> pour agrandir ou réduire, <b>côtés</b> pour élargir ; glisser pour déplacer (le centre est aimanté) ; <b>flèches</b> pour ajuster finement (Maj = plus grand pas) ; <b>Ctrl+C / Ctrl+V</b> pour copier-coller un calque, aussi vers un autre plan ou un autre événement ; Ctrl+X couper, <b>Ctrl+D</b> dupliquer, <b>Suppr</b> supprimer, Ctrl+Z annuler ; coller une image ou un texte copié ailleurs le pose sur le plan ; <b>clic droit</b> pour le menu (premier plan, arrière-plan, centrer…). La barre au-dessus de l'aperçu donne les réglages rapides : taille, couleur, gras, italique, alignement.</li>
         <li><b>À droite</b>, les réglages : fond, durée, transition, puis les calques (+ Texte, + Bouton, + Compteur, + Média) et leurs propriétés : police, taille, couleur, animation, moment d'entrée.</li>
         <li><b>▶ Plan</b> joue le plan, <b>▶ Toute l'invitation</b> joue tout. « Voir : lien personnel / lien général » montre ce que voit une famille ou un groupe.</li>
         <li><b>↶</b> annule, <b>↷</b> rétablit. Tout s'enregistre seul.</li></ul>
