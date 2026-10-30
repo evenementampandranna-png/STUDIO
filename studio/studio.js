@@ -1093,7 +1093,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           const calques = (pl.calques || []).filter(c => !c.masque && !exclus.has(c.id)).map(c => ({ c, b: E.eng.bbox[c.id] }));
           const prompt = Fabrique.promptFond(p, k, Object.assign({ calques, fonds: tousFonds(), reference: '' }, o, { cible: 'video', inspiration: '' })).replace(/^Use the attached reference video.*\n/, '').replace(/1080x1920, \d+ seconds/, '704x1280, 5 seconds');
           const imageBlob = await imageFondSeul();
-          let wf = null; if (cf.workflow) { try { wf = Fabrique.lireJSON(cf.workflow); } catch (e) { throw new Error('Le workflow collé dans Réglages est illisible'); } }
+          let wf = Comfy.WORKFLOWS[cf.modele || '14b'] || Comfy.WORKFLOW_14B;
+          if (cf.modele === 'perso') { try { wf = Fabrique.lireJSON(cf.workflow); } catch (e) { throw new Error('Le workflow collé dans Réglages est illisible'); } }
           const r = await Comfy.generer(cf.url, wf, { imageBlob, prompt, negatif: 'text, letters, words, numbers, watermark, logo, people, faces', secondes: Math.min(o.duree || 5, 10) }, t => { etat.textContent = t; });
           fichier = new File([r.blob], 'wan-plan-' + (k + 1) + '-' + r.nom.split('/').pop(), { type: r.blob.type || 'video/mp4' });
           const u = URL.createObjectURL(fichier);
@@ -1537,6 +1538,10 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <p class="muet">Pour que le bouton « Générer avec Wan 2.2 » du fond sur mesure envoie la demande à votre pod et récupère la vidéo tout seul.</p>
           <label class="champ">Adresse de votre pod ComfyUI<input type="url" id="cf-url" value="${esc((reglages.comfy || {}).url || '')}" placeholder="https://xxxxxxxx-8188.proxy.runpod.net"></label>
           <div class="ligne"><button class="btn plein" id="cf-ok">Enregistrer</button><button class="btn" id="cf-test">Tester</button><span class="muet" id="cf-etat"></span></div>
+          <label class="champ">Modèle utilisé<select id="cf-modele">
+            <option value="14b" ${((reglages.comfy || {}).modele || '14b') === '14b' ? 'selected' : ''}>Wan 2.2 14B image vers vidéo + lightx2v (pod « One Click - ComfyUI Wan 2.2 », A40)</option>
+            <option value="5b" ${(reglages.comfy || {}).modele === '5b' ? 'selected' : ''}>Wan 2.2 5B (modèle officiel ComfyUI, carte 24 Go)</option>
+            <option value="perso" ${(reglages.comfy || {}).modele === 'perso' ? 'selected' : ''}>Mon propre workflow (collé ci-dessous)</option></select></label>
           <details><summary class="muet" style="cursor:pointer">Votre propre workflow (facultatif)</summary>
             <p class="muet">Par défaut, le studio utilise le modèle officiel « Wan 2.2 5B image vers vidéo » de ComfyUI. Si vos fichiers de modèle portent d'autres noms ou si vous utilisez le 14B : ouvrez votre workflow image vers vidéo qui marche dans ComfyUI, puis menu <b>Workflow → Export (API)</b>, et collez le contenu du fichier ici. Il doit contenir un nœud « Load Image » et un « Save Video ».</p>
             <textarea id="cf-wf" rows="6" style="width:100%" placeholder='{"1": {"class_type": "UNETLoader", ...}}'>${esc((reglages.comfy || {}).workflow || '')}</textarea></details>
@@ -1557,7 +1562,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       try { const r = await fetch(`https://api.github.com/repos/${reglages.github.owner}/${reglages.github.repo}`, { headers: GitHub.entetes() }); const j = await r.json(); $('#g-etat').textContent = r.ok ? (j.permissions && j.permissions.push ? 'Connexion réussie' : 'Connecté, mais sans droit d\'écriture') : 'Échec : ' + (j.message || r.status); }
       catch (e) { $('#g-etat').textContent = 'Échec : ' + e.message; }
     };
-    const lireCf = () => { reglages.comfy = { url: Comfy.nettoyerUrl($('#cf-url').value), workflow: $('#cf-wf').value.trim() }; sauverReglages(); };
+    const lireCf = () => { const wf = $('#cf-wf').value.trim(); let modele = $('#cf-modele').value; if (wf && modele !== 'perso' && lireCf.change) modele = 'perso'; reglages.comfy = { url: Comfy.nettoyerUrl($('#cf-url').value), workflow: wf, modele }; sauverReglages(); };
+    $('#cf-wf').oninput = () => { if ($('#cf-wf').value.trim()) $('#cf-modele').value = 'perso'; };
     $('#cf-ok').onclick = () => { lireCf(); toast('Enregistré'); };
     $('#cf-test').onclick = async () => { lireCf(); $('#cf-etat').textContent = 'Test…'; try { $('#cf-etat').textContent = 'Connexion réussie : ' + await Comfy.tester(reglages.comfy.url); } catch (e) { $('#cf-etat').textContent = e.message; } };
     $('#fb-ok').onclick = () => { const v = $('#fb').value.trim(); if (!v) { reglages.firebase = null; sauverReglages(); return toast('Firebase désactivé'); } try { const t = v.replace(/^[^{]*/, '').replace(/[^}]*$/, ''); reglages.firebase = JSON.parse(t.replace(/(\w+)\s*:/g, '"$1":').replace(/""/g, '"').replace(/'/g, '"')); sauverReglages(); toast('Firebase enregistré'); } catch (e) { toast('Configuration illisible'); } };

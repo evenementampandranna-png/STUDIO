@@ -21,6 +21,29 @@
     '12': { class_type: 'SaveVideo', inputs: { video: ['11', 0], filename_prefix: 'studio/fond', format: 'auto', codec: 'auto' } }
   };
 
+  // Workflow « Wan 2.2 14B image vers vidéo + lightx2v 4 étapes » : modèles du template RunPod
+  // « One Click - ComfyUI Wan2.1 - Wan 2.2 » (hearmeman). Testé sur A40 48 Go.
+  const WORKFLOW_14B = {
+    '1': { class_type: 'UNETLoader', inputs: { unet_name: 'wan2.2_i2v_high_noise_14B_fp16.safetensors', weight_dtype: 'fp8_e4m3fn' } },
+    '2': { class_type: 'UNETLoader', inputs: { unet_name: 'wan2.2_i2v_low_noise_14B_fp16.safetensors', weight_dtype: 'fp8_e4m3fn' } },
+    '3': { class_type: 'LoraLoaderModelOnly', inputs: { model: ['1', 0], lora_name: 'i2v_lightx2v_high_noise_model.safetensors', strength_model: 1 } },
+    '4': { class_type: 'LoraLoaderModelOnly', inputs: { model: ['2', 0], lora_name: 'i2v_lightx2v_low_noise_model.safetensors', strength_model: 1 } },
+    '5': { class_type: 'ModelSamplingSD3', inputs: { model: ['3', 0], shift: 5 } },
+    '6': { class_type: 'ModelSamplingSD3', inputs: { model: ['4', 0], shift: 5 } },
+    '7': { class_type: 'CLIPLoader', inputs: { clip_name: 'umt5_xxl_fp8_e4m3fn_scaled.safetensors', type: 'wan', device: 'default' } },
+    '8': { class_type: 'VAELoader', inputs: { vae_name: 'wan_2.1_vae.safetensors' } },
+    '9': { class_type: 'CLIPTextEncode', inputs: { clip: ['7', 0], text: '' } },
+    '10': { class_type: 'CLIPTextEncode', inputs: { clip: ['7', 0], text: 'text, letters, words, numbers, watermark, logo, people, faces, blurry, flicker, low quality, distorted' } },
+    '11': { class_type: 'LoadImage', inputs: { image: 'depart.jpg' } },
+    '12': { class_type: 'WanImageToVideo', inputs: { positive: ['9', 0], negative: ['10', 0], vae: ['8', 0], start_image: ['11', 0], width: 704, height: 1280, length: 81, batch_size: 1 } },
+    '13': { class_type: 'KSamplerAdvanced', inputs: { model: ['5', 0], add_noise: 'enable', noise_seed: 1, steps: 4, cfg: 1, sampler_name: 'euler', scheduler: 'simple', positive: ['12', 0], negative: ['12', 1], latent_image: ['12', 2], start_at_step: 0, end_at_step: 2, return_with_leftover_noise: 'enable' } },
+    '14': { class_type: 'KSamplerAdvanced', inputs: { model: ['6', 0], add_noise: 'disable', noise_seed: 1, steps: 4, cfg: 1, sampler_name: 'euler', scheduler: 'simple', positive: ['12', 0], negative: ['12', 1], latent_image: ['13', 0], start_at_step: 2, end_at_step: 4, return_with_leftover_noise: 'disable' } },
+    '15': { class_type: 'VAEDecode', inputs: { samples: ['14', 0], vae: ['8', 0] } },
+    '16': { class_type: 'CreateVideo', inputs: { images: ['15', 0], fps: 16 } },
+    '17': { class_type: 'SaveVideo', inputs: { video: ['16', 0], filename_prefix: 'studio/fond', format: 'auto' } }
+  };
+  const WORKFLOWS = { '14b': WORKFLOW_14B, '5b': WORKFLOW_5B };
+
   const nettoyerUrl = u => String(u || '').trim().replace(/\/+$/, '').replace(/\/(api)?$/, '');
   function erreurReseau(e) {
     return new Error('Le pod ne répond pas ou refuse le studio. Vérifiez : 1) le pod est démarré (Running) ; 2) l\'adresse se termine par -8188.proxy.runpod.net ; 3) ComfyUI est lancé avec l\'option --enable-cors-header. (' + e.message + ')');
@@ -123,5 +146,5 @@
     }
   }
 
-  global.Comfy = { WORKFLOW_5B, tester, generer, preparer, nettoyerUrl };
+  global.Comfy = { WORKFLOW_5B, WORKFLOW_14B, WORKFLOWS, tester, generer, preparer, nettoyerUrl };
 })(window);
