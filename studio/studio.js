@@ -1668,7 +1668,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         const quoi = ev.target.dataset.v; if (!quoi) return;
         try { await Comfy.signalVeille(reglages.comfy.url, quoi); toast(quoi === 'continuer' ? 'Le pod continue : nouvelle alerte après 1 minute sans travail' : 'Arrêt du pod demandé'); }
         catch (e) { toast(e.message); }
-        fermerVeille();
+        Veille.pause = Date.now() + 15000; Veille.etat = null; fermerVeille();
       };
       Veille.cligne = setInterval(() => { document.title = document.title === Veille.titre ? '⚠ Pod inactif — arrêter ?' : Veille.titre; }, 1000);
       try { if (window.Notification && Notification.permission === 'granted') new Notification('Pod RunPod inactif', { body: 'Arrêter ou continuer ? Arrêt automatique dans ' + reste + ' s.' }); } catch (e) {}
@@ -1679,8 +1679,10 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
   async function surveiller() {
     const cf = reglages.comfy || {};
     if (!cf.url || cf.veille === false) { fermerVeille(); Veille.etat = null; return; }
+    if (Veille.pause && Date.now() < Veille.pause) return;
     try {
       const e = await Comfy.etatVeille(cf.url);
+      if (Veille.pause && Date.now() < Veille.pause) return;
       Veille.etat = e;
       if (e.etat === 'arret') { fermerVeille(); return; }
       if (e.etat === 'inactif' && e.inactif >= (e.alerte || 60)) boiteVeille(e); else fermerVeille();
