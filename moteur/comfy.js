@@ -146,5 +146,19 @@
     }
   }
 
-  global.Comfy = { WORKFLOW_5B, WORKFLOW_14B, WORKFLOWS, tester, generer, preparer, nettoyerUrl };
+  // ----- Veille du pod : état, continuer, arrêter -----
+  async function etatVeille(base) {
+    const r = await fetch(nettoyerUrl(base) + '/view?filename=veille.json&subfolder=studio&type=output&t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) throw new Error('veille absente');
+    return r.json();
+  }
+  const PNG = () => new Blob([Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='), c => c.charCodeAt(0))], { type: 'image/png' });
+  async function signalVeille(base, quoi) {
+    const fd = new FormData(); fd.append('image', PNG(), 'studio-veille-' + quoi + '.png'); fd.append('overwrite', 'true'); fd.append('type', 'input');
+    const r = await appel(base, '/upload/image', { method: 'POST', body: fd });
+    if (!r.ok) throw new Error('Le pod ne répond pas (' + r.status + ')');
+  }
+  const COMMANDE_VEILLE = 'curl -fsSL https://evenementampandranna-png.github.io/STUDIO/outils/veille.sh | sh';
+
+  global.Comfy = { etatVeille, signalVeille, COMMANDE_VEILLE, WORKFLOW_5B, WORKFLOW_14B, WORKFLOWS, tester, generer, preparer, nettoyerUrl };
 })(window);

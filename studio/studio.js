@@ -1545,6 +1545,14 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <details><summary class="muet" style="cursor:pointer">Votre propre workflow (facultatif)</summary>
             <p class="muet">Par défaut, le studio utilise le modèle officiel « Wan 2.2 5B image vers vidéo » de ComfyUI. Si vos fichiers de modèle portent d'autres noms ou si vous utilisez le 14B : ouvrez votre workflow image vers vidéo qui marche dans ComfyUI, puis menu <b>Workflow → Export (API)</b>, et collez le contenu du fichier ici. Il doit contenir un nœud « Load Image » et un « Save Video ».</p>
             <textarea id="cf-wf" rows="6" style="width:100%" placeholder='{"1": {"class_type": "UNETLoader", ...}}'>${esc((reglages.comfy || {}).workflow || '')}</textarea></details>
+          <div class="carte pile" style="padding:10px;background:#fbf7f1">
+            <b>Arrêt automatique du pod (pour ne pas payer pour rien)</b>
+            <p class="muet" style="margin:0">Quand le pod ne travaille plus depuis 1 minute, le studio vous demande « Arrêter ou continuer ? ». Sans réponse dans les 30 secondes, le pod s'arrête tout seul, même si le studio est fermé.</p>
+            <div class="muet" id="cf-veille">État : vérification…</div>
+            <p class="muet" style="margin:0">À faire <b>après chaque démarrage du pod</b> : ouvrez JupyterLab (Connect → port 8888) → Terminal, collez cette commande et appuyez sur Entrée :</p>
+            <div class="ligne"><input type="text" readonly value="${esc(Comfy.COMMANDE_VEILLE)}" style="flex:1;font-family:ui-monospace,monospace;font-size:12.5px"><button class="btn petit" id="cf-copier-veille">Copier</button></div>
+            <div class="cases"><label><input type="checkbox" id="cf-notif"> Recevoir aussi une notification du navigateur</label></div>
+          </div>
           <details><summary class="muet" style="cursor:pointer">Comment trouver l'adresse et autoriser le studio ?</summary><ol class="muet">
             <li>Sur console.runpod.io → <b>Pods</b> → votre pod ComfyUI → <b>Connect</b> → <b>Connect to HTTP Service [Port 8188]</b>. Copiez l'adresse qui s'ouvre (elle finit par <b>-8188.proxy.runpod.net</b>).</li>
             <li>ComfyUI doit accepter les demandes venant du studio : il faut le lancer avec l'option <b>--enable-cors-header</b>. Selon votre modèle de pod, ajoutez-la aux arguments de lancement de ComfyUI (variable d'environnement ou commande de démarrage du template), puis redémarrez le pod.</li>
@@ -1565,6 +1573,12 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     const lireCf = () => { const wf = $('#cf-wf').value.trim(); let modele = $('#cf-modele').value; if (wf && modele !== 'perso' && lireCf.change) modele = 'perso'; reglages.comfy = { url: Comfy.nettoyerUrl($('#cf-url').value), workflow: wf, modele }; sauverReglages(); };
     $('#cf-wf').oninput = () => { if ($('#cf-wf').value.trim()) $('#cf-modele').value = 'perso'; };
     $('#cf-ok').onclick = () => { lireCf(); toast('Enregistré'); };
+    $('#cf-copier-veille').onclick = () => copier(Comfy.COMMANDE_VEILLE);
+    $('#cf-notif').checked = !!(window.Notification && Notification.permission === 'granted');
+    $('#cf-notif').onchange = e => { if (e.target.checked && window.Notification) Notification.requestPermission().then(p => { e.target.checked = p === 'granted'; }); };
+    (async () => { const el = $('#cf-veille'); const cf = reglages.comfy || {}; if (!cf.url) { el.textContent = 'État : renseignez d\'abord l\'adresse du pod.'; return; }
+      try { const e = await Comfy.etatVeille(cf.url); el.innerHTML = e.etat === 'arret' ? 'État : le pod s\'est arrêté (' + esc(e.raison) + ').' : '<span class="badge ok">Surveillance active</span> ' + (e.etat === 'actif' ? 'le pod travaille' : 'inactif depuis ' + e.inactif + ' s'); }
+      catch (err) { el.innerHTML = '<span class="badge alerte">Surveillance non installée</span> ou pod arrêté : collez la commande ci-dessous dans le terminal du pod.'; } })();
     $('#cf-test').onclick = async () => { lireCf(); $('#cf-etat').textContent = 'Test…'; try { $('#cf-etat').textContent = 'Connexion réussie : ' + await Comfy.tester(reglages.comfy.url); } catch (e) { $('#cf-etat').textContent = e.message; } };
     $('#fb-ok').onclick = () => { const v = $('#fb').value.trim(); if (!v) { reglages.firebase = null; sauverReglages(); return toast('Firebase désactivé'); } try { const t = v.replace(/^[^{]*/, '').replace(/[^}]*$/, ''); reglages.firebase = JSON.parse(t.replace(/(\w+)\s*:/g, '"$1":').replace(/""/g, '"').replace(/'/g, '"')); sauverReglages(); toast('Firebase enregistré'); } catch (e) { toast('Configuration illisible'); } };
     $('#exp-tout').onclick = () => telecharger('studio-sauvegarde.json', JSON.stringify({ projets, medias: medias.map(m => Object.assign({}, m)) }, null, 1));
@@ -1604,6 +1618,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <ul><li><b>Fond vidéo</b> (en haut à droite) : choisissez un fond de la bibliothèque, ou <b>Importer un fond</b> directement depuis le plan. Le studio indique combien de plans utilisent déjà ce fond.</li>
         <li><b>✨ Créer un fond sur mesure (IA)</b> : quand il vous manque un fond, ou qu'un même fond revient trop souvent. La fenêtre montre d'abord <b>les calques du plan</b> (textes, boutons, photos) avec leur contenu et leur place : ils sont décrits un par un dans le prompt, pour que le nouveau fond leur laisse de l'espace. Corrigez un texte ou décochez un calque si besoin. Choisissez ensuite le <b>point de départ</b> : le fond actuel (l'IA crée un autre fond du même thème, proche de son décor), ou <b>une autre vidéo ou image d'inspiration</b>, même sans rapport avec le thème, que l'IA transforme aux couleurs du fond actuel ou de toute l'invitation. Votre idée est <b>facultative</b>. Troisième choix : <b>Recolorer une vidéo déjà prête</b> (étalonnage). Le studio mesure la palette du fond actuel et prépare le prompt pour Claude, qui recolore la vidéo élément par élément et vous rend le MP4. Ou bien cliquez <b>Recolorer toute la vidéo</b> pour le faire directement dans le studio, gratuitement (réglez l'intensité, vérifiez avec Aperçu avant / après). Copiez le prompt, cliquez <b>Télécharger la vidéo de fond actuelle</b> et joignez-la au prompt dans ChatGPT (ou Sora, Veo, Kling, Runway) : l'IA s'en sert comme modèle. Importez ensuite la nouvelle vidéo : elle remplace le fond du plan et rejoint la bibliothèque. Le prompt se régénère à chaque changement.</li>
         <li><b>Wan 2.2</b> (gratuit, open source) : il crée des vidéos à partir d'un texte ou d'une image, mais il tourne sur un ordinateur avec une bonne carte graphique (ComfyUI), pas dans le navigateur. Dans « Créer un fond sur mesure », choisissez « Le fond actuel du plan », copiez le prompt de l'onglet <b>Directement pour … Wan 2.2</b> et téléchargez <b>l'image du fond seul</b> (704 × 1280) comme image de départ. Wan 2.2 rend des vidéos de 5 secondes : le studio les fait boucler. Il ne sait pas recolorer une vidéo existante : pour cela, utilisez « Recolorer toute la vidéo » dans le studio. <b>Avec un pod RunPod</b> : collez l'adresse du pod dans Réglages, puis le bouton <b>▶ Générer avec Wan 2.2 sur mon RunPod</b> envoie le prompt et l'image du fond seul, attend la fin (souvent 3 à 10 minutes) et place la vidéo à l'étape 5.</li>
+        <li><b>Arrêt automatique du pod RunPod</b> : après chaque démarrage du pod, collez dans son terminal JupyterLab la commande donnée dans Réglages. Ensuite, si le pod ne travaille plus depuis 1 minute, le studio affiche « Arrêter ou continuer ? ». Sans réponse dans les 30 secondes, le pod s'arrête tout seul (même studio fermé). Pour le relancer : RunPod → Pods → ▶ Start.</li>
         <li><b>+ Photo / vidéo</b> : choisissez un fichier sur l'ordinateur ou le téléphone ; il est posé tout de suite sur le plan. Réglez sa taille, sa forme (ronde, arrondie), sa bordure.</li>
         <li><b>Animation</b> d'un texte ou d'une photo : un effet d'<b>entrée</b> (fondu, lettre par lettre, mot par mot, zoom, rebond, flou, glissement…) et un effet de <b>sortie</b>, chacun avec son moment et sa durée. <b>▶ Voir l'animation</b> pour vérifier.</li>
         <li><b>Éviter les chevauchements de textes</b> : remet les textes du plan les uns sous les autres, sans qu'ils se touchent.</li></ul>`)}
@@ -1636,6 +1651,44 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         </tbody></table>`)}
       </div>`;
   }
+
+  /* ================= Veille du pod RunPod ================= */
+  // Toutes les 10 s : si le pod ne travaille plus depuis 1 min, on demande « Arrêter ou continuer ? ».
+  // Sans réponse, le pod s'arrête lui-même 30 s plus tard (script de veille installé sur le pod).
+  const Veille = { etat: null, boite: null, titre: document.title, cligne: null };
+  function boiteVeille(e) {
+    const reste = Math.max(0, Math.round((e.arret || 90) - (e.inactif || 0)));
+    if (!Veille.boite) {
+      Veille.boite = document.createElement('div');
+      Veille.boite.className = 'veille-alerte';
+      Veille.boite.innerHTML = `<b>Le pod RunPod ne travaille plus depuis 1 minute.</b><div>Il est facturé tant qu'il tourne. Sans réponse, il s'arrêtera tout seul dans <b class="veille-reste"></b> s.</div>
+        <div class="ligne"><button class="btn plein" data-v="continuer">Continuer</button><button class="btn danger" data-v="arreter">Arrêter maintenant</button></div>`;
+      document.body.appendChild(Veille.boite);
+      Veille.boite.onclick = async ev => {
+        const quoi = ev.target.dataset.v; if (!quoi) return;
+        try { await Comfy.signalVeille(reglages.comfy.url, quoi); toast(quoi === 'continuer' ? 'Le pod continue : nouvelle alerte après 1 minute sans travail' : 'Arrêt du pod demandé'); }
+        catch (e) { toast(e.message); }
+        fermerVeille();
+      };
+      Veille.cligne = setInterval(() => { document.title = document.title === Veille.titre ? '⚠ Pod inactif — arrêter ?' : Veille.titre; }, 1000);
+      try { if (window.Notification && Notification.permission === 'granted') new Notification('Pod RunPod inactif', { body: 'Arrêter ou continuer ? Arrêt automatique dans ' + reste + ' s.' }); } catch (e) {}
+    }
+    $('.veille-reste', Veille.boite).textContent = reste;
+  }
+  function fermerVeille() { if (Veille.boite) { Veille.boite.remove(); Veille.boite = null; } clearInterval(Veille.cligne); Veille.cligne = null; document.title = Veille.titre; }
+  async function surveiller() {
+    const cf = reglages.comfy || {};
+    if (!cf.url || cf.veille === false) { fermerVeille(); Veille.etat = null; return; }
+    try {
+      const e = await Comfy.etatVeille(cf.url);
+      Veille.etat = e;
+      if (e.etat === 'arret') { fermerVeille(); return; }
+      if (e.etat === 'inactif' && e.inactif >= (e.alerte || 60)) boiteVeille(e); else fermerVeille();
+    } catch (err) { Veille.etat = null; fermerVeille(); }
+  }
+  setInterval(surveiller, 10000); setTimeout(surveiller, 2000);
+  // le compte à rebours avance entre deux vérifications
+  setInterval(() => { if (Veille.boite && Veille.etat) { Veille.etat.inactif += 1; boiteVeille(Veille.etat); } }, 1000);
 
   route();
 })();

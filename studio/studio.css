@@ -208,3 +208,7 @@ textarea.edition-directe { position: absolute; z-index: 8; resize: none; overflo
 .barre-sel .btn:disabled { opacity: .35; }
 .wan-boite { display: flex; flex-direction: column; gap: 6px; background: #fbf7f1; border: 1px solid var(--ligne); border-radius: 10px; padding: 8px 10px; }
 .wan-boite .btn { align-self: flex-start; }
+
+.veille-alerte { position: fixed; z-index: 70; right: 18px; bottom: 18px; width: min(380px, calc(100vw - 36px)); background: #fff; border: 2px solid var(--vin); border-radius: 14px; padding: 14px 16px; box-shadow: 0 16px 40px rgba(40,10,10,.3); display: flex; flex-direction: column; gap: 8px; font-size: 14px; animation: veilleEntree .3s ease; }
+.veille-alerte .veille-reste { color: var(--vin); font-size: 18px; }
+@keyframes veilleEntree { from { transform: translateY(20px); opacity: 0; } }
