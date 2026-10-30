@@ -912,234 +912,222 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     const role = pl.role;
     const usage = { ouverture: 'ouverture', confirmation: 'confirmation', remerciement: 'remerciement' }[role] || 'programme';
     const exclus = new Set(h.exclus || []);
+    const wanOk = !!(reglages.comfy && reglages.comfy.url);
+    let methode = h.methode || (h.mode === 'recolorer' ? 'recolorer' : (wanOk ? 'wan' : 'ia'));
+    const autresPlans = p.plans.filter((x, i) => i !== k && x.fond && x.fond.media === pl.fond.media).length;
     const nomRef = () => { const f = tousFonds().find(x => x.src === pl.fond.media); return ((f && f.nom) || 'fond').replace(/[^\w\-]+/g, '-').toLowerCase() + '-reference-plan-' + (k + 1) + '.mp4'; };
-    const lignesCalques = () => (pl.calques || []).filter(c => !c.masque).map(c => {
+    const calquesVisibles = (pl.calques || []).filter(c => !c.masque);
+    const lignesCalques = () => calquesVisibles.map(c => {
       const b = E.eng.bbox[c.id];
       const editable = c.type === 'texte' || c.type === 'bouton' || c.type === 'compteur';
-      const zone = b ? `${Math.round(b.y)}–${Math.round(b.y + b.h)} % de la hauteur` : 'non visible sur ce lien';
+      const zone = b ? `${Math.round(b.y)}–${Math.round(b.y + b.h)} %` : '';
       return `<div class="calque-ia ${exclus.has(c.id) ? 'off' : ''}" data-id="${c.id}">
-        <input type="checkbox" ${exclus.has(c.id) ? '' : 'checked'} title="Inclure dans le prompt">
+        <input type="checkbox" ${exclus.has(c.id) ? '' : 'checked'} title="Laisser de la place pour ce calque">
         <span class="badge">${esc(NOMS_TYPE[c.type] || c.type)}</span>
-        ${editable ? `<textarea class="ci-texte" rows="${String(c.texte || '').split('\n').length > 1 ? 3 : 1}">${esc(c.texte || '')}</textarea>` : `<span class="ci-nom">${esc(nomMedia(c.media) || '(photo ou vidéo)')}</span>`}
+        ${editable ? `<textarea class="ci-texte" rows="${String(c.texte || '').split('\n').length > 1 ? 2 : 1}">${esc(c.texte || '')}</textarea>` : `<span class="ci-nom">${esc(nomMedia(c.media) || '(photo ou vidéo)')}</span>`}
         <span class="muet ci-zone">${esc(zone)}</span></div>`;
     }).join('');
-    modale(`<h2>Créer un fond vidéo sur mesure — plan ${k + 1}</h2>
-      <p class="muet">Le prompt part des calques de ce plan et de son fond actuel. Le studio y ajoute le thème de l'invitation (couleurs, décor des autres fonds) et la zone à laisser libre.</p>
-      <div class="ia-grille">
+    modale(`<h2 style="margin-bottom:2px">Nouveau fond pour le plan ${k + 1}</h2>
+      <p class="muet" style="margin:0 0 12px">Le studio tient compte tout seul du thème, des couleurs de l'invitation et de la place à laisser à vos ${calquesVisibles.length} calque${calquesVisibles.length > 1 ? 's' : ''}.</p>
+      <div class="nf-grille">
         <div class="pile">
-          <p class="ia-etape">1. Les calques de ce plan</p>
-          <p class="muet" style="margin:0">Ce que le nouveau fond doit accueillir. Corrigez un texte ici si besoin, ou décochez un calque à ne pas mentionner. Pour en ajouter ou en déplacer, fermez cette fenêtre et utilisez le panneau du plan.</p>
-          <div id="fi-calques" class="pile">${lignesCalques() || '<p class="muet">Aucun calque sur ce plan.</p>'}</div>
-          <p class="ia-etape" style="margin-top:6px">2. Point de départ du nouveau fond</p>
-          <div class="pile depart">
-            <label class="cases"><input type="radio" name="fi-mode" value="actuel" ${h.mode !== 'autre' ? 'checked' : ''}> <span><b>Le fond actuel du plan</b> — un autre fond du même thème, proche de son décor</span></label>
-            <label class="cases"><input type="radio" name="fi-mode" value="autre" ${h.mode === 'autre' ? 'checked' : ''}> <span><b>Une autre vidéo ou image d'inspiration</b>, même sans rapport avec le thème : l'IA la transformera aux couleurs de l'invitation</span></label>
-            <label class="cases"><input type="radio" name="fi-mode" value="recolorer" ${h.mode === 'recolorer' ? 'checked' : ''}> <span><b>Recolorer une vidéo déjà prête</b> aux couleurs du fond actuel (étalonnage) : sa composition et son mouvement restent identiques</span></label>
-            <div id="fi-recol" class="pile" style="margin-left:24px;${h.mode === 'recolorer' ? '' : 'display:none'}">
-              <div class="ligne"><label class="btn petit">Choisir la vidéo à recolorer<input type="file" id="fi-v2" accept="video/*" hidden></label><span class="muet" id="fi-v2-nom">aucune vidéo choisie</span></div>
-              <label class="champ">Correspondances particulières <span class="muet">(facultatif)</span><input type="text" id="fi-corr" value="${esc(h.correspondances || '')}" placeholder="Ex. : les roses blanches deviennent bordeaux #7a1f2b, le filet doré reste doré"></label>
-              <div id="fi-palette" class="muet">La palette du fond actuel sera mesurée automatiquement.</div>
-              <div class="carte pile" style="padding:10px;background:#fbf7f1">
-                <b>Recolorer ici, automatiquement et gratuitement</b>
-                <label class="champ">Intensité<input type="range" id="fi-force" min="0.3" max="1" step="0.05" value="0.9"></label>
-                <div class="comparer" id="fi-comp"></div>
-                <div class="ligne"><button class="btn petit" id="fi-voir">Aperçu avant / après</button><button class="btn petit plein" id="fi-auto">Recolorer toute la vidéo</button></div>
-                <div class="progres"><div id="fi-barre"></div></div>
-                <span class="muet">Plus simple et plus rapide que l'IA, mais moins précis élément par élément. Sinon, utilisez le prompt ci-contre avec Claude.</span>
+          <div class="pile nf-bloc">
+            <p class="ia-etape">1. Votre idée <span class="muet" style="font-weight:400">(facultatif)</span></p>
+            <textarea id="fi-idee" rows="2" placeholder="Ex. : plus de lumière dorée, des bougies sur les côtés…">${esc(h.idee || '')}</textarea>
+            <div class="nf-puces">${(IDEES[role] || IDEES.intermediaire).map(t => `<button class="puce" data-idee="${esc(t)}">+ ${esc(t)}</button>`).join('')}</div>
+            <div class="ligne"><label class="muet">Mouvement</label><div class="segment" id="fi-mvt">${['calme', 'moyen', 'vivant'].map(m => `<button data-v="${m}" class="${(h.mouvement || 'calme') === m ? 'actif' : ''}">${m}</button>`).join('')}</div></div>
+            <details><summary class="muet">Calques pris en compte (${calquesVisibles.length})</summary>
+              <p class="muet" style="margin:6px 0">Le fond laissera de la place pour chacun. Décochez-en un s'il ne compte pas.</p>
+              <div id="fi-calques" class="pile">${lignesCalques() || '<p class="muet">Aucun calque sur ce plan.</p>'}</div></details>
+          </div>
+          <div class="pile nf-bloc">
+            <p class="ia-etape">2. Comment le créer ?</p>
+            <div class="nf-methodes">
+              <button data-m="wan"><b>Wan 2.2</b><span>Automatique, sur votre pod</span></button>
+              <button data-m="ia"><b>ChatGPT, Sora…</b><span>Copier un prompt</span></button>
+              <button data-m="recolorer"><b>Recolorer</b><span>Une vidéo déjà prête</span></button>
+            </div>
+            <div data-panneau="wan" class="pile">
+              <p class="muet" style="margin:0">Le studio part de l'image du fond actuel, envoie tout à Wan 2.2 et récupère la vidéo (environ 5 minutes). Si le pod est éteint, il vous guide pour l'allumer.</p>
+              <button class="btn ia" id="fi-wan">▶ Générer avec Wan 2.2</button>
+              <span class="muet" id="fi-wan-etat">${wanOk ? '' : 'Ajoutez d\'abord l\'adresse de votre pod dans <a href="#/reglages">Réglages</a>.'}</span>
+            </div>
+            <div data-panneau="ia" class="pile">
+              <div class="segment" id="fi-cible"><button data-v="ia" class="actif">Pour ChatGPT ou Claude</button><button data-v="video">Pour Sora, Veo, Kling, Runway</button></div>
+              <label class="cases"><input type="checkbox" id="fi-insp-on" ${h.mode === 'autre' ? 'checked' : ''}> Partir d'une autre vidéo ou image d'inspiration</label>
+              <div id="fi-autre" class="ligne" style="${h.mode === 'autre' ? '' : 'display:none'}">
+                <label class="btn petit">Choisir le fichier<input type="file" id="fi-insp" accept="video/*,image/*" hidden></label><span class="muet" id="fi-insp-nom">${esc(h.inspiration || 'aucun fichier')}</span>
+                <select id="fi-suivre"><option value="fond" ${h.suivre !== 'invitation' ? 'selected' : ''}>au style du fond actuel</option><option value="invitation" ${h.suivre === 'invitation' ? 'selected' : ''}>au thème de l'invitation</option></select>
               </div>
+              <ol class="nf-faire">
+                <li><button class="btn plein petit" id="fi-copier">Copier le prompt</button></li>
+                <li><button class="btn petit" id="fi-video">Télécharger le fond actuel</button> <span class="muet">et joignez-le au message</span></li>
+                <li class="muet">Récupérez la vidéo créée, puis importez-la à droite.</li>
+              </ol>
+              <details><summary class="muet">Voir le prompt</summary><textarea class="prompt-zone" id="fi-prompt" readonly></textarea></details>
             </div>
-            <div id="fi-autre" class="pile" style="margin-left:24px;${h.mode === 'autre' ? '' : 'display:none'}">
-              <div class="ligne"><label class="btn petit">Choisir le fichier d'inspiration<input type="file" id="fi-insp" accept="video/*,image/*" hidden></label><span class="muet" id="fi-insp-nom">${esc(h.inspiration || 'aucun fichier choisi')}</span></div>
-              <label class="champ">La transformer pour suivre<select id="fi-suivre"><option value="fond" ${h.suivre !== 'invitation' ? 'selected' : ''}>le style du fond actuel de ce plan</option><option value="invitation" ${h.suivre === 'invitation' ? 'selected' : ''}>le thème de toute l'invitation</option></select></label>
+            <div data-panneau="recolorer" class="pile">
+              <p class="muet" style="margin:0">Gardez la composition et le mouvement d'une vidéo, et donnez-lui les couleurs du fond actuel. Gratuit, directement ici.</p>
+              <div class="ligne"><label class="btn petit plein">Choisir la vidéo<input type="file" id="fi-v2" accept="video/*" hidden></label><span class="muet" id="fi-v2-nom">aucune vidéo</span></div>
+              <div id="fi-palette" class="muet"></div>
+              <label class="champ">Intensité<input type="range" id="fi-force" min="0.3" max="1" step="0.05" value="0.9"></label>
+              <div class="comparer" id="fi-comp"></div>
+              <div class="ligne"><button class="btn petit" id="fi-voir">Aperçu avant / après</button><button class="btn petit plein" id="fi-auto">Recolorer</button></div>
+              <div class="progres"><div id="fi-barre"></div></div>
+              <details><summary class="muet">Ou avec Claude (plus précis, élément par élément)</summary>
+                <label class="champ">Correspondances <span class="muet">(facultatif)</span><input type="text" id="fi-corr" value="${esc(h.correspondances || '')}" placeholder="Ex. : les roses blanches deviennent bordeaux"></label>
+                <div class="ligne"><button class="btn petit" id="fi-copier-etal">Copier le prompt</button><button class="btn petit" id="fi-video2">Télécharger le fond actuel</button></div>
+                <p class="muet" style="margin:0">Envoyez à Claude le prompt, le fond actuel (vidéo 1) et votre vidéo (vidéo 2).</p></details>
             </div>
           </div>
-          <div id="fi-bloc-idee" class="pile" style="${h.mode === 'recolorer' ? 'display:none' : ''}">
-          <p class="ia-etape" style="margin-top:6px">3. Votre idée <span class="muet" style="font-weight:400">(facultatif)</span></p>
-          <textarea id="fi-idee" rows="2" style="width:100%" placeholder="Ex. : plus de lumière dorée, des bougies sur les côtés…">${esc(h.idee || '')}</textarea>
-          <div class="ligne" style="gap:6px">${(IDEES[role] || IDEES.intermediaire).map(t => `<button class="btn petit" data-idee="${esc(t)}">${esc(t)}</button>`).join('')}</div>
-          <div class="deux"><label class="champ">Mouvement<select id="fi-mvt">${['calme', 'moyen', 'vivant'].map(m => `<option ${h.mouvement === m ? 'selected' : ''}>${m}</option>`).join('')}</select></label>
-            <label class="champ">Durée de la vidéo (s)<input type="number" id="fi-duree" min="5" max="15" value="${h.duree || Math.max(8, Math.ceil(Number(pl.duree) || 8))}"></label></div>
-          </div>
-          <button class="btn plein" id="fi-generer">Régénérer le prompt</button>
         </div>
-        <div class="pile">
-          <p class="ia-etape">4. Copier le prompt et joindre les fichiers</p>
-          <div class="onglets" id="fi-onglets" style="margin:0"><a href="#" data-cible="ia" class="actif">Pour ChatGPT ou Claude</a><a href="#" data-cible="video">Directement pour Sora, Veo, Kling, Runway, Wan 2.2</a></div>
-          <textarea class="prompt-zone" id="fi-prompt" readonly></textarea>
-          <div class="ligne"><button class="btn plein" id="fi-copier">Copier le prompt</button><button class="btn plein" id="fi-video">Télécharger la vidéo de fond actuelle</button><button class="btn petit" id="fi-image">ou l'image</button><button class="btn petit" id="fi-fondseul" title="Première image du fond, sans les textes : point de départ pour Wan 2.2 (image vers vidéo)">Image du fond seul (Wan 2.2)</button></div>
-          <div class="wan-boite" id="fi-wan-boite"><button class="btn ia" id="fi-wan">▶ Générer avec Wan 2.2 sur mon RunPod</button><span class="muet" id="fi-wan-etat">${reglages.comfy && reglages.comfy.url ? 'Le studio envoie le prompt et l\'image du fond seul à votre ComfyUI, puis récupère la vidéo.' : 'À relier une fois dans <a href="#/reglages">Réglages</a>.'}</span></div>
-          <p class="muet" style="margin:0" id="fi-joindre">Envoyez le prompt avec la vidéo de fond actuelle jointe : l'IA s'en sert comme modèle pour créer la nouvelle vidéo.</p><p class="muet" style="margin:0" id="fi-note"> ChatGPT peut créer la vidéo s'il a accès à la génération vidéo ; sinon il rend un prompt anglais amélioré pour un générateur de vidéo. Claude écrit le prompt mais ne crée pas de vidéo.</p>
-          <p class="ia-etape" style="margin-top:6px">5. Importer la nouvelle vidéo <span class="muet" style="font-weight:400">(ou celle recolorée ici)</span></p>
-          <div class="ligne"><label class="btn plein">Choisir la vidéo<input type="file" id="fi-fichier" accept="video/*" hidden></label><span id="fi-apercu" class="muet">Verticale 9:16, de préférence 1080 × 1920, sans texte.</span></div>
-          <div class="deux"><label class="champ">Nom du fond<input type="text" id="fi-nom" value="${esc('Fond plan ' + (k + 1) + ' — ' + (p.fiche.titre || '').slice(0, 30))}"></label>
-          <label class="champ">Usage<select id="fi-usage">${['ouverture', 'titre', 'programme', 'confirmation', 'remerciement'].map(u => `<option ${u === usage ? 'selected' : ''}>${u}</option>`).join('')}</select></label></div>
-          <div class="cases"><label><input type="checkbox" id="fi-autres"> Remplacer aussi dans les autres plans qui utilisent le fond actuel</label></div>
-          <button class="btn plein" id="fi-utiliser" disabled>Utiliser ce fond pour le plan ${k + 1}</button>
+        <div class="pile nf-bloc nf-resultat">
+          <p class="ia-etape">3. Résultat</p>
+          <div class="nf-ecran" id="fi-apercu"><span class="muet">La nouvelle vidéo s'affichera ici.</span></div>
+          <label class="btn petit" style="align-self:center">Importer une vidéo de l'ordinateur<input type="file" id="fi-fichier" accept="video/*" hidden></label>
+          <button class="btn petit" id="fi-harmo" hidden>Harmoniser ses couleurs avec le fond actuel</button>
+          ${autresPlans ? `<label class="cases"><input type="checkbox" id="fi-autres"> Aussi pour les ${autresPlans} autre${autresPlans > 1 ? 's' : ''} plan${autresPlans > 1 ? 's' : ''} qui ont ce fond</label>` : ''}
+          <button class="btn plein" id="fi-utiliser" disabled>Utiliser ce fond</button>
         </div>
       </div>`, (box, fermer) => {
-      let cible = 'ia', fichier = null;
+      let cible = 'ia', fichier = null, video2 = null, paletteRef = null, statsRef = null;
       let inspiration = h.inspiration || '';
-      const mode = () => ($('input[name=fi-mode]:checked', box) || {}).value || 'actuel';
-      const lire = () => ({ idee: $('#fi-idee', box).value.trim(), mouvement: $('#fi-mvt', box).value, duree: Number($('#fi-duree', box).value) || 8, mode: mode(), inspiration, suivre: $('#fi-suivre', box).value });
-      let video2 = null, paletteRef = null, statsRef = null;
-      const majJoindre = () => {
-        const j = $('#fi-joindre', box);
-        const rec = mode() === 'recolorer';
-        $('#fi-onglets', box).style.display = rec ? 'none' : '';
-        $('#fi-note', box).textContent = rec ? ' Claude sait faire cette recoloration (il mesure la palette, puis recolore la vidéo 2 et vous rend le MP4) ; ChatGPT aussi s\'il peut traiter des vidéos.' : ' ChatGPT peut créer la vidéo s\'il a accès à la génération vidéo ; sinon il rend un prompt anglais amélioré pour un générateur de vidéo. Claude écrit le prompt mais ne crée pas de vidéo.';
-        if (rec) { j.innerHTML = video2 ? `Joignez au prompt <b>la vidéo 1</b> (fond actuel, bouton ci-dessus) <b>et la vidéo 2</b> (${esc(video2.name)}).` : '<b>Choisissez d\'abord la vidéo à recolorer</b> (étape 2).'; return; }
-        if (mode() === 'autre') j.innerHTML = inspiration ? `Joignez au prompt <b>votre fichier d'inspiration</b> (${esc(inspiration)})${$('#fi-suivre', box).value === 'fond' ? ' <b>et la vidéo de fond actuelle</b>' : ''}.` : '<b>Choisissez d\'abord le fichier d\'inspiration</b> (étape 2).';
-        else j.textContent = 'Joignez au prompt la vidéo de fond actuelle : l\'IA s\'en sert comme modèle pour créer un autre fond du même thème.';
-      };
+      let mouvement = h.mouvement || 'calme';
+      const duree = Math.max(5, Math.min(15, Math.ceil(Number(pl.duree) || 8)));
+      const inspOn = () => $('#fi-insp-on', box).checked;
+      const lire = () => ({ idee: $('#fi-idee', box).value.trim(), mouvement, duree, mode: methode === 'recolorer' ? 'recolorer' : (methode === 'ia' && inspOn() ? 'autre' : 'actuel'), inspiration, suivre: $('#fi-suivre', box).value, methode });
+      const calquesPris = () => (pl.calques || []).filter(c => !c.masque && !exclus.has(c.id)).map(c => ({ c, b: E.eng.bbox[c.id] }));
+      const promptEtal = () => { const zs = calquesPris().map(x => x.b).filter(Boolean);
+        return Fabrique.promptEtalonnage({ video1: nomRef(), video2: video2 ? video2.name : 'video-2.mp4', palette: paletteRef, correspondances: $('#fi-corr', box).value.trim(), zone: zs.length ? { haut: Math.round(Math.min(...zs.map(b => b.y))), bas: Math.round(Math.max(...zs.map(b => b.y + b.h))) } : null }); };
       const generer = () => {
         const o = lire();
-        const calques = (pl.calques || []).filter(c => !c.masque && !exclus.has(c.id)).map(c => ({ c, b: E.eng.bbox[c.id] }));
-        const zs = calques.map(x => x.b).filter(Boolean);
-        const texte = o.mode === 'recolorer'
-          ? Fabrique.promptEtalonnage({ video1: nomRef(), video2: video2 ? video2.name : '', palette: paletteRef, correspondances: $('#fi-corr', box).value.trim(), zone: zs.length ? { haut: Math.round(Math.min(...zs.map(b => b.y))), bas: Math.round(Math.max(...zs.map(b => b.y + b.h))) } : null })
-          : Fabrique.promptFond(p, k, Object.assign({ calques, fonds: tousFonds(), cible, reference: nomRef() }, o, { inspiration: o.mode === 'autre' ? (o.inspiration || 'inspiration') : '' }));
-        o.correspondances = $('#fi-corr', box).value.trim();
+        const texte = Fabrique.promptFond(p, k, Object.assign({ calques: calquesPris(), fonds: tousFonds(), cible, reference: nomRef() }, o, { inspiration: o.mode === 'autre' ? (o.inspiration || 'inspiration') : '' }));
         $('#fi-prompt', box).value = texte;
-        pl.fond_ia = Object.assign({}, pl.fond_ia || {}, o, { exclus: [...exclus], prompt: texte, date: new Date().toISOString() });
+        pl.fond_ia = Object.assign({}, pl.fond_ia || {}, o, { correspondances: $('#fi-corr', box).value.trim(), exclus: [...exclus], prompt: texte, date: new Date().toISOString() });
         enregistrer(p);
       };
-      generer(); majJoindre();
+      const choisirMethode = m => {
+        methode = m;
+        $$('[data-m]', box).forEach(b => b.classList.toggle('actif', b.dataset.m === m));
+        $$('[data-panneau]', box).forEach(d => d.style.display = d.dataset.panneau === m ? '' : 'none');
+        if (m === 'recolorer') mesurer();
+        generer();
+      };
       const urlFond = async () => { const src = pl.fond.media; if (/^idb:/.test(src)) { const b = await IDB.lire(src); return URL.createObjectURL(b); } return resoudre(src); };
       const mesurer = async () => {
         if (paletteRef) return;
         try {
-          $('#fi-palette', box).textContent = 'Mesure de la palette du fond actuel…';
+          $('#fi-palette', box).textContent = 'Mesure des couleurs du fond actuel…';
           const r = await Etalonnage.palette(await urlFond(), 6);
           paletteRef = r.palette; statsRef = r.stats;
-          $('#fi-palette', box).innerHTML = 'Palette du fond actuel : ' + paletteRef.map(x => `<span class="pastille" style="background:${x.hex}" title="${esc(x.role)} · ${x.part} %"></span>`).join('') + ' <span class="muet">(ajoutée au prompt)</span>';
-          generer();
+          $('#fi-palette', box).innerHTML = 'Couleurs visées : ' + paletteRef.map(x => `<span class="pastille" style="background:${x.hex}" title="${esc(x.role)} · ${x.part} %"></span>`).join('');
         } catch (e) { $('#fi-palette', box).textContent = e.message; }
       };
-      $$('input[name=fi-mode]', box).forEach(r => r.onchange = () => {
-        $('#fi-autre', box).style.display = mode() === 'autre' ? '' : 'none';
-        $('#fi-recol', box).style.display = mode() === 'recolorer' ? '' : 'none';
-        $('#fi-bloc-idee', box).style.display = mode() === 'recolorer' ? 'none' : '';
-        if (mode() === 'recolorer') mesurer();
-        generer(); majJoindre();
-      });
-      if (mode() === 'recolorer') mesurer();
-      $('#fi-corr', box).oninput = () => { clearTimeout(box._t); box._t = setTimeout(generer, 400); };
-      $('#fi-v2', box).onchange = e => { video2 = e.target.files[0]; if (!video2) return; $('#fi-v2-nom', box).textContent = video2.name; $('#fi-comp', box).innerHTML = ''; generer(); majJoindre(); };
-      let statsV2 = null, urlV2 = null;
-      const preparer = async () => {
-        if (!video2) throw new Error('Choisissez d\'abord la vidéo à recolorer');
-        await mesurer(); if (!statsRef) throw new Error('Palette du fond actuel indisponible');
-        if (!urlV2 || urlV2.nom !== video2.name) { urlV2 = { u: URL.createObjectURL(video2), nom: video2.name }; statsV2 = (await Etalonnage.palette(urlV2.u, 6)).stats; }
-        return Etalonnage.construireLUT(statsV2, statsRef, Number($('#fi-force', box).value));
+      const montrer = (f, note) => {
+        fichier = f;
+        const u = URL.createObjectURL(f);
+        $('#fi-apercu', box).innerHTML = `<video src="${u}" autoplay muted loop playsinline></video><div class="muet">${esc(note || f.name)} · <a href="${u}" download="${esc(f.name)}">télécharger</a></div>`;
+        $('#fi-utiliser', box).disabled = false;
+        $('#fi-harmo', box).hidden = false;
       };
-      $('#fi-voir', box).onclick = async () => {
-        try { const lut = await preparer(); const a = await Etalonnage.apercu(urlV2.u, lut); $('#fi-comp', box).innerHTML = `<div><img src="${a.avant}" style="width:110px;border-radius:8px"><br>Avant</div><div><img src="${a.apres}" style="width:110px;border-radius:8px"><br>Après</div>`; }
-        catch (e) { toast(e.message); }
-      };
-      $('#fi-force', box).oninput = () => { clearTimeout(box._f); box._f = setTimeout(() => { if ($('#fi-comp', box).innerHTML) $('#fi-voir', box).click(); }, 300); };
-      $('#fi-auto', box).onclick = async () => {
-        const b = $('#fi-auto', box); b.disabled = true;
-        try {
-          const lut = await preparer();
-          b.textContent = 'Recoloration en cours…';
-          const r = await Etalonnage.recolorer(urlV2.u, lut, { progres: v => { $('#fi-barre', box).style.width = Math.round(v * 100) + '%'; } });
-          fichier = new File([r.blob], video2.name.replace(/\.\w+$/, '') + '-recolore.' + r.extension, { type: r.blob.type });
-          const u = URL.createObjectURL(fichier);
-          $('#fi-apercu', box).innerHTML = `<video src="${u}" autoplay muted loop playsinline style="width:90px;aspect-ratio:9/16;object-fit:cover;border-radius:8px;vertical-align:middle"></video> ${esc(fichier.name)} <a href="${u}" download="${esc(fichier.name)}">télécharger</a>`;
-          $('#fi-utiliser', box).disabled = false;
-          toast('Vidéo recolorée : vérifiez-la à l\'étape 5, puis « Utiliser ce fond »');
-        } catch (e) { toast(e.message); }
-        b.disabled = false; b.textContent = 'Recolorer toute la vidéo';
-      };
-      $('#fi-suivre', box).onchange = () => { generer(); majJoindre(); };
-      $('#fi-insp', box).onchange = e => { const f = e.target.files[0]; if (!f) return; inspiration = f.name; $('#fi-insp-nom', box).textContent = f.name; generer(); majJoindre(); };
+      // ----- 1. idée, mouvement, calques -----
+      $$('[data-idee]', box).forEach(b => b.onclick = () => { const t = $('#fi-idee', box); t.value = (t.value ? t.value.replace(/[.\s]*$/, '') + '. ' : '') + b.dataset.idee; generer(); });
+      $('#fi-idee', box).oninput = () => { clearTimeout(box._t); box._t = setTimeout(generer, 400); };
+      $$('#fi-mvt button', box).forEach(b => b.onclick = () => { mouvement = b.dataset.v; $$('#fi-mvt button', box).forEach(x => x.classList.toggle('actif', x === b)); generer(); });
       $$('.calque-ia', box).forEach(l => {
         const id = l.dataset.id, c = pl.calques.find(x => x.id === id);
         $('input[type=checkbox]', l).onchange = e => { if (e.target.checked) exclus.delete(id); else exclus.add(id); l.classList.toggle('off', !e.target.checked); generer(); };
         const t = $('.ci-texte', l);
         if (t) t.oninput = () => { E.modif(); c.texte = t.value; E.rafraichir(); generer(); };
       });
-      $$('[data-idee]', box).forEach(b => b.onclick = () => { const t = $('#fi-idee', box); t.value = (t.value ? t.value.replace(/[.\s]*$/, '') + '. ' : '') + b.dataset.idee; generer(); });
-      $('#fi-idee', box).oninput = () => { clearTimeout(box._t); box._t = setTimeout(generer, 500); };
-      $('#fi-mvt', box).onchange = generer; $('#fi-duree', box).oninput = generer;
-      $('#fi-generer', box).onclick = () => { generer(); toast('Prompt régénéré'); };
-      $$('[data-cible]', box).forEach(a => a.onclick = e => { e.preventDefault(); cible = a.dataset.cible; $$('[data-cible]', box).forEach(x => x.classList.toggle('actif', x === a)); generer(); });
-      $('#fi-copier', box).onclick = () => copier($('#fi-prompt', box).value);
-      $('#fi-video', box).onclick = async () => {
+      // ----- 2. méthodes -----
+      $$('[data-m]', box).forEach(b => b.onclick = () => choisirMethode(b.dataset.m));
+      $$('#fi-cible button', box).forEach(b => b.onclick = () => { cible = b.dataset.v; $$('#fi-cible button', box).forEach(x => x.classList.toggle('actif', x === b)); generer(); });
+      $('#fi-insp-on', box).onchange = () => { $('#fi-autre', box).style.display = inspOn() ? '' : 'none'; generer(); };
+      $('#fi-insp', box).onchange = e => { const f = e.target.files[0]; if (!f) return; inspiration = f.name; $('#fi-insp-nom', box).textContent = f.name; generer(); };
+      $('#fi-suivre', box).onchange = generer;
+      $('#fi-copier', box).onclick = () => { generer(); copier($('#fi-prompt', box).value); };
+      const telechargerFond = async () => {
         try {
           const src = pl.fond.media;
-          let blob = /^idb:/.test(src) ? await IDB.lire(src) : await (await fetch(await resoudre(src))).blob();
+          const blob = /^idb:/.test(src) ? await IDB.lire(src) : await (await fetch(await resoudre(src))).blob();
           if (!blob) throw new Error('fichier introuvable');
           telecharger(nomRef(), blob);
         } catch (e) { toast('Téléchargement impossible : ' + e.message); }
       };
+      $('#fi-video', box).onclick = telechargerFond; $('#fi-video2', box).onclick = telechargerFond;
+      $('#fi-copier-etal', box).onclick = async () => { await mesurer(); copier(promptEtal()); };
       const imageFondSeul = async () => {
-          const u = await urlFond();
-          const v = document.createElement('video'); v.muted = true; v.src = u;
-          await new Promise((ok, ko) => { v.onloadeddata = ok; v.onerror = () => ko(new Error('vidéo illisible')); });
-          await new Promise(ok => { v.onseeked = ok; v.currentTime = Math.min(1, (v.duration || 2) / 2); });
-          const c = document.createElement('canvas'); c.width = 704; c.height = 1280;
-          const g = c.getContext('2d'); const r = Math.max(704 / v.videoWidth, 1280 / v.videoHeight);
-          g.drawImage(v, (704 - v.videoWidth * r) / 2, (1280 - v.videoHeight * r) / 2, v.videoWidth * r, v.videoHeight * r);
-          return dataURLversBlob(c.toDataURL('image/jpeg', 0.92));
+        const u = await urlFond();
+        const v = document.createElement('video'); v.muted = true; v.src = u;
+        await new Promise((ok, ko) => { v.onloadeddata = ok; v.onerror = () => ko(new Error('vidéo illisible')); });
+        await new Promise(ok => { v.onseeked = ok; v.currentTime = Math.min(1, (v.duration || 2) / 2); });
+        const c = document.createElement('canvas'); c.width = 704; c.height = 1280;
+        const g = c.getContext('2d'); const r = Math.max(704 / v.videoWidth, 1280 / v.videoHeight);
+        g.drawImage(v, (704 - v.videoWidth * r) / 2, (1280 - v.videoHeight * r) / 2, v.videoWidth * r, v.videoHeight * r);
+        return dataURLversBlob(c.toDataURL('image/jpeg', 0.92));
       };
       $('#fi-wan', box).onclick = async () => {
         const cf = reglages.comfy || {};
-        if (!cf.url) { toast('Collez d\'abord l\'adresse de votre pod RunPod dans Réglages'); return; }
-        if (mode() === 'recolorer') { toast('Wan 2.2 crée des vidéos, il ne recolore pas : utilisez « Recolorer toute la vidéo »'); return; }
+        if (!cf.url) { location.hash = '#/reglages'; fermer(); toast('Collez d\'abord l\'adresse de votre pod'); return; }
         const b = $('#fi-wan', box), etat = $('#fi-wan-etat', box); b.disabled = true;
         etat.textContent = 'Vérification du pod…';
-        if (!(await podPret())) { b.disabled = false; etat.textContent = 'Pod pas prêt : cliquez à nouveau sur Générer quand vous voulez.'; return; }
+        if (!(await podPret())) { b.disabled = false; etat.textContent = 'Pod pas prêt : recliquez sur Générer quand vous voulez.'; return; }
         try {
-          const o = lire();
-          const calques = (pl.calques || []).filter(c => !c.masque && !exclus.has(c.id)).map(c => ({ c, b: E.eng.bbox[c.id] }));
-          const prompt = Fabrique.promptFond(p, k, Object.assign({ calques, fonds: tousFonds(), reference: '' }, o, { cible: 'video', inspiration: '' })).replace(/^Use the attached reference video.*\n/, '').replace(/1080x1920, \d+ seconds/, '704x1280, 5 seconds');
+          const prompt = Fabrique.promptFond(p, k, Object.assign({ calques: calquesPris(), fonds: tousFonds(), reference: '' }, lire(), { mode: 'actuel', cible: 'video', inspiration: '' })).replace(/^Use the attached reference video.*\n/, '').replace(/1080x1920, \d+ seconds/, '704x1280, 5 seconds');
           const imageBlob = await imageFondSeul();
           let wf = Comfy.WORKFLOWS[cf.modele || '14b'] || Comfy.WORKFLOW_14B;
           if (cf.modele === 'perso') { try { wf = Fabrique.lireJSON(cf.workflow); } catch (e) { throw new Error('Le workflow collé dans Réglages est illisible'); } }
           const r = await Comfy.generer(cf.url, wf, { imageBlob, prompt, negatif: 'text, letters, words, numbers, watermark, logo, people, faces', secondes: 5, maxImages: (cf.modele || '14b') === '14b' ? 81 : 121 }, t => { etat.textContent = t; });
-          fichier = new File([r.blob], 'wan-plan-' + (k + 1) + '-' + r.nom.split('/').pop(), { type: r.blob.type || 'video/mp4' });
-          const u = URL.createObjectURL(fichier);
-          $('#fi-apercu', box).innerHTML = `<video src="${u}" autoplay muted loop playsinline style="width:90px;aspect-ratio:9/16;object-fit:cover;border-radius:8px;vertical-align:middle"></video> ${esc(fichier.name)} <a href="${u}" download="${esc(fichier.name)}">télécharger</a>`;
-          $('#fi-utiliser', box).disabled = false;
-          etat.textContent = 'Vidéo reçue : vérifiez-la à l\'étape 5. Si les couleurs s\'écartent, recolorez-la (choix 3 de l\'étape 2).';
+          montrer(new File([r.blob], 'wan-plan-' + (k + 1) + '-' + r.nom.split('/').pop(), { type: r.blob.type || 'video/mp4' }), 'Créée par Wan 2.2');
+          etat.textContent = 'Vidéo reçue, voir à droite.';
         } catch (e) { etat.textContent = e.message; }
         b.disabled = false;
       };
-      $('#fi-fondseul', box).onclick = async () => {
+      // ----- recoloration (gratuite, dans le navigateur) -----
+      let statsV2 = null, urlV2 = null;
+      $('#fi-v2', box).onchange = e => { video2 = e.target.files[0]; if (!video2) return; $('#fi-v2-nom', box).textContent = video2.name; $('#fi-comp', box).innerHTML = ''; };
+      const preparer = async () => {
+        if (!video2) throw new Error('Choisissez d\'abord la vidéo à recolorer');
+        await mesurer(); if (!statsRef) throw new Error('Couleurs du fond actuel indisponibles');
+        if (!urlV2 || urlV2.f !== video2) { urlV2 = { u: URL.createObjectURL(video2), f: video2 }; statsV2 = (await Etalonnage.palette(urlV2.u, 6)).stats; }
+        return Etalonnage.construireLUT(statsV2, statsRef, Number($('#fi-force', box).value));
+      };
+      $('#fi-voir', box).onclick = async () => {
+        try { const lut = await preparer(); const a = await Etalonnage.apercu(urlV2.u, lut); $('#fi-comp', box).innerHTML = `<div><img src="${a.avant}" style="width:96px;border-radius:8px"><br>Avant</div><div><img src="${a.apres}" style="width:96px;border-radius:8px"><br>Après</div>`; }
+        catch (e) { toast(e.message); }
+      };
+      $('#fi-force', box).oninput = () => { clearTimeout(box._f); box._f = setTimeout(() => { if ($('#fi-comp', box).innerHTML) $('#fi-voir', box).click(); }, 300); };
+      const recolorer = async (b, libelle) => {
+        b.disabled = true;
         try {
-          const u = await urlFond();
-          const v = document.createElement('video'); v.muted = true; v.src = u;
-          await new Promise((ok, ko) => { v.onloadeddata = ok; v.onerror = () => ko(new Error('vidéo illisible')); });
-          await new Promise(ok => { v.onseeked = ok; v.currentTime = Math.min(1, (v.duration || 2) / 2); });
-          const c = document.createElement('canvas'); c.width = 704; c.height = 1280;
-          const g = c.getContext('2d'); const r = Math.max(704 / v.videoWidth, 1280 / v.videoHeight);
-          g.drawImage(v, (704 - v.videoWidth * r) / 2, (1280 - v.videoHeight * r) / 2, v.videoWidth * r, v.videoHeight * r);
-          telecharger(nomRef().replace(/\.mp4$/, '') + '-704x1280.jpg', dataURLversBlob(c.toDataURL('image/jpeg', 0.92)));
-        } catch (e) { toast('Image impossible : ' + e.message); }
+          const lut = await preparer();
+          b.textContent = 'Recoloration…';
+          const r = await Etalonnage.recolorer(urlV2.u, lut, { progres: v => { $('#fi-barre', box).style.width = Math.round(v * 100) + '%'; b.textContent = 'Recoloration… ' + Math.round(v * 100) + ' %'; } });
+          montrer(new File([r.blob], video2.name.replace(/\.\w+$/, '') + '-recolore.' + r.extension, { type: r.blob.type }), 'Recolorée aux couleurs du fond actuel');
+        } catch (e) { toast(e.message); }
+        b.disabled = false; b.textContent = libelle;
       };
-      $('#fi-image', box).onclick = () => { try { telecharger(`mise-en-page-plan-${k + 1}.jpg`, dataURLversBlob(E.eng.imageTest())); } catch (e) { toast(e.message); } };
-      $('#fi-fichier', box).onchange = e => {
-        fichier = e.target.files[0]; if (!fichier) return;
-        const u = URL.createObjectURL(fichier);
-        $('#fi-apercu', box).innerHTML = `<video src="${u}" autoplay muted loop playsinline style="width:90px;aspect-ratio:9/16;object-fit:cover;border-radius:8px;vertical-align:middle"></video> ${esc(fichier.name)}`;
-        $('#fi-utiliser', box).disabled = false;
-      };
+      $('#fi-auto', box).onclick = () => recolorer($('#fi-auto', box), 'Recolorer');
+      $('#fi-harmo', box).onclick = () => { if (!fichier) return; video2 = fichier; $('#fi-v2-nom', box).textContent = fichier.name; recolorer($('#fi-harmo', box), 'Harmoniser ses couleurs avec le fond actuel'); };
+      // ----- 3. résultat -----
+      $('#fi-fichier', box).onchange = e => { const f = e.target.files[0]; if (f) montrer(f); };
       $('#fi-utiliser', box).onclick = async () => {
         if (!fichier) return;
         const m = await importerFichier(fichier, 'fond');
         const o = lire();
-        Object.assign(m, { nom: $('#fi-nom', box).value.trim() || m.nom, usage: $('#fi-usage', box).value, description: o.idee || 'Fond créé avec l\'IA pour le plan ' + (k + 1), description_en: '', zone_texte: 'voir la mise en page du plan ' + (k + 1), origine: 'ia' });
+        Object.assign(m, { nom: 'Fond plan ' + (k + 1) + ' — ' + (p.fiche.titre || '').slice(0, 30), usage, description: o.idee || 'Fond créé pour le plan ' + (k + 1), description_en: '', zone_texte: 'voir la mise en page du plan ' + (k + 1), origine: 'ia' });
         sauverMedias();
         E.modif(true);
         const ancien = pl.fond.media;
-        if ($('#fi-autres', box).checked) p.plans.forEach(x => { if (x.fond && x.fond.media === ancien) x.fond.media = m.src; });
+        if ($('#fi-autres', box) && $('#fi-autres', box).checked) p.plans.forEach(x => { if (x.fond && x.fond.media === ancien) x.fond.media = m.src; });
         pl.fond.media = m.src;
         pl.fond_ia = Object.assign(pl.fond_ia || {}, { fichier: m.src });
         enregistrer(p); fermer();
         E.eng.precharger().then(() => { E.eng._entrerPlan(); E.afficher(); });
         toast('Nouveau fond appliqué (↶ pour revenir en arrière)');
       };
+      choisirMethode(methode);
     });
   }
 
@@ -1620,8 +1608,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <p class="muet">Textes variables : {famille}, {places}, {date}, {heure}, {date_limite}, {compte_a_rebours} sont remplacés automatiquement.</p>`)}
       ${etape('3b', 'Fond, photos et animations d\'un plan', `
         <ul><li><b>Fond vidéo</b> (en haut à droite) : choisissez un fond de la bibliothèque, ou <b>Importer un fond</b> directement depuis le plan. Le studio indique combien de plans utilisent déjà ce fond.</li>
-        <li><b>✨ Créer un fond sur mesure (IA)</b> : quand il vous manque un fond, ou qu'un même fond revient trop souvent. La fenêtre montre d'abord <b>les calques du plan</b> (textes, boutons, photos) avec leur contenu et leur place : ils sont décrits un par un dans le prompt, pour que le nouveau fond leur laisse de l'espace. Corrigez un texte ou décochez un calque si besoin. Choisissez ensuite le <b>point de départ</b> : le fond actuel (l'IA crée un autre fond du même thème, proche de son décor), ou <b>une autre vidéo ou image d'inspiration</b>, même sans rapport avec le thème, que l'IA transforme aux couleurs du fond actuel ou de toute l'invitation. Votre idée est <b>facultative</b>. Troisième choix : <b>Recolorer une vidéo déjà prête</b> (étalonnage). Le studio mesure la palette du fond actuel et prépare le prompt pour Claude, qui recolore la vidéo élément par élément et vous rend le MP4. Ou bien cliquez <b>Recolorer toute la vidéo</b> pour le faire directement dans le studio, gratuitement (réglez l'intensité, vérifiez avec Aperçu avant / après). Copiez le prompt, cliquez <b>Télécharger la vidéo de fond actuelle</b> et joignez-la au prompt dans ChatGPT (ou Sora, Veo, Kling, Runway) : l'IA s'en sert comme modèle. Importez ensuite la nouvelle vidéo : elle remplace le fond du plan et rejoint la bibliothèque. Le prompt se régénère à chaque changement.</li>
-        <li><b>Wan 2.2</b> (gratuit, open source) : il crée des vidéos à partir d'un texte ou d'une image, mais il tourne sur un ordinateur avec une bonne carte graphique (ComfyUI), pas dans le navigateur. Dans « Créer un fond sur mesure », choisissez « Le fond actuel du plan », copiez le prompt de l'onglet <b>Directement pour … Wan 2.2</b> et téléchargez <b>l'image du fond seul</b> (704 × 1280) comme image de départ. Wan 2.2 rend des vidéos de 5 secondes : le studio les fait boucler. Il ne sait pas recolorer une vidéo existante : pour cela, utilisez « Recolorer toute la vidéo » dans le studio. <b>Avec un pod RunPod</b> : collez l'adresse du pod dans Réglages, puis le bouton <b>▶ Générer avec Wan 2.2 sur mon RunPod</b> envoie le prompt et l'image du fond seul, attend la fin (souvent 3 à 10 minutes) et place la vidéo à l'étape 5.</li>
+        <li><b>✨ Créer un fond sur mesure (IA)</b> : quand il vous manque un fond, ou qu'un même fond revient trop souvent. La fenêtre a trois parties. <b>1. Votre idée</b> (facultatif) : quelques mots ou une suggestion, et le mouvement (calme, moyen, vivant). Le studio ajoute tout seul le thème, les couleurs de l'invitation et la place à laisser à chaque calque (liste dans « Calques pris en compte », à décocher si besoin). <b>2. Comment le créer</b> : <b>Wan 2.2</b> (automatique sur votre pod), <b>ChatGPT, Sora…</b> (copiez le prompt, joignez le fond actuel téléchargé ; vous pouvez partir d'une autre vidéo ou image d'inspiration) ou <b>Recolorer</b> une vidéo déjà prête aux couleurs du fond actuel (gratuit, ici même ; ou avec Claude pour plus de précision). <b>3. Résultat</b> : la vidéo s'affiche ; « Harmoniser ses couleurs » la rapproche du fond actuel si besoin, puis <b>Utiliser ce fond</b>.</li>
+        <li><b>Wan 2.2</b> (gratuit, open source) : il tourne sur votre pod RunPod (ComfyUI). Le studio lui envoie l'image du fond actuel et le prompt, puis récupère la vidéo (5 s, environ 5 minutes) : vous n'avez rien à copier ni à télécharger. L'adresse du pod se règle une seule fois dans Réglages.</li>
         <li><b>Démarrer le pod</b> : cliquez simplement sur « ▶ Générer avec Wan 2.2 ». Si le pod est éteint, le studio ouvre un assistant avec les liens à cliquer (Start sur RunPod, puis le terminal pour l'arrêt automatique) et coche chaque étape tout seul ; la génération démarre d'elle-même quand Wan 2.2 est prêt (5 à 20 min après Start). Le même assistant est dans Réglages → « Démarrer le pod ».</li>
         <li><b>Arrêt automatique du pod RunPod</b> : après chaque démarrage du pod, collez dans son terminal JupyterLab la commande donnée par l'assistant (ou dans Réglages). Ensuite, si le pod ne travaille plus depuis 1 minute, le studio affiche « Arrêter ou continuer ? ». Sans réponse dans les 30 secondes, le pod s'arrête tout seul (même studio fermé). Pour le relancer : RunPod → Pods → ▶ Start.</li>
         <li><b>+ Photo / vidéo</b> : choisissez un fichier sur l'ordinateur ou le téléphone ; il est posé tout de suite sur le plan. Réglez sa taille, sa forme (ronde, arrondie), sa bordure.</li>
