@@ -598,7 +598,7 @@
       this.onTemps = () => { ecoule = (performance.now() - debut) / 1000; if (opts.progres) opts.progres(Math.min(1, ecoule / total)); };
       const termine = new Promise(res => { this.onFin = res; });
       rec.start(250);
-      if (musique) { try { await audioCtx.resume(); musique.currentTime = 0; await musique.play(); } catch (e) {} }
+      if (musique) { try { await audioCtx.resume(); musique.currentTime = opts.debut || 0; await musique.play(); } catch (e) {} }
       this.jouer(seq, 0);
       await termine;
       await new Promise(r => setTimeout(r, 300));

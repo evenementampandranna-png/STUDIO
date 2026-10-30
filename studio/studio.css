@@ -238,7 +238,7 @@ textarea.edition-directe { position: absolute; z-index: 8; resize: none; overflo
 .segment { display: inline-flex; border: 1px solid var(--ligne); border-radius: 99px; overflow: hidden; background: #fff; flex-wrap: wrap; }
 .segment button { border: 0; background: none; padding: 5px 12px; font: inherit; font-size: 13px; cursor: pointer; color: var(--gris); }
 .segment button.actif { background: var(--vin); color: #fff; }
-.nf-methodes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.nf-methodes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .nf-methodes button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; border: 1.5px solid var(--ligne); background: #fff; border-radius: 12px; padding: 10px 12px; font: inherit; cursor: pointer; }
 .nf-methodes button span { font-size: 12px; color: var(--gris); }
 .nf-methodes button.actif { border-color: var(--vin); box-shadow: 0 0 0 3px rgba(122,31,43,.12); }
@@ -253,3 +253,13 @@ textarea.edition-directe { position: absolute; z-index: 8; resize: none; overflo
 @media (max-width: 760px) { .nf-grille { grid-template-columns: 1fr; } .nf-methodes { grid-template-columns: 1fr; } .nf-resultat { position: static; } }
 
 [hidden] { display: none !important; }
+
+.nf-photos { display: flex; flex-wrap: wrap; gap: 8px; }
+.nf-photo { width: 64px; height: 64px; border-radius: 10px; border: 2px solid var(--ligne); background: #fff; padding: 0; overflow: hidden; cursor: pointer; display: grid; place-items: center; font-size: 24px; color: var(--gris); }
+.nf-photo img { width: 100%; height: 100%; object-fit: cover; }
+.nf-photo.actif { border-color: var(--vin); box-shadow: 0 0 0 3px rgba(122,31,43,.15); }
+.puce.actif { background: var(--vin); border-color: var(--vin); color: #fff; }
+
+.bib-evt { background: #fbf7f1; border: 1px solid var(--ligne); border-radius: 12px; padding: 10px 14px; margin: 6px 0 16px; }
+.bib-evt select { min-width: 240px; }
+@media (max-width: 760px) { .nf-methodes { grid-template-columns: 1fr; } }

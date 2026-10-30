@@ -37,9 +37,9 @@
 <button id="son" aria-label="Son">♪</button>
 <div id="bandeau" role="dialog"></div>
 <div id="erreur"></div>
-<script src="../config.js?v=202610301225"></script>
-<script src="../moteur/moteur.js?v=202610301225"></script>
-<script src="../moteur/fabrique.js?v=202610301225"></script>
+<script src="../config.js?v=202610301457"></script>
+<script src="../moteur/moteur.js?v=202610301457"></script>
+<script src="../moteur/fabrique.js?v=202610301457"></script>
 <script>
 (async function () {
   const q = new URLSearchParams(location.search);
@@ -119,7 +119,10 @@
   let musique = null;
   if (projet.musique && projet.musique.src) {
     musique = new Audio(await resoudre(projet.musique.src));
-    musique.loop = true; musique.volume = projet.musique.volume != null ? projet.musique.volume : .8;
+    const debutM = Number(projet.musique.debut) || 0;
+    musique.volume = projet.musique.volume != null ? projet.musique.volume : .8;
+    musique.addEventListener('loadedmetadata', () => { if (debutM) musique.currentTime = debutM; }, { once: true });
+    musique.addEventListener('ended', () => { musique.currentTime = debutM; musique.play().catch(() => {}); });
     $('#son').style.display = 'block';
     $('#son').onclick = () => { if (musique.paused) { musique.play(); $('#son').textContent = '♪'; } else { musique.pause(); $('#son').textContent = '×'; } };
   }
