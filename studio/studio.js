@@ -1095,7 +1095,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           const imageBlob = await imageFondSeul();
           let wf = Comfy.WORKFLOWS[cf.modele || '14b'] || Comfy.WORKFLOW_14B;
           if (cf.modele === 'perso') { try { wf = Fabrique.lireJSON(cf.workflow); } catch (e) { throw new Error('Le workflow collé dans Réglages est illisible'); } }
-          const r = await Comfy.generer(cf.url, wf, { imageBlob, prompt, negatif: 'text, letters, words, numbers, watermark, logo, people, faces', secondes: Math.min(o.duree || 5, 10) }, t => { etat.textContent = t; });
+          const r = await Comfy.generer(cf.url, wf, { imageBlob, prompt, negatif: 'text, letters, words, numbers, watermark, logo, people, faces', secondes: 5, maxImages: (cf.modele || '14b') === '14b' ? 81 : 121 }, t => { etat.textContent = t; });
           fichier = new File([r.blob], 'wan-plan-' + (k + 1) + '-' + r.nom.split('/').pop(), { type: r.blob.type || 'video/mp4' });
           const u = URL.createObjectURL(fichier);
           $('#fi-apercu', box).innerHTML = `<video src="${u}" autoplay muted loop playsinline style="width:90px;aspect-ratio:9/16;object-fit:cover;border-radius:8px;vertical-align:middle"></video> ${esc(fichier.name)} <a href="${u}" download="${esc(fichier.name)}">télécharger</a>`;
