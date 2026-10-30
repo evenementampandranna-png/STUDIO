@@ -957,7 +957,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
                 <div class="comparer" id="fi-wan-comp"></div>
                 <p class="muet" style="margin:0">Le studio la recadre en vertical et la passe aux couleurs du fond actuel avant de l'envoyer ; Wan 2.2 l'anime et l'adapte au thème.</p>
               </div>
-              <p class="muet" style="margin:0" id="fi-wan-expl">Wan 2.2 anime l'image de départ dans le thème de l'invitation (environ 5 minutes). Si le pod est éteint, le studio vous guide pour l'allumer.</p>
+              <p class="muet" style="margin:0" id="fi-wan-expl">Environ 5 minutes. Si le pod est éteint, le studio vous guide pour l'allumer.</p>
 <div id="fi-bloc-idee" class="pile" style="gap:8px">
             <b style="font-size:14px">Votre idée <span class="muet" style="font-weight:400">(facultatif)</span></b>
             <textarea id="fi-idee" rows="2" placeholder="Ex. : plus de lumière dorée, des bougies sur les côtés…">${esc(h.idee || '')}</textarea>
