@@ -324,10 +324,9 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <div class="commandes">
             <button class="btn petit" id="jouer-plan">▶ Plan</button><button class="btn petit" id="jouer-tout">▶ Toute l'invitation</button><button class="btn petit" id="stop">■</button>
             <select id="vue" class="btn petit"><option value="famille">Voir : lien personnel</option><option value="general">Voir : lien général</option></select>
-            <button class="btn petit" id="musique-btn" title="Chanson de l'invitation">♪ ${p.musique ? esc((p.musique.nom || 'Chanson').replace(/\.\w+$/, '').slice(0, 18)) : 'Ajouter une chanson'}</button>
             <button class="btn petit icone" id="annuler" title="Annuler">↶</button><button class="btn petit icone" id="refaire" title="Rétablir">↷</button>
           </div>
-          <div class="commandes"><button class="btn petit" id="img-test">Image test</button><button class="btn ia" id="finaliser">✨ Finaliser ce plan avec l'IA</button></div>
+          <div class="commandes"><button class="btn petit" id="musique-btn" title="Chanson de l'invitation">♪ ${p.musique ? esc((p.musique.nom || 'Chanson').replace(/\.\w+$/, '').slice(0, 18)) : 'Ajouter une chanson'}</button><button class="btn petit" id="img-test">Image test</button><button class="btn ia" id="finaliser">✨ Finaliser ce plan avec l'IA</button></div>
         </div>
         <div class="col-reglages carte" id="col-reglages"></div>
       </div>`;
@@ -1047,13 +1046,13 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
               <span class="muet" id="fi-wan-etat">${wanOk ? '' : 'Ajoutez d\'abord l\'adresse de votre pod dans <a href="#/reglages">Réglages</a>.'}</span>
             </div>
             <div data-panneau="animer" class="pile">
-              <b style="font-size:14px">Image à animer</b>
+              <div><b style="font-size:14px">Image à animer</b></div>
               <div class="nf-photos">${photos.map(c => `<button class="nf-photo ${c.id === ouv.calque ? 'actif' : ''}" data-photo="${c.id}" title="Photo du plan"><img src="${esc((medias.find(m => m.src === c.media) || {}).vignette || '')}" alt=""></button>`).join('')}
                 <label class="nf-photo nf-photo-plus" title="Choisir une autre image">＋<input type="file" id="fi-anim-src" accept="image/*" hidden></label></div>
-              <span class="muet" id="fi-anim-nom">${photos.length ? 'Choisissez une photo du plan, ou ＋ pour une autre image.' : 'Choisissez une image (＋) : elle sera posée sur le fond.'}</span>
-              <b style="font-size:14px">Mouvement</b>
+              <div class="muet" id="fi-anim-nom">${photos.length ? 'Choisissez une photo du plan, ou ＋ pour une autre image.' : 'Choisissez une image (＋) : elle sera posée sur le fond.'}</div>
+              <div><b style="font-size:14px">Mouvement</b></div>
               <div class="nf-puces" id="fi-anim-mvt">${ANIM_MVT.map((x, i) => `<button class="puce ${i === 0 ? 'actif' : ''}" data-v="${i}">${esc(x[0])}</button>`).join('')}</div>
-              <input type="text" id="fi-anim-idee" placeholder="Précision facultative : ex. le voile de la mariée bouge au vent">
+              <input type="text" id="fi-anim-idee" style="width:100%" placeholder="Précision facultative : ex. le voile de la mariée bouge au vent">
               <label class="cases"><input type="checkbox" id="fi-anim-theme"> Passer l'image aux couleurs du thème</label>
               <p class="muet" style="margin:0">Les visages et les personnes restent identiques. Environ 4 à 5 minutes ; si le pod est éteint, le studio vous guide.</p>
               <button class="btn ia" id="fi-animer">▶ Animer avec Wan 2.2</button>
