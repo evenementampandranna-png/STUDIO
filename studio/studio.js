@@ -967,6 +967,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <div class="onglets" id="fi-onglets" style="margin:0"><a href="#" data-cible="ia" class="actif">Pour ChatGPT ou Claude</a><a href="#" data-cible="video">Directement pour Sora, Veo, Kling, Runway, Wan 2.2</a></div>
           <textarea class="prompt-zone" id="fi-prompt" readonly></textarea>
           <div class="ligne"><button class="btn plein" id="fi-copier">Copier le prompt</button><button class="btn plein" id="fi-video">Télécharger la vidéo de fond actuelle</button><button class="btn petit" id="fi-image">ou l'image</button><button class="btn petit" id="fi-fondseul" title="Première image du fond, sans les textes : point de départ pour Wan 2.2 (image vers vidéo)">Image du fond seul (Wan 2.2)</button></div>
+          <div class="wan-boite" id="fi-wan-boite"><button class="btn ia" id="fi-wan">▶ Générer avec Wan 2.2 sur mon RunPod</button><span class="muet" id="fi-wan-etat">${reglages.comfy && reglages.comfy.url ? 'Le studio envoie le prompt et l\'image du fond seul à votre ComfyUI, puis récupère la vidéo.' : 'À relier une fois dans <a href="#/reglages">Réglages</a>.'}</span></div>
           <p class="muet" style="margin:0" id="fi-joindre">Envoyez le prompt avec la vidéo de fond actuelle jointe : l'IA s'en sert comme modèle pour créer la nouvelle vidéo.</p><p class="muet" style="margin:0" id="fi-note"> ChatGPT peut créer la vidéo s'il a accès à la génération vidéo ; sinon il rend un prompt anglais amélioré pour un générateur de vidéo. Claude écrit le prompt mais ne crée pas de vidéo.</p>
           <p class="ia-etape" style="margin-top:6px">5. Importer la nouvelle vidéo <span class="muet" style="font-weight:400">(ou celle recolorée ici)</span></p>
           <div class="ligne"><label class="btn plein">Choisir la vidéo<input type="file" id="fi-fichier" accept="video/*" hidden></label><span id="fi-apercu" class="muet">Verticale 9:16, de préférence 1080 × 1920, sans texte.</span></div>
@@ -1071,6 +1072,36 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           if (!blob) throw new Error('fichier introuvable');
           telecharger(nomRef(), blob);
         } catch (e) { toast('Téléchargement impossible : ' + e.message); }
+      };
+      const imageFondSeul = async () => {
+          const u = await urlFond();
+          const v = document.createElement('video'); v.muted = true; v.src = u;
+          await new Promise((ok, ko) => { v.onloadeddata = ok; v.onerror = () => ko(new Error('vidéo illisible')); });
+          await new Promise(ok => { v.onseeked = ok; v.currentTime = Math.min(1, (v.duration || 2) / 2); });
+          const c = document.createElement('canvas'); c.width = 704; c.height = 1280;
+          const g = c.getContext('2d'); const r = Math.max(704 / v.videoWidth, 1280 / v.videoHeight);
+          g.drawImage(v, (704 - v.videoWidth * r) / 2, (1280 - v.videoHeight * r) / 2, v.videoWidth * r, v.videoHeight * r);
+          return dataURLversBlob(c.toDataURL('image/jpeg', 0.92));
+      };
+      $('#fi-wan', box).onclick = async () => {
+        const cf = reglages.comfy || {};
+        if (!cf.url) { toast('Collez d\'abord l\'adresse de votre pod RunPod dans Réglages'); return; }
+        if (mode() === 'recolorer') { toast('Wan 2.2 crée des vidéos, il ne recolore pas : utilisez « Recolorer toute la vidéo »'); return; }
+        const b = $('#fi-wan', box), etat = $('#fi-wan-etat', box); b.disabled = true;
+        try {
+          const o = lire();
+          const calques = (pl.calques || []).filter(c => !c.masque && !exclus.has(c.id)).map(c => ({ c, b: E.eng.bbox[c.id] }));
+          const prompt = Fabrique.promptFond(p, k, Object.assign({ calques, fonds: tousFonds(), reference: '' }, o, { cible: 'video', inspiration: '' })).replace(/^Use the attached reference video.*\n/, '').replace(/1080x1920, \d+ seconds/, '704x1280, 5 seconds');
+          const imageBlob = await imageFondSeul();
+          let wf = null; if (cf.workflow) { try { wf = Fabrique.lireJSON(cf.workflow); } catch (e) { throw new Error('Le workflow collé dans Réglages est illisible'); } }
+          const r = await Comfy.generer(cf.url, wf, { imageBlob, prompt, negatif: 'text, letters, words, numbers, watermark, logo, people, faces', secondes: Math.min(o.duree || 5, 10) }, t => { etat.textContent = t; });
+          fichier = new File([r.blob], 'wan-plan-' + (k + 1) + '-' + r.nom.split('/').pop(), { type: r.blob.type || 'video/mp4' });
+          const u = URL.createObjectURL(fichier);
+          $('#fi-apercu', box).innerHTML = `<video src="${u}" autoplay muted loop playsinline style="width:90px;aspect-ratio:9/16;object-fit:cover;border-radius:8px;vertical-align:middle"></video> ${esc(fichier.name)} <a href="${u}" download="${esc(fichier.name)}">télécharger</a>`;
+          $('#fi-utiliser', box).disabled = false;
+          etat.textContent = 'Vidéo reçue : vérifiez-la à l\'étape 5. Si les couleurs s\'écartent, recolorez-la (choix 3 de l\'étape 2).';
+        } catch (e) { etat.textContent = e.message; }
+        b.disabled = false;
       };
       $('#fi-fondseul', box).onclick = async () => {
         try {
@@ -1502,6 +1533,19 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <label class="champ">Configuration web Firebase (JSON)<textarea id="fb" rows="7" placeholder='{"apiKey":"...","authDomain":"...","projectId":"..."}'>${reglages.firebase ? esc(JSON.stringify(reglages.firebase, null, 1)) : ''}</textarea></label>
           <button class="btn plein" id="fb-ok">Enregistrer</button>
         </div>
+        <div class="carte pile"><h3>Wan 2.2 sur RunPod (ComfyUI)</h3>
+          <p class="muet">Pour que le bouton « Générer avec Wan 2.2 » du fond sur mesure envoie la demande à votre pod et récupère la vidéo tout seul.</p>
+          <label class="champ">Adresse de votre pod ComfyUI<input type="url" id="cf-url" value="${esc((reglages.comfy || {}).url || '')}" placeholder="https://xxxxxxxx-8188.proxy.runpod.net"></label>
+          <div class="ligne"><button class="btn plein" id="cf-ok">Enregistrer</button><button class="btn" id="cf-test">Tester</button><span class="muet" id="cf-etat"></span></div>
+          <details><summary class="muet" style="cursor:pointer">Votre propre workflow (facultatif)</summary>
+            <p class="muet">Par défaut, le studio utilise le modèle officiel « Wan 2.2 5B image vers vidéo » de ComfyUI. Si vos fichiers de modèle portent d'autres noms ou si vous utilisez le 14B : ouvrez votre workflow image vers vidéo qui marche dans ComfyUI, puis menu <b>Workflow → Export (API)</b>, et collez le contenu du fichier ici. Il doit contenir un nœud « Load Image » et un « Save Video ».</p>
+            <textarea id="cf-wf" rows="6" style="width:100%" placeholder='{"1": {"class_type": "UNETLoader", ...}}'>${esc((reglages.comfy || {}).workflow || '')}</textarea></details>
+          <details><summary class="muet" style="cursor:pointer">Comment trouver l'adresse et autoriser le studio ?</summary><ol class="muet">
+            <li>Sur console.runpod.io → <b>Pods</b> → votre pod ComfyUI → <b>Connect</b> → <b>Connect to HTTP Service [Port 8188]</b>. Copiez l'adresse qui s'ouvre (elle finit par <b>-8188.proxy.runpod.net</b>).</li>
+            <li>ComfyUI doit accepter les demandes venant du studio : il faut le lancer avec l'option <b>--enable-cors-header</b>. Selon votre modèle de pod, ajoutez-la aux arguments de lancement de ComfyUI (variable d'environnement ou commande de démarrage du template), puis redémarrez le pod.</li>
+            <li>Cliquez <b>Tester</b> : le studio affiche la carte graphique du pod si tout va bien.</li>
+            <li>Arrêtez le pod quand vous ne vous en servez pas : RunPod facture le temps où il tourne.</li></ol></details>
+        </div>
         <div class="carte pile"><h3>Sauvegarde</h3>
           <p class="muet">Vos projets sont gardés dans ce navigateur. Exportez-les régulièrement, ou pour passer sur un autre appareil.</p>
           <div class="ligne"><button class="btn" id="exp-tout">Exporter tous les projets</button><label class="btn">Importer une sauvegarde<input type="file" id="imp-tout" accept=".json" hidden></label></div>
@@ -1513,6 +1557,9 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       try { const r = await fetch(`https://api.github.com/repos/${reglages.github.owner}/${reglages.github.repo}`, { headers: GitHub.entetes() }); const j = await r.json(); $('#g-etat').textContent = r.ok ? (j.permissions && j.permissions.push ? 'Connexion réussie' : 'Connecté, mais sans droit d\'écriture') : 'Échec : ' + (j.message || r.status); }
       catch (e) { $('#g-etat').textContent = 'Échec : ' + e.message; }
     };
+    const lireCf = () => { reglages.comfy = { url: Comfy.nettoyerUrl($('#cf-url').value), workflow: $('#cf-wf').value.trim() }; sauverReglages(); };
+    $('#cf-ok').onclick = () => { lireCf(); toast('Enregistré'); };
+    $('#cf-test').onclick = async () => { lireCf(); $('#cf-etat').textContent = 'Test…'; try { $('#cf-etat').textContent = 'Connexion réussie : ' + await Comfy.tester(reglages.comfy.url); } catch (e) { $('#cf-etat').textContent = e.message; } };
     $('#fb-ok').onclick = () => { const v = $('#fb').value.trim(); if (!v) { reglages.firebase = null; sauverReglages(); return toast('Firebase désactivé'); } try { const t = v.replace(/^[^{]*/, '').replace(/[^}]*$/, ''); reglages.firebase = JSON.parse(t.replace(/(\w+)\s*:/g, '"$1":').replace(/""/g, '"').replace(/'/g, '"')); sauverReglages(); toast('Firebase enregistré'); } catch (e) { toast('Configuration illisible'); } };
     $('#exp-tout').onclick = () => telecharger('studio-sauvegarde.json', JSON.stringify({ projets, medias: medias.map(m => Object.assign({}, m)) }, null, 1));
     $('#imp-tout').onchange = async e => { try { const j = JSON.parse(await e.target.files[0].text()); Object.assign(projets, j.projets || {}); sauverProjets(); toast('Sauvegarde importée'); } catch (err) { toast('Fichier invalide'); } };
@@ -1550,7 +1597,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       ${etape('3b', 'Fond, photos et animations d\'un plan', `
         <ul><li><b>Fond vidéo</b> (en haut à droite) : choisissez un fond de la bibliothèque, ou <b>Importer un fond</b> directement depuis le plan. Le studio indique combien de plans utilisent déjà ce fond.</li>
         <li><b>✨ Créer un fond sur mesure (IA)</b> : quand il vous manque un fond, ou qu'un même fond revient trop souvent. La fenêtre montre d'abord <b>les calques du plan</b> (textes, boutons, photos) avec leur contenu et leur place : ils sont décrits un par un dans le prompt, pour que le nouveau fond leur laisse de l'espace. Corrigez un texte ou décochez un calque si besoin. Choisissez ensuite le <b>point de départ</b> : le fond actuel (l'IA crée un autre fond du même thème, proche de son décor), ou <b>une autre vidéo ou image d'inspiration</b>, même sans rapport avec le thème, que l'IA transforme aux couleurs du fond actuel ou de toute l'invitation. Votre idée est <b>facultative</b>. Troisième choix : <b>Recolorer une vidéo déjà prête</b> (étalonnage). Le studio mesure la palette du fond actuel et prépare le prompt pour Claude, qui recolore la vidéo élément par élément et vous rend le MP4. Ou bien cliquez <b>Recolorer toute la vidéo</b> pour le faire directement dans le studio, gratuitement (réglez l'intensité, vérifiez avec Aperçu avant / après). Copiez le prompt, cliquez <b>Télécharger la vidéo de fond actuelle</b> et joignez-la au prompt dans ChatGPT (ou Sora, Veo, Kling, Runway) : l'IA s'en sert comme modèle. Importez ensuite la nouvelle vidéo : elle remplace le fond du plan et rejoint la bibliothèque. Le prompt se régénère à chaque changement.</li>
-        <li><b>Wan 2.2</b> (gratuit, open source) : il crée des vidéos à partir d'un texte ou d'une image, mais il tourne sur un ordinateur avec une bonne carte graphique (ComfyUI), pas dans le navigateur. Dans « Créer un fond sur mesure », choisissez « Le fond actuel du plan », copiez le prompt de l'onglet <b>Directement pour … Wan 2.2</b> et téléchargez <b>l'image du fond seul</b> (704 × 1280) comme image de départ. Wan 2.2 rend des vidéos de 5 secondes : le studio les fait boucler. Il ne sait pas recolorer une vidéo existante : pour cela, utilisez « Recolorer toute la vidéo » dans le studio.</li>
+        <li><b>Wan 2.2</b> (gratuit, open source) : il crée des vidéos à partir d'un texte ou d'une image, mais il tourne sur un ordinateur avec une bonne carte graphique (ComfyUI), pas dans le navigateur. Dans « Créer un fond sur mesure », choisissez « Le fond actuel du plan », copiez le prompt de l'onglet <b>Directement pour … Wan 2.2</b> et téléchargez <b>l'image du fond seul</b> (704 × 1280) comme image de départ. Wan 2.2 rend des vidéos de 5 secondes : le studio les fait boucler. Il ne sait pas recolorer une vidéo existante : pour cela, utilisez « Recolorer toute la vidéo » dans le studio. <b>Avec un pod RunPod</b> : collez l'adresse du pod dans Réglages, puis le bouton <b>▶ Générer avec Wan 2.2 sur mon RunPod</b> envoie le prompt et l'image du fond seul, attend la fin (souvent 3 à 10 minutes) et place la vidéo à l'étape 5.</li>
         <li><b>+ Photo / vidéo</b> : choisissez un fichier sur l'ordinateur ou le téléphone ; il est posé tout de suite sur le plan. Réglez sa taille, sa forme (ronde, arrondie), sa bordure.</li>
         <li><b>Animation</b> d'un texte ou d'une photo : un effet d'<b>entrée</b> (fondu, lettre par lettre, mot par mot, zoom, rebond, flou, glissement…) et un effet de <b>sortie</b>, chacun avec son moment et sa durée. <b>▶ Voir l'animation</b> pour vérifier.</li>
         <li><b>Éviter les chevauchements de textes</b> : remet les textes du plan les uns sous les autres, sans qu'ils se touchent.</li></ul>`)}
