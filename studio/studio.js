@@ -913,7 +913,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     const usage = { ouverture: 'ouverture', confirmation: 'confirmation', remerciement: 'remerciement' }[role] || 'programme';
     const exclus = new Set(h.exclus || []);
     const wanOk = !!(reglages.comfy && reglages.comfy.url);
-    let methode = h.methode || (h.mode === 'recolorer' ? 'recolorer' : (wanOk ? 'wan' : 'ia'));
+    let methode = ['recolorer', 'wan'].includes(h.methode) ? h.methode : 'recolorer';
     const autresPlans = p.plans.filter((x, i) => i !== k && x.fond && x.fond.media === pl.fond.media).length;
     const nomRef = () => { const f = tousFonds().find(x => x.src === pl.fond.media); return ((f && f.nom) || 'fond').replace(/[^\w\-]+/g, '-').toLowerCase() + '-reference-plan-' + (k + 1) + '.mp4'; };
     const calquesVisibles = (pl.calques || []).filter(c => !c.masque);
@@ -932,39 +932,10 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       <div class="nf-grille">
         <div class="pile">
           <div class="pile nf-bloc">
-            <p class="ia-etape">1. Votre idée <span class="muet" style="font-weight:400">(facultatif)</span></p>
-            <textarea id="fi-idee" rows="2" placeholder="Ex. : plus de lumière dorée, des bougies sur les côtés…">${esc(h.idee || '')}</textarea>
-            <div class="nf-puces">${(IDEES[role] || IDEES.intermediaire).map(t => `<button class="puce" data-idee="${esc(t)}">+ ${esc(t)}</button>`).join('')}</div>
-            <div class="ligne"><label class="muet">Mouvement</label><div class="segment" id="fi-mvt">${['calme', 'moyen', 'vivant'].map(m => `<button data-v="${m}" class="${(h.mouvement || 'calme') === m ? 'actif' : ''}">${m}</button>`).join('')}</div></div>
-            <details><summary class="muet">Calques pris en compte (${calquesVisibles.length})</summary>
-              <p class="muet" style="margin:6px 0">Le fond laissera de la place pour chacun. Décochez-en un s'il ne compte pas.</p>
-              <div id="fi-calques" class="pile">${lignesCalques() || '<p class="muet">Aucun calque sur ce plan.</p>'}</div></details>
-          </div>
-          <div class="pile nf-bloc">
-            <p class="ia-etape">2. Comment le créer ?</p>
+            <p class="ia-etape">1. Comment le créer ?</p>
             <div class="nf-methodes">
-              <button data-m="wan"><b>Wan 2.2</b><span>Automatique, sur votre pod</span></button>
-              <button data-m="ia"><b>ChatGPT, Sora…</b><span>Copier un prompt</span></button>
-              <button data-m="recolorer"><b>Recolorer</b><span>Une vidéo déjà prête</span></button>
-            </div>
-            <div data-panneau="wan" class="pile">
-              <p class="muet" style="margin:0">Le studio part de l'image du fond actuel, envoie tout à Wan 2.2 et récupère la vidéo (environ 5 minutes). Si le pod est éteint, il vous guide pour l'allumer.</p>
-              <button class="btn ia" id="fi-wan">▶ Générer avec Wan 2.2</button>
-              <span class="muet" id="fi-wan-etat">${wanOk ? '' : 'Ajoutez d\'abord l\'adresse de votre pod dans <a href="#/reglages">Réglages</a>.'}</span>
-            </div>
-            <div data-panneau="ia" class="pile">
-              <div class="segment" id="fi-cible"><button data-v="ia" class="actif">Pour ChatGPT ou Claude</button><button data-v="video">Pour Sora, Veo, Kling, Runway</button></div>
-              <label class="cases"><input type="checkbox" id="fi-insp-on" ${h.mode === 'autre' ? 'checked' : ''}> Partir d'une autre vidéo ou image d'inspiration</label>
-              <div id="fi-autre" class="ligne" style="${h.mode === 'autre' ? '' : 'display:none'}">
-                <label class="btn petit">Choisir le fichier<input type="file" id="fi-insp" accept="video/*,image/*" hidden></label><span class="muet" id="fi-insp-nom">${esc(h.inspiration || 'aucun fichier')}</span>
-                <select id="fi-suivre"><option value="fond" ${h.suivre !== 'invitation' ? 'selected' : ''}>au style du fond actuel</option><option value="invitation" ${h.suivre === 'invitation' ? 'selected' : ''}>au thème de l'invitation</option></select>
-              </div>
-              <ol class="nf-faire">
-                <li><button class="btn plein petit" id="fi-copier">Copier le prompt</button></li>
-                <li><button class="btn petit" id="fi-video">Télécharger le fond actuel</button> <span class="muet">et joignez-le au message</span></li>
-                <li class="muet">Récupérez la vidéo créée, puis importez-la à droite.</li>
-              </ol>
-              <details><summary class="muet">Voir le prompt</summary><textarea class="prompt-zone" id="fi-prompt" readonly></textarea></details>
+              <button data-m="recolorer"><b>Recolorer</b><span>Une vidéo déjà prête, aux couleurs du fond actuel</span></button>
+              <button data-m="wan"><b>Wan 2.2</b><span>Créer une nouvelle vidéo, automatiquement sur votre pod</span></button>
             </div>
             <div data-panneau="recolorer" class="pile">
               <p class="muet" style="margin:0">Gardez la composition et le mouvement d'une vidéo, et donnez-lui les couleurs du fond actuel. Gratuit, directement ici.</p>
@@ -979,10 +950,24 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
                 <div class="ligne"><button class="btn petit" id="fi-copier-etal">Copier le prompt</button><button class="btn petit" id="fi-video2">Télécharger le fond actuel</button></div>
                 <p class="muet" style="margin:0">Envoyez à Claude le prompt, le fond actuel (vidéo 1) et votre vidéo (vidéo 2).</p></details>
             </div>
+            <div data-panneau="wan" class="pile">
+              <p class="muet" style="margin:0">Le studio part de l'image du fond actuel, envoie tout à Wan 2.2 et récupère la vidéo (environ 5 minutes). Si le pod est éteint, il vous guide pour l'allumer.</p>
+              <button class="btn ia" id="fi-wan">▶ Générer avec Wan 2.2</button>
+              <span class="muet" id="fi-wan-etat">${wanOk ? '' : 'Ajoutez d\'abord l\'adresse de votre pod dans <a href="#/reglages">Réglages</a>.'}</span>
+            </div>
+          </div>
+          <div class="pile nf-bloc" id="fi-bloc-idee">
+            <p class="ia-etape">Votre idée pour Wan 2.2 <span class="muet" style="font-weight:400">(facultatif)</span></p>
+            <textarea id="fi-idee" rows="2" placeholder="Ex. : plus de lumière dorée, des bougies sur les côtés…">${esc(h.idee || '')}</textarea>
+            <div class="nf-puces">${(IDEES[role] || IDEES.intermediaire).map(t => `<button class="puce" data-idee="${esc(t)}">+ ${esc(t)}</button>`).join('')}</div>
+            <div class="ligne"><label class="muet">Mouvement</label><div class="segment" id="fi-mvt">${['calme', 'moyen', 'vivant'].map(m => `<button data-v="${m}" class="${(h.mouvement || 'calme') === m ? 'actif' : ''}">${m}</button>`).join('')}</div></div>
+            <details><summary class="muet">Calques pris en compte (${calquesVisibles.length})</summary>
+              <p class="muet" style="margin:6px 0">Le fond laissera de la place pour chacun. Décochez-en un s'il ne compte pas.</p>
+              <div id="fi-calques" class="pile">${lignesCalques() || '<p class="muet">Aucun calque sur ce plan.</p>'}</div></details>
           </div>
         </div>
         <div class="pile nf-bloc nf-resultat">
-          <p class="ia-etape">3. Résultat</p>
+          <p class="ia-etape">2. Résultat</p>
           <div class="nf-ecran" id="fi-apercu"><span class="muet">La nouvelle vidéo s'affichera ici.</span></div>
           <label class="btn petit" style="align-self:center">Importer une vidéo de l'ordinateur<input type="file" id="fi-fichier" accept="video/*" hidden></label>
           <button class="btn petit" id="fi-harmo" hidden>Harmoniser ses couleurs avec le fond actuel</button>
@@ -990,19 +975,17 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <button class="btn plein" id="fi-utiliser" disabled>Utiliser ce fond</button>
         </div>
       </div>`, (box, fermer) => {
-      let cible = 'ia', fichier = null, video2 = null, paletteRef = null, statsRef = null;
-      let inspiration = h.inspiration || '';
+      let fichier = null, video2 = null, paletteRef = null, statsRef = null;
       let mouvement = h.mouvement || 'calme';
       const duree = Math.max(5, Math.min(15, Math.ceil(Number(pl.duree) || 8)));
-      const inspOn = () => $('#fi-insp-on', box).checked;
-      const lire = () => ({ idee: $('#fi-idee', box).value.trim(), mouvement, duree, mode: methode === 'recolorer' ? 'recolorer' : (methode === 'ia' && inspOn() ? 'autre' : 'actuel'), inspiration, suivre: $('#fi-suivre', box).value, methode });
+      const lire = () => ({ idee: $('#fi-idee', box).value.trim(), mouvement, duree, mode: methode === 'recolorer' ? 'recolorer' : 'actuel', methode });
       const calquesPris = () => (pl.calques || []).filter(c => !c.masque && !exclus.has(c.id)).map(c => ({ c, b: E.eng.bbox[c.id] }));
       const promptEtal = () => { const zs = calquesPris().map(x => x.b).filter(Boolean);
         return Fabrique.promptEtalonnage({ video1: nomRef(), video2: video2 ? video2.name : 'video-2.mp4', palette: paletteRef, correspondances: $('#fi-corr', box).value.trim(), zone: zs.length ? { haut: Math.round(Math.min(...zs.map(b => b.y))), bas: Math.round(Math.max(...zs.map(b => b.y + b.h))) } : null }); };
+      const promptWan = () => Fabrique.promptFond(p, k, Object.assign({ calques: calquesPris(), fonds: tousFonds(), reference: '' }, lire(), { mode: 'actuel', cible: 'video', inspiration: '' })).replace(/^Use the attached reference video.*\n/, '').replace(/1080x1920, \d+ seconds/, '704x1280, 5 seconds');
       const generer = () => {
         const o = lire();
-        const texte = Fabrique.promptFond(p, k, Object.assign({ calques: calquesPris(), fonds: tousFonds(), cible, reference: nomRef() }, o, { inspiration: o.mode === 'autre' ? (o.inspiration || 'inspiration') : '' }));
-        $('#fi-prompt', box).value = texte;
+        const texte = promptWan();
         pl.fond_ia = Object.assign({}, pl.fond_ia || {}, o, { correspondances: $('#fi-corr', box).value.trim(), exclus: [...exclus], prompt: texte, date: new Date().toISOString() });
         enregistrer(p);
       };
@@ -1010,6 +993,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         methode = m;
         $$('[data-m]', box).forEach(b => b.classList.toggle('actif', b.dataset.m === m));
         $$('[data-panneau]', box).forEach(d => d.style.display = d.dataset.panneau === m ? '' : 'none');
+        $('#fi-bloc-idee', box).style.display = m === 'wan' ? '' : 'none';
         if (m === 'recolorer') mesurer();
         generer();
       };
@@ -1042,11 +1026,6 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       });
       // ----- 2. méthodes -----
       $$('[data-m]', box).forEach(b => b.onclick = () => choisirMethode(b.dataset.m));
-      $$('#fi-cible button', box).forEach(b => b.onclick = () => { cible = b.dataset.v; $$('#fi-cible button', box).forEach(x => x.classList.toggle('actif', x === b)); generer(); });
-      $('#fi-insp-on', box).onchange = () => { $('#fi-autre', box).style.display = inspOn() ? '' : 'none'; generer(); };
-      $('#fi-insp', box).onchange = e => { const f = e.target.files[0]; if (!f) return; inspiration = f.name; $('#fi-insp-nom', box).textContent = f.name; generer(); };
-      $('#fi-suivre', box).onchange = generer;
-      $('#fi-copier', box).onclick = () => { generer(); copier($('#fi-prompt', box).value); };
       const telechargerFond = async () => {
         try {
           const src = pl.fond.media;
@@ -1055,7 +1034,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           telecharger(nomRef(), blob);
         } catch (e) { toast('Téléchargement impossible : ' + e.message); }
       };
-      $('#fi-video', box).onclick = telechargerFond; $('#fi-video2', box).onclick = telechargerFond;
+      $('#fi-video2', box).onclick = telechargerFond;
       $('#fi-copier-etal', box).onclick = async () => { await mesurer(); copier(promptEtal()); };
       const imageFondSeul = async () => {
         const u = await urlFond();
@@ -1074,7 +1053,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         etat.textContent = 'Vérification du pod…';
         if (!(await podPret())) { b.disabled = false; etat.textContent = 'Pod pas prêt : recliquez sur Générer quand vous voulez.'; return; }
         try {
-          const prompt = Fabrique.promptFond(p, k, Object.assign({ calques: calquesPris(), fonds: tousFonds(), reference: '' }, lire(), { mode: 'actuel', cible: 'video', inspiration: '' })).replace(/^Use the attached reference video.*\n/, '').replace(/1080x1920, \d+ seconds/, '704x1280, 5 seconds');
+          const prompt = promptWan();
           const imageBlob = await imageFondSeul();
           let wf = Comfy.WORKFLOWS[cf.modele || '14b'] || Comfy.WORKFLOW_14B;
           if (cf.modele === 'perso') { try { wf = Fabrique.lireJSON(cf.workflow); } catch (e) { throw new Error('Le workflow collé dans Réglages est illisible'); } }
@@ -1608,7 +1587,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <p class="muet">Textes variables : {famille}, {places}, {date}, {heure}, {date_limite}, {compte_a_rebours} sont remplacés automatiquement.</p>`)}
       ${etape('3b', 'Fond, photos et animations d\'un plan', `
         <ul><li><b>Fond vidéo</b> (en haut à droite) : choisissez un fond de la bibliothèque, ou <b>Importer un fond</b> directement depuis le plan. Le studio indique combien de plans utilisent déjà ce fond.</li>
-        <li><b>✨ Créer un fond sur mesure (IA)</b> : quand il vous manque un fond, ou qu'un même fond revient trop souvent. La fenêtre a trois parties. <b>1. Votre idée</b> (facultatif) : quelques mots ou une suggestion, et le mouvement (calme, moyen, vivant). Le studio ajoute tout seul le thème, les couleurs de l'invitation et la place à laisser à chaque calque (liste dans « Calques pris en compte », à décocher si besoin). <b>2. Comment le créer</b> : <b>Wan 2.2</b> (automatique sur votre pod), <b>ChatGPT, Sora…</b> (copiez le prompt, joignez le fond actuel téléchargé ; vous pouvez partir d'une autre vidéo ou image d'inspiration) ou <b>Recolorer</b> une vidéo déjà prête aux couleurs du fond actuel (gratuit, ici même ; ou avec Claude pour plus de précision). <b>3. Résultat</b> : la vidéo s'affiche ; « Harmoniser ses couleurs » la rapproche du fond actuel si besoin, puis <b>Utiliser ce fond</b>.</li>
+        <li><b>✨ Créer un fond sur mesure (IA)</b> : quand il vous manque un fond, ou qu'un même fond revient trop souvent. Deux façons : <b>Recolorer</b> une vidéo déjà prête aux couleurs du fond actuel (gratuit, ici même ; ou avec Claude pour plus de précision), ou <b>Wan 2.2</b>, qui crée une nouvelle vidéo sur votre pod à partir du fond actuel. Pour Wan, ajoutez si vous voulez une idée et le mouvement : le studio ajoute tout seul le thème, les couleurs et la place à laisser à chaque calque (liste dans « Calques pris en compte »). La vidéo s'affiche à droite ; « Harmoniser ses couleurs » la rapproche du fond actuel si besoin, puis <b>Utiliser ce fond</b>.</li>
         <li><b>Wan 2.2</b> (gratuit, open source) : il tourne sur votre pod RunPod (ComfyUI). Le studio lui envoie l'image du fond actuel et le prompt, puis récupère la vidéo (5 s, environ 5 minutes) : vous n'avez rien à copier ni à télécharger. L'adresse du pod se règle une seule fois dans Réglages.</li>
         <li><b>Démarrer le pod</b> : cliquez simplement sur « ▶ Générer avec Wan 2.2 ». Si le pod est éteint, le studio ouvre un assistant avec les liens à cliquer (Start sur RunPod, puis le terminal pour l'arrêt automatique) et coche chaque étape tout seul ; la génération démarre d'elle-même quand Wan 2.2 est prêt (5 à 20 min après Start). Le même assistant est dans Réglages → « Démarrer le pod ».</li>
         <li><b>Arrêt automatique du pod RunPod</b> : après chaque démarrage du pod, collez dans son terminal JupyterLab la commande donnée par l'assistant (ou dans Réglages). Ensuite, si le pod ne travaille plus depuis 1 minute, le studio affiche « Arrêter ou continuer ? ». Sans réponse dans les 30 secondes, le pod s'arrête tout seul (même studio fermé). Pour le relancer : RunPod → Pods → ▶ Start.</li>
