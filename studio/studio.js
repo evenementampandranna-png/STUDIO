@@ -951,7 +951,13 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
                 <p class="muet" style="margin:0">Envoyez à Claude le prompt, le fond actuel (vidéo 1) et votre vidéo (vidéo 2).</p></details>
             </div>
             <div data-panneau="wan" class="pile">
-              <p class="muet" style="margin:0">Le studio part de l'image du fond actuel, envoie tout à Wan 2.2 et récupère la vidéo (environ 5 minutes). Si le pod est éteint, il vous guide pour l'allumer.</p>
+              <div class="ligne"><span class="muet">Partir de</span><div class="segment" id="fi-depart"><button data-v="actuel" class="${h.depart_wan !== 'fichier' ? 'actif' : ''}">l'image du fond actuel</button><button data-v="fichier" class="${h.depart_wan === 'fichier' ? 'actif' : ''}">ma photo ou vidéo</button></div></div>
+              <div id="fi-depart-fichier" class="pile" style="gap:6px;${h.depart_wan === 'fichier' ? '' : 'display:none'}">
+                <div class="ligne"><label class="btn petit plein">Choisir la photo ou la vidéo<input type="file" id="fi-wan-src" accept="image/*,video/*" hidden></label><span class="muet" id="fi-wan-src-nom">aucun fichier</span></div>
+                <div class="comparer" id="fi-wan-comp"></div>
+                <p class="muet" style="margin:0">Le studio la recadre en vertical et la passe aux couleurs du fond actuel avant de l'envoyer ; Wan 2.2 l'anime et l'adapte au thème.</p>
+              </div>
+              <p class="muet" style="margin:0" id="fi-wan-expl">Wan 2.2 anime l'image de départ dans le thème de l'invitation (environ 5 minutes). Si le pod est éteint, le studio vous guide pour l'allumer.</p>
 <div id="fi-bloc-idee" class="pile" style="gap:8px">
             <b style="font-size:14px">Votre idée <span class="muet" style="font-weight:400">(facultatif)</span></b>
             <textarea id="fi-idee" rows="2" placeholder="Ex. : plus de lumière dorée, des bougies sur les côtés…">${esc(h.idee || '')}</textarea>
@@ -978,11 +984,16 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       let fichier = null, video2 = null, paletteRef = null, statsRef = null;
       let mouvement = h.mouvement || 'calme';
       const duree = Math.max(5, Math.min(15, Math.ceil(Number(pl.duree) || 8)));
-      const lire = () => ({ idee: $('#fi-idee', box).value.trim(), mouvement, duree, mode: methode === 'recolorer' ? 'recolorer' : 'actuel', methode });
+      let departWan = h.depart_wan === 'fichier' ? 'fichier' : 'actuel', srcWan = null, imageWan = null;
+      const lire = () => ({ idee: $('#fi-idee', box).value.trim(), mouvement, duree, mode: methode === 'recolorer' ? 'recolorer' : 'actuel', methode, depart_wan: departWan });
       const calquesPris = () => (pl.calques || []).filter(c => !c.masque && !exclus.has(c.id)).map(c => ({ c, b: E.eng.bbox[c.id] }));
       const promptEtal = () => { const zs = calquesPris().map(x => x.b).filter(Boolean);
         return Fabrique.promptEtalonnage({ video1: nomRef(), video2: video2 ? video2.name : 'video-2.mp4', palette: paletteRef, correspondances: $('#fi-corr', box).value.trim(), zone: zs.length ? { haut: Math.round(Math.min(...zs.map(b => b.y))), bas: Math.round(Math.max(...zs.map(b => b.y + b.h))) } : null }); };
-      const promptWan = () => Fabrique.promptFond(p, k, Object.assign({ calques: calquesPris(), fonds: tousFonds(), reference: '' }, lire(), { mode: 'actuel', cible: 'video', inspiration: '' })).replace(/^Use the attached reference video.*\n/, '').replace(/1080x1920, \d+ seconds/, '704x1280, 5 seconds');
+      const promptWan = () => {
+        let t = Fabrique.promptFond(p, k, Object.assign({ calques: calquesPris(), fonds: tousFonds(), reference: '' }, lire(), { mode: 'actuel', cible: 'video', inspiration: '' })).replace(/^Use the attached reference video.*\n/, '').replace(/1080x1920, \d+ seconds/, '704x1280, 5 seconds');
+        if (departWan === 'fichier') t = 'Animate this image into an elegant invitation background. Keep its main subject and composition, and blend it fully into the invitation theme below: same colors first of all, same kind of decoration, textures and light.\n' + t;
+        return t;
+      };
       const generer = () => {
         const o = lire();
         const texte = promptWan();
@@ -1045,7 +1056,36 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         g.drawImage(v, (704 - v.videoWidth * r) / 2, (1280 - v.videoHeight * r) / 2, v.videoWidth * r, v.videoHeight * r);
         return dataURLversBlob(c.toDataURL('image/jpeg', 0.92));
       };
+      // Photo ou vidéo de l'utilisateur : recadrée en 704×1280, puis passée aux couleurs du fond actuel
+      const cadrer = async f => {
+        const u = URL.createObjectURL(f);
+        let el, w, hh;
+        if (/^video/.test(f.type)) {
+          el = document.createElement('video'); el.muted = true; el.src = u;
+          await new Promise((ok, ko) => { el.onloadeddata = ok; el.onerror = () => ko(new Error('vidéo illisible')); });
+          await new Promise(ok => { el.onseeked = ok; el.currentTime = Math.min(1, (el.duration || 2) / 2); });
+          w = el.videoWidth; hh = el.videoHeight;
+        } else {
+          el = new Image(); el.src = u; await el.decode().catch(() => { throw new Error('image illisible'); }); w = el.naturalWidth; hh = el.naturalHeight;
+        }
+        const c = document.createElement('canvas'); c.width = 704; c.height = 1280;
+        const r = Math.max(704 / w, 1280 / hh);
+        c.getContext('2d').drawImage(el, (704 - w * r) / 2, (1280 - hh * r) / 2, w * r, hh * r);
+        return c;
+      };
+      const preparerSrcWan = async () => {
+        if (!srcWan) throw new Error('Choisissez d\'abord votre photo ou vidéo');
+        const c = await cadrer(srcWan);
+        const avant = c.toDataURL('image/jpeg', 0.8);
+        await mesurer();
+        if (statsRef) Etalonnage.recolorerCanvas(c, Etalonnage.construireLUT(Etalonnage.statsCanvas(c), statsRef, 0.9));
+        $('#fi-wan-comp', box).innerHTML = `<div><img src="${avant}" style="width:72px;border-radius:6px"><br>Votre fichier</div><div><img src="${c.toDataURL('image/jpeg', 0.8)}" style="width:72px;border-radius:6px"><br>Aux couleurs du thème</div>`;
+        imageWan = dataURLversBlob(c.toDataURL('image/jpeg', 0.92));
+      };
+      $$('#fi-depart button', box).forEach(b => b.onclick = () => { departWan = b.dataset.v; $$('#fi-depart button', box).forEach(x => x.classList.toggle('actif', x === b)); $('#fi-depart-fichier', box).style.display = departWan === 'fichier' ? '' : 'none'; generer(); });
+      $('#fi-wan-src', box).onchange = async e => { srcWan = e.target.files[0]; imageWan = null; if (!srcWan) return; $('#fi-wan-src-nom', box).textContent = srcWan.name; try { await preparerSrcWan(); } catch (err) { toast(err.message); } };
       $('#fi-wan', box).onclick = async () => {
+        if (departWan === 'fichier' && !srcWan) { toast('Choisissez d\'abord votre photo ou vidéo'); return; }
         const cf = reglages.comfy || {};
         if (!cf.url) { location.hash = '#/reglages'; fermer(); toast('Collez d\'abord l\'adresse de votre pod'); return; }
         const b = $('#fi-wan', box), etat = $('#fi-wan-etat', box); b.disabled = true;
@@ -1053,7 +1093,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         if (!(await podPret())) { b.disabled = false; etat.textContent = 'Pod pas prêt : recliquez sur Générer quand vous voulez.'; return; }
         try {
           const prompt = promptWan();
-          const imageBlob = await imageFondSeul();
+          if (departWan === 'fichier' && !imageWan) await preparerSrcWan();
+          const imageBlob = departWan === 'fichier' ? imageWan : await imageFondSeul();
           let wf = Comfy.WORKFLOWS[cf.modele || '14b'] || Comfy.WORKFLOW_14B;
           if (cf.modele === 'perso') { try { wf = Fabrique.lireJSON(cf.workflow); } catch (e) { throw new Error('Le workflow collé dans Réglages est illisible'); } }
           const r = await Comfy.generer(cf.url, wf, { imageBlob, prompt, negatif: 'text, letters, words, numbers, watermark, logo, people, faces', secondes: 5, maxImages: (cf.modele || '14b') === '14b' ? 81 : 121 }, t => { etat.textContent = t; });
@@ -1586,7 +1627,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <p class="muet">Textes variables : {famille}, {places}, {date}, {heure}, {date_limite}, {compte_a_rebours} sont remplacés automatiquement.</p>`)}
       ${etape('3b', 'Fond, photos et animations d\'un plan', `
         <ul><li><b>Fond vidéo</b> (en haut à droite) : choisissez un fond de la bibliothèque, ou <b>Importer un fond</b> directement depuis le plan. Le studio indique combien de plans utilisent déjà ce fond.</li>
-        <li><b>✨ Créer un fond sur mesure (IA)</b> : quand il vous manque un fond, ou qu'un même fond revient trop souvent. Deux façons : <b>Recolorer</b> une vidéo déjà prête aux couleurs du fond actuel (gratuit, ici même ; ou avec Claude pour plus de précision), ou <b>Wan 2.2</b>, qui crée une nouvelle vidéo sur votre pod à partir du fond actuel. Pour Wan, ajoutez si vous voulez une idée et le mouvement : le studio ajoute tout seul le thème, les couleurs et la place à laisser à chaque calque (liste dans « Calques pris en compte »). La vidéo s'affiche à droite ; « Harmoniser ses couleurs » la rapproche du fond actuel si besoin, puis <b>Utiliser ce fond</b>.</li>
+        <li><b>✨ Créer un fond sur mesure (IA)</b> : quand il vous manque un fond, ou qu'un même fond revient trop souvent. Deux façons : <b>Recolorer</b> une vidéo déjà prête aux couleurs du fond actuel (gratuit, ici même ; ou avec Claude pour plus de précision), ou <b>Wan 2.2</b>, qui crée une nouvelle vidéo sur votre pod, en partant soit de l'image du fond actuel, soit de <b>votre propre photo ou vidéo</b> (le studio la recadre et la passe d'abord aux couleurs du fond actuel, puis Wan l'anime dans le thème). Pour Wan, ajoutez si vous voulez une idée et le mouvement : le studio ajoute tout seul le thème, les couleurs et la place à laisser à chaque calque (liste dans « Calques pris en compte »). La vidéo s'affiche à droite ; « Harmoniser ses couleurs » la rapproche du fond actuel si besoin, puis <b>Utiliser ce fond</b>.</li>
         <li><b>Wan 2.2</b> (gratuit, open source) : il tourne sur votre pod RunPod (ComfyUI). Le studio lui envoie l'image du fond actuel et le prompt, puis récupère la vidéo (5 s, environ 5 minutes) : vous n'avez rien à copier ni à télécharger. L'adresse du pod se règle une seule fois dans Réglages.</li>
         <li><b>Démarrer le pod</b> : cliquez simplement sur « ▶ Générer avec Wan 2.2 ». Si le pod est éteint, le studio ouvre un assistant avec les liens à cliquer (Start sur RunPod, puis le terminal pour l'arrêt automatique) et coche chaque étape tout seul ; la génération démarre d'elle-même quand Wan 2.2 est prêt (5 à 20 min après Start). Le même assistant est dans Réglages → « Démarrer le pod ».</li>
         <li><b>Arrêt automatique du pod RunPod</b> : après chaque démarrage du pod, collez dans son terminal JupyterLab la commande donnée par l'assistant (ou dans Réglages). Ensuite, si le pod ne travaille plus depuis 1 minute, le studio affiche « Arrêter ou continuer ? ». Sans réponse dans les 30 secondes, le pod s'arrête tout seul (même studio fermé). Pour le relancer : RunPod → Pods → ▶ Start.</li>

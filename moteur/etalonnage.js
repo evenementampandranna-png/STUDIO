@@ -183,5 +183,19 @@
     return { blob: new Blob(morceaux, { type: mime || 'video/webm' }), extension: /mp4/.test(mime) ? 'mp4' : 'webm' };
   }
 
-  global.Etalonnage = { palette, construireLUT, apercu, recolorer, rgbLab };
+  /* ---------- Image fixe (canvas) : stats et recoloration ---------- */
+  function statsCanvas(c) {
+    const p = document.createElement('canvas'); p.width = 72; p.height = Math.round(72 * c.height / c.width);
+    const x = p.getContext('2d', { willReadFrequently: true }); x.drawImage(c, 0, 0, p.width, p.height);
+    const d = x.getImageData(0, 0, p.width, p.height).data; const labs = [];
+    for (let j = 0; j < d.length; j += 4) labs.push(rgbLab(d[j], d[j + 1], d[j + 2]));
+    return statsLab(labs);
+  }
+  function recolorerCanvas(c, lut) {
+    const x = c.getContext('2d', { willReadFrequently: true });
+    const im = x.getImageData(0, 0, c.width, c.height); appliquer(im.data, lut); x.putImageData(im, 0, 0);
+    return c;
+  }
+
+  global.Etalonnage = { palette, construireLUT, apercu, recolorer, rgbLab, statsCanvas, recolorerCanvas };
 })(window);
