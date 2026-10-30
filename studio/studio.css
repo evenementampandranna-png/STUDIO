@@ -203,3 +203,6 @@ textarea.edition-directe { position: absolute; z-index: 8; resize: none; overflo
 .menu-ctx button:hover:not(:disabled) { background: #f6eee4; color: var(--vin); }
 .menu-ctx button:disabled { color: #bbb; cursor: default; }
 @media (max-width: 760px) { .astuce { display: none; } .poignee .h { width: 16px; height: 16px; } }
+.poignees.pinceau, .poignees.pinceau .poignee { cursor: copy; }
+.menu-ctx hr { border: 0; border-top: 1px solid var(--ligne); margin: 4px 0; }
+.barre-sel .btn:disabled { opacity: .35; }

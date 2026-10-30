@@ -304,7 +304,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <div class="col-apercu">
           <div class="barre-sel" id="barre-sel"></div>
           <div class="apercu-cadre" id="cadre" tabindex="0"><div id="scene"></div><div class="poignees" id="poignees"></div></div>
-          <div class="astuce">Double-clic : écrire dans le texte · Coins : agrandir · Côtés : élargir · Ctrl+C / Ctrl+V : copier-coller (aussi entre plans) · Ctrl+D : dupliquer · Suppr : supprimer · Flèches : déplacer · Clic droit : menu</div>
+          <div class="astuce">Double-clic : écrire dans le texte · Coins : agrandir · Côtés : élargir · Ctrl+C / Ctrl+V : copier-coller (aussi entre plans) · Ctrl+Alt+C / Ctrl+Alt+V : copier-coller la mise en forme · 🖌 : pinceau · Ctrl+D : dupliquer · Suppr : supprimer · Flèches : déplacer · Clic droit : menu</div>
           <div class="temps"><span id="t-aff">0,0 s</span><input type="range" id="t-curseur" min="0" max="6" step="0.05" value="0"><span id="t-dur"></span></div>
           <div class="commandes">
             <button class="btn petit" id="jouer-plan">▶ Plan</button><button class="btn petit" id="jouer-tout">▶ Toute l'invitation</button><button class="btn petit" id="stop">■</button>
@@ -396,6 +396,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         zone.setPointerCapture(e.pointerId); e.preventDefault(); return;
       }
       const c = calqueA(e);
+      if (pinceau) { if (c) { appliquerStyle([c]); } else { pinceau = false; zone.classList.remove('pinceau'); rendreBarre(); } return; }
       if (!c) { choisir(null); return; }
       choisir(c.id);
       drag = { mode: 'deplacer', c, x0: e.clientX, y0: e.clientY, cx: Number(c.x), cy: Number(c.y), w: r.width, h: r.height, bouge: false };
@@ -501,6 +502,49 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     function dupliquerCalque(c) { if (!c) return; const d = JSON.parse(JSON.stringify(c)); delete d._edition; E.modif(true); d.id = uid(); d.x = Math.min(95, Number(d.x) + 2); d.y = Math.min(95, Number(d.y) + 2); plan().calques.push(d); E.sel = d.id; E.rafraichir(); rendreReglages(); rendrePlans(); }
     function supprimerCalque(c) { if (!c) return; E.modif(true); const pl = plan(); pl.calques = pl.calques.filter(x => x.id !== c.id); E.sel = null; E.rafraichir(); rendreReglages(); rendrePlans(); }
     function ordreCalque(c, sens) { if (!c) return; const pl = plan(); const k = pl.calques.indexOf(c); E.modif(true); pl.calques.splice(k, 1); if (sens === 'avant') pl.calques.push(c); else pl.calques.unshift(c); E.rafraichir(); rendreReglages(); }
+    // Mise en forme : copier / coller le style d'un calque sur un autre (pinceau)
+    const STYLE_TEXTE = ['police', 'taille', 'couleur', 'gras', 'italique', 'majuscules', 'align', 'interligne', 'ombre', 'ombre_couleur', 'contour', 'contour_epaisseur', 'fond_couleur', 'fond_opacite', 'opacite', 'animation', 'duree_animation', 'sortie', 'duree_sortie'];
+    const STYLE_BOUTON = ['police', 'taille', 'couleur', 'style'];
+    const STYLE_MEDIA = ['forme', 'bordure', 'opacite', 'remplir', 'animation', 'duree_animation', 'sortie', 'duree_sortie'];
+    const clesStyle = t => t === 'texte' ? STYLE_TEXTE : (t === 'bouton' || t === 'compteur' || t === 'champ') ? STYLE_BOUTON : STYLE_MEDIA;
+    let pinceau = false;
+    function copierStyle(c) {
+      if (!c) return;
+      const props = {}; clesStyle(c.type).forEach(k => { if (c[k] !== undefined) props[k] = c[k]; });
+      Stock.ecrire('studio.style', { type: c.type, props });
+      toast('Mise en forme copiée : choisissez un calque puis « Coller la mise en forme » (Ctrl+Alt+V), ou cliquez-le avec le pinceau');
+      rendreBarre();
+    }
+    function appliquerStyle(cibles) {
+      const st = Stock.lire('studio.style', null);
+      if (!st) return toast('Copiez d\'abord une mise en forme (Ctrl+Alt+C)');
+      E.modif(true);
+      let n = 0;
+      cibles.forEach(c => {
+        const autorises = clesStyle(c.type);
+        Object.entries(st.props).forEach(([k, v]) => {
+          if (!autorises.includes(k)) return;
+          if (k === 'taille' && st.type !== c.type) return;     // tailles de texte et de bouton ne se comparent pas
+          c[k] = v;
+        });
+        n++;
+      });
+      E.rafraichir(); rendreReglages();
+      toast(n > 1 ? `Mise en forme appliquée à ${n} calques` : 'Mise en forme collée');
+    }
+    function collerStyle(c) { if (c) appliquerStyle([c]); }
+    function collerStylePartout(c, portee) {
+      const st = Stock.lire('studio.style', null); if (!st) return toast('Copiez d\'abord une mise en forme (Ctrl+Alt+C)');
+      const type = c ? c.type : st.type;
+      const plans = portee === 'invitation' ? p.plans : [plan()];
+      const cibles = []; plans.forEach(pl => (pl.calques || []).forEach(x => { if (x.type === type) cibles.push(x); }));
+      appliquerStyle(cibles);
+    }
+    function basculerPinceau() {
+      if (!pinceau) { if (calqueSel()) copierStyle(calqueSel()); else if (!Stock.lire('studio.style', null)) return toast('Choisissez d\'abord le calque dont vous voulez copier la mise en forme'); }
+      pinceau = !pinceau; zone.classList.toggle('pinceau', pinceau); rendreBarre();
+      if (pinceau) toast('Pinceau actif : cliquez les calques à mettre en forme (Échap pour arrêter)');
+    }
     E.copierCalque = copierCalque; E.collerCalque = collerCalque; E.dupliquerCalque = dupliquerCalque; E.supprimerCalque = supprimerCalque; E.ordreCalque = ordreCalque;
 
     const dansChamp = el => el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable);
@@ -509,6 +553,9 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       const c = calqueSel(), mod = e.ctrlKey || e.metaKey;
       if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); (e.shiftKey ? $('#refaire') : $('#annuler')).click(); return; }
       if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); $('#refaire').click(); return; }
+      if (mod && e.altKey && e.code === 'KeyC' && c) { e.preventDefault(); copierStyle(c); return; }
+      if (mod && e.altKey && e.code === 'KeyV' && c) { e.preventDefault(); collerStyle(c); return; }
+      if (e.key === 'Escape' && pinceau) { pinceau = false; zone.classList.remove('pinceau'); rendreBarre(); return; }
       if (mod && e.key.toLowerCase() === 'd' && c) { e.preventDefault(); dupliquerCalque(c); return; }
       if (!c) return;
       if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); supprimerCalque(c); return; }
@@ -542,7 +589,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       menu = document.createElement('div'); menu.className = 'menu-ctx';
       const it = (a, t, ok) => `<button data-m="${a}" ${ok === false ? 'disabled' : ''}>${t}</button>`;
       const ecr = c && (c.type === 'texte' || c.type === 'bouton' || c.type === 'compteur');
-      menu.innerHTML = (c ? it('editer', 'Modifier le texte', ecr) + it('copier', 'Copier  ·  Ctrl+C') + it('couper', 'Couper  ·  Ctrl+X') : '') + it('coller', 'Coller  ·  Ctrl+V', !!Stock.lire('studio.presse', null)) + (c ? it('dupliquer', 'Dupliquer  ·  Ctrl+D') + it('avant', 'Mettre au premier plan') + it('arriere', 'Mettre à l\'arrière-plan') + it('centrer', 'Centrer horizontalement') + it('suppr', 'Supprimer  ·  Suppr') : '');
+      menu.innerHTML = (c ? it('editer', 'Modifier le texte', ecr) + it('copier', 'Copier  ·  Ctrl+C') + it('couper', 'Couper  ·  Ctrl+X') : '') + it('coller', 'Coller  ·  Ctrl+V', !!Stock.lire('studio.presse', null)) + (c ? '<hr>' + it('style-c', 'Copier la mise en forme  ·  Ctrl+Alt+C') + it('style-v', 'Coller la mise en forme  ·  Ctrl+Alt+V', !!Stock.lire('studio.style', null)) + it('style-plan', 'Coller la mise en forme sur tout le plan', !!Stock.lire('studio.style', null)) + it('style-inv', 'Coller la mise en forme sur toute l\'invitation', !!Stock.lire('studio.style', null)) + '<hr>' : '') + (c ? it('dupliquer', 'Dupliquer  ·  Ctrl+D') + it('avant', 'Mettre au premier plan') + it('arriere', 'Mettre à l\'arrière-plan') + it('centrer', 'Centrer horizontalement') + it('suppr', 'Supprimer  ·  Suppr') : '');
       menu.style.left = (e.clientX - r.left) + 'px'; menu.style.top = (e.clientY - r.top) + 'px';
       $('.col-apercu').appendChild(menu);
       menu.onclick = ev => {
@@ -550,6 +597,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         if (a === 'editer') editer(c); if (a === 'copier') copierCalque(c); if (a === 'couper') copierCalque(c, true); if (a === 'coller') collerCalque(null);
         if (a === 'dupliquer') dupliquerCalque(c); if (a === 'avant' || a === 'arriere') ordreCalque(c, a); if (a === 'suppr') supprimerCalque(c);
         if (a === 'centrer') { E.modif(true); c.x = 50; E.rafraichir(); majChamps(c); }
+        if (a === 'style-c') copierStyle(c); if (a === 'style-v') collerStyle(c);
+        if (a === 'style-plan') collerStylePartout(c, 'plan'); if (a === 'style-inv') { if (confirm('Appliquer cette mise en forme à tous les calques du même type dans toute l\'invitation ?')) collerStylePartout(c, 'invitation'); }
       };
     });
     ecouter(document, 'pointerdown', e => { if (menu && !menu.contains(e.target)) fermerMenu(); });
@@ -558,13 +607,15 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     function rendreBarre() {
       const bar = $('#barre-sel'); if (!bar) return;
       const c = calqueSel();
-      if (!c) { bar.innerHTML = `<span class="muet">Cliquez un élément de l'aperçu pour le modifier</span>${Stock.lire('studio.presse', null) ? '<button class="btn petit" data-b="coller">Coller</button>' : ''}`; lierBarre(bar, c); return; }
+      if (!c) { bar.innerHTML = pinceau ? `<span class="muet">🖌 Pinceau actif : cliquez les calques à mettre en forme</span><button class="btn petit" data-b="pinceau">Arrêter</button>` : `<span class="muet">Cliquez un élément de l'aperçu pour le modifier</span>${Stock.lire('studio.presse', null) ? '<button class="btn petit" data-b="coller">Coller</button>' : ''}`; lierBarre(bar, c); return; }
       const ecr = c.type === 'texte' || c.type === 'bouton' || c.type === 'compteur';
       bar.innerHTML = `<b class="type-sel">${esc(NOMS_TYPE[c.type])}</b>
         ${ecr ? '<button class="btn petit" data-b="editer" title="Modifier le texte (double-clic)">✎ Écrire</button>' : '<button class="btn petit" data-b="remplacer">Remplacer</button>'}
         ${c.type !== 'image' && c.type !== 'video' ? `<button class="btn petit icone" data-b="moins" title="Plus petit">A−</button><button class="btn petit icone" data-b="plus" title="Plus grand">A+</button>` : `<button class="btn petit icone" data-b="moins" title="Plus petit">−</button><button class="btn petit icone" data-b="plus" title="Plus grand">+</button>`}
         ${c.type === 'texte' || c.type === 'bouton' || c.type === 'compteur' ? `<input type="color" data-b="couleur" value="${c.couleur || '#7a1f2b'}" title="Couleur">` : ''}
         ${c.type === 'texte' ? `<button class="btn petit icone ${c.gras ? 'on' : ''}" data-b="gras" title="Gras"><b>G</b></button><button class="btn petit icone ${c.italique ? 'on' : ''}" data-b="italique" title="Italique"><i>I</i></button><button class="btn petit icone" data-b="align" title="Alignement">${{ left: '⇤', right: '⇥' }[c.align] || '↔'}</button>` : ''}
+        <span class="sep"></span>
+        <button class="btn petit icone ${pinceau ? 'on' : ''}" data-b="pinceau" title="Pinceau : copier la mise en forme puis cliquer les calques à mettre en forme">🖌</button><button class="btn petit icone" data-b="style-v" title="Coller la mise en forme (Ctrl+Alt+V)" ${Stock.lire('studio.style', null) ? '' : 'disabled'}>🎨</button>
         <span class="sep"></span>
         <button class="btn petit icone" data-b="copier" title="Copier (Ctrl+C)">⧉</button><button class="btn petit icone" data-b="coller" title="Coller (Ctrl+V)">📋</button><button class="btn petit icone" data-b="dupliquer" title="Dupliquer (Ctrl+D)">⊕</button>
         <button class="btn petit icone" data-b="avant" title="Premier plan">⬆</button><button class="btn petit icone" data-b="arriere" title="Arrière-plan">⬇</button>
@@ -577,6 +628,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         if (a === 'couleur') { el.oninput = () => { E.modif(); c.couleur = el.value; if (I.TYPES_HTML.includes(c.type)) E.rafraichir(); const i = $('#props [data-k="couleur"]'); if (i) i.value = el.value; }; return; }
         el.onclick = () => {
           if (a === 'coller') return collerCalque(null);
+          if (a === 'pinceau' && !c) return basculerPinceau();
           if (!c) return;
           if (a === 'editer') editer(c);
           if (a === 'remplacer') { const inp = $('#props [data-remplacer]'); if (inp) inp.click(); }
@@ -589,6 +641,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           if (a === 'gras' || a === 'italique') { E.modif(true); c[a] = !c[a]; rendreReglages(); }
           if (a === 'align') { E.modif(true); c.align = { center: 'left', left: 'right', right: 'center' }[c.align || 'center']; rendreReglages(); }
           if (a === 'copier') copierCalque(c);
+          if (a === 'pinceau') return basculerPinceau();
+          if (a === 'style-v') return collerStyle(c);
           if (a === 'dupliquer') dupliquerCalque(c);
           if (a === 'avant' || a === 'arriere') ordreCalque(c, a);
           if (a === 'suppr') supprimerCalque(c);
@@ -1476,7 +1530,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       ${etape(3, 'Monter les plans', `
         <ul><li><b>À gauche</b>, la liste des plans. ▲ ▼ pour déplacer un plan intermédiaire, ⧉ pour le dupliquer, ✕ pour le supprimer, <b>+ Plan intermédiaire</b> pour en ajouter. L'ouverture, la confirmation et le remerciement restent à leur place.</li>
         <li><b>Au centre</b>, l'aperçu. Cliquez un texte ou un bouton pour le choisir, glissez-le pour le déplacer. Le curseur sous l'aperçu montre un instant précis du plan.</li>
-        <li><b>Directement sur l'aperçu</b>, comme dans Canva : <b>double-clic</b> sur un texte ou un bouton pour écrire dedans (Échap ou clic ailleurs pour valider) ; <b>coins</b> pour agrandir ou réduire, <b>côtés</b> pour élargir ; glisser pour déplacer (le centre est aimanté) ; <b>flèches</b> pour ajuster finement (Maj = plus grand pas) ; <b>Ctrl+C / Ctrl+V</b> pour copier-coller un calque, aussi vers un autre plan ou un autre événement ; Ctrl+X couper, <b>Ctrl+D</b> dupliquer, <b>Suppr</b> supprimer, Ctrl+Z annuler ; coller une image ou un texte copié ailleurs le pose sur le plan ; <b>clic droit</b> pour le menu (premier plan, arrière-plan, centrer…). La barre au-dessus de l'aperçu donne les réglages rapides : taille, couleur, gras, italique, alignement.</li>
+        <li><b>Directement sur l'aperçu</b>, comme dans Canva : <b>double-clic</b> sur un texte ou un bouton pour écrire dedans (Échap ou clic ailleurs pour valider) ; <b>coins</b> pour agrandir ou réduire, <b>côtés</b> pour élargir ; glisser pour déplacer (le centre est aimanté) ; <b>flèches</b> pour ajuster finement (Maj = plus grand pas) ; <b>Ctrl+C / Ctrl+V</b> pour copier-coller un calque, aussi vers un autre plan ou un autre événement ; Ctrl+X couper, <b>Ctrl+D</b> dupliquer, <b>Suppr</b> supprimer, Ctrl+Z annuler ; coller une image ou un texte copié ailleurs le pose sur le plan ; <b>clic droit</b> pour le menu (premier plan, arrière-plan, centrer…). <b>Mise en forme</b> : <b>Ctrl+Alt+C</b> copie le style d'un calque (police, taille, couleur, gras, ombre, animations…) et <b>Ctrl+Alt+V</b> le colle sur un autre ; le <b>pinceau 🖌</b> de la barre copie le style puis l'applique à chaque calque cliqué (Échap pour arrêter) ; le clic droit permet aussi de coller le style sur tous les textes du plan ou de toute l'invitation. La barre au-dessus de l'aperçu donne les réglages rapides : taille, couleur, gras, italique, alignement.</li>
         <li><b>À droite</b>, les réglages : fond, durée, transition, puis les calques (+ Texte, + Bouton, + Compteur, + Média) et leurs propriétés : police, taille, couleur, animation, moment d'entrée.</li>
         <li><b>▶ Plan</b> joue le plan, <b>▶ Toute l'invitation</b> joue tout. « Voir : lien personnel / lien général » montre ce que voit une famille ou un groupe.</li>
         <li><b>↶</b> annule, <b>↷</b> rétablit. Tout s'enregistre seul.</li></ul>
