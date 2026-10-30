@@ -946,9 +946,12 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
               <div class="ligne"><button class="btn petit" id="fi-voir">Aperçu avant / après</button><button class="btn petit plein" id="fi-auto">Recolorer</button></div>
               <div class="progres"><div id="fi-barre"></div></div>
               <details><summary class="muet">Ou avec Claude (plus précis, élément par élément)</summary>
-                <label class="champ">Correspondances <span class="muet">(facultatif)</span><input type="text" id="fi-corr" value="${esc(h.correspondances || '')}" placeholder="Ex. : les roses blanches deviennent bordeaux"></label>
-                <div class="ligne"><button class="btn petit" id="fi-copier-etal">Copier le prompt</button><button class="btn petit" id="fi-video2">Télécharger le fond actuel</button></div>
-                <p class="muet" style="margin:0">Envoyez à Claude le prompt, le fond actuel (vidéo 1) et votre vidéo (vidéo 2).</p></details>
+                <ol class="nf-faire" style="margin-top:8px">
+                  <li><button class="btn petit plein" id="fi-copier-etal">Copier le prompt</button> <span class="muet">(les couleurs du thème y sont déjà)</span></li>
+                  <li class="muet">Dans Claude, collez le prompt et joignez <b>votre vidéo à recolorer</b>.</li>
+                  <li class="muet">Récupérez la vidéo recolorée, puis « Importer une vidéo de l'ordinateur » à droite.</li>
+                </ol>
+                <label class="champ">Correspondances particulières <span class="muet">(facultatif)</span><input type="text" id="fi-corr" value="${esc(h.correspondances || '')}" placeholder="Ex. : les roses blanches deviennent bordeaux"></label></details>
             </div>
             <div data-panneau="wan" class="pile">
               <div class="ligne"><span class="muet">Partir de</span><div class="segment" id="fi-depart"><button data-v="actuel" class="${h.depart_wan !== 'fichier' ? 'actif' : ''}">l'image du fond actuel</button><button data-v="fichier" class="${h.depart_wan === 'fichier' ? 'actif' : ''}">ma photo ou vidéo</button></div></div>
@@ -988,7 +991,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       const lire = () => ({ idee: $('#fi-idee', box).value.trim(), mouvement, duree, mode: methode === 'recolorer' ? 'recolorer' : 'actuel', methode, depart_wan: departWan });
       const calquesPris = () => (pl.calques || []).filter(c => !c.masque && !exclus.has(c.id)).map(c => ({ c, b: E.eng.bbox[c.id] }));
       const promptEtal = () => { const zs = calquesPris().map(x => x.b).filter(Boolean);
-        return Fabrique.promptEtalonnage({ video1: nomRef(), video2: video2 ? video2.name : 'video-2.mp4', palette: paletteRef, correspondances: $('#fi-corr', box).value.trim(), zone: zs.length ? { haut: Math.round(Math.min(...zs.map(b => b.y))), bas: Math.round(Math.max(...zs.map(b => b.y + b.h))) } : null }); };
+        return Fabrique.promptEtalonnage({ video: video2 ? video2.name : '', palette: paletteRef, ambiance: Fabrique.ambiance(p, tousFonds()), correspondances: $('#fi-corr', box).value.trim(), zone: zs.length ? { haut: Math.round(Math.min(...zs.map(b => b.y))), bas: Math.round(Math.max(...zs.map(b => b.y + b.h))) } : null }); };
       const promptWan = () => {
         let t = Fabrique.promptFond(p, k, Object.assign({ calques: calquesPris(), fonds: tousFonds(), reference: '' }, lire(), { mode: 'actuel', cible: 'video', inspiration: '' })).replace(/^Use the attached reference video.*\n/, '').replace(/1080x1920, \d+ seconds/, '704x1280, 5 seconds');
         if (departWan === 'fichier') t = 'Animate this image into an elegant invitation background. Keep its main subject and composition, and blend it fully into the invitation theme below: same colors first of all, same kind of decoration, textures and light.\n' + t;
@@ -1036,15 +1039,6 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       });
       // ----- 2. méthodes -----
       $$('[data-m]', box).forEach(b => b.onclick = () => choisirMethode(b.dataset.m));
-      const telechargerFond = async () => {
-        try {
-          const src = pl.fond.media;
-          const blob = /^idb:/.test(src) ? await IDB.lire(src) : await (await fetch(await resoudre(src))).blob();
-          if (!blob) throw new Error('fichier introuvable');
-          telecharger(nomRef(), blob);
-        } catch (e) { toast('Téléchargement impossible : ' + e.message); }
-      };
-      $('#fi-video2', box).onclick = telechargerFond;
       $('#fi-copier-etal', box).onclick = async () => { await mesurer(); copier(promptEtal()); };
       const imageFondSeul = async () => {
         const u = await urlFond();

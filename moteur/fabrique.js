@@ -507,37 +507,38 @@ ${o.idee ? `Souhait particulier pour ce plan : ${o.idee}\n` : ''}Style commun à
 ${video}`;
   }
 
-  /* ---------- 6. Prompt : recolorer une vidéo dans la palette d'une autre (étalonnage) ---------- */
+  /* ---------- 6. Prompt : recolorer UNE vidéo aux couleurs du thème (étalonnage avec Claude) ---------- */
+  // Une seule vidéo à joindre : la palette visée est écrite dans le prompt (mesurée par le studio sur le fond actuel).
   function promptEtalonnage(o) {
     o = o || {};
-    const v1 = o.video1 || '[nom-video-1.mp4]', v2 = o.video2 || '[nom-video-2.mp4]';
-    const pal = (o.palette || []).length ? `\nPour t'aider, voici la palette déjà mesurée par le studio sur la vidéo 1 (à vérifier et compléter) :
-Rôle | Code hex | Part de l'image
-${o.palette.map(x => `${x.role} | ${x.hex} | ${x.part} %`).join('\n')}\n` : '';
+    const v = o.video || o.video2 || 'la vidéo jointe';
+    const pal = (o.palette || []).length
+      ? `Rôle de la couleur | Code hex | Part de l'image\n${o.palette.map(x => `${x.role} | ${x.hex} | ${x.part} %`).join('\n')}`
+      : `(palette du thème : ${o.couleurs || 'ivoire et crème, bordeaux #7a1f2b, brun doré #9c6b3f, or ancien doux'})`;
     const zone = o.zone ? `La zone réservée au texte (de ${o.zone.haut} % à ${o.zone.bas} % de la hauteur) doit rester claire, calme et lisible.` : 'La zone centrale réservée au texte doit rester claire, calme et lisible.';
-    return `Tu es directeur artistique et étalonneur vidéo (color grading).
-Je joins deux vidéos :
-- VIDÉO 1 (référence couleur) : « ${v1} »
-- VIDÉO 2 (à modifier) : « ${v2} »
+    return `Tu es étalonneur vidéo (color grading).
+Je joins UNE vidéo : « ${v} ». Recolore-la pour qu'elle devienne un fond d'invitation aux couleurs de mon thème, puis rends-moi le fichier MP4.
 
-Étape 1 — Analyse de la palette de la vidéo 1
-Analyse la vidéo 1 et extrais sa palette de couleurs réelle (mesurée sur les images, pas devinée). Présente-la sous forme de tableau :
-Rôle de la couleur (fond, ombres, élément principal, feuillage, contours, accents…) | Nom de la couleur | Code hex approximatif | Part de l'image en %.
-Décris en 2–3 phrases l'ambiance de cette palette (chaude/froide, saturée ou non, contraste).
+Palette visée (mesurée sur mon fond actuel) :
 ${pal}
-Étape 2 — Recoloration de la vidéo 2
-Recolore la vidéo 2 pour qu'elle adopte exactement la palette de la vidéo 1, élément par élément :
-- le fond de la vidéo 2 prend la couleur du fond de la vidéo 1 ;
-- les éléments principaux (ex. fleurs) prennent la couleur d'accent principale de la vidéo 1 ;
-- le feuillage / éléments secondaires prennent la couleur secondaire ;
+${o.ambiance ? `Ambiance du thème : ${o.ambiance}\n` : ''}
+Comment recolorer, élément par élément :
+- le fond de la vidéo prend la couleur de fond de la palette (la plus présente) ;
+- les éléments principaux (ex. fleurs) prennent la couleur d'accent principale ;
+- le feuillage et les éléments secondaires prennent la couleur secondaire ;
 - les ombres, contours et filets prennent les tons sombres de la palette.
-${o.correspondances ? `Correspondances particulières demandées : ${o.correspondances}\n` : ''}
-À conserver strictement de la vidéo 2 : composition, cadrage, mouvement, durée, résolution, son. Ne rien ajouter ni supprimer, seulement changer les couleurs.
-Garder les dégradés doux, pas de taches, pas de scintillement d'une image à l'autre.
+${o.correspondances ? `Correspondances particulières : ${o.correspondances}\n` : ''}
+À garder strictement : composition, cadrage, mouvement, durée, résolution. Ne rien ajouter ni supprimer, seulement changer les couleurs.
+Dégradés doux, pas de taches, pas de scintillement d'une image à l'autre.
 ${zone}
 
-Livrable : la vidéo 2 recolorée en MP4 (H.264), ${o.format || 'même format que l\'original'}, plus un court récapitulatif des correspondances de couleurs appliquées (avant → après) et des éventuels défauts restants.`;
+Méthode conseillée : mesure la palette réelle de la vidéo jointe, construis une correspondance de couleurs (par exemple une LUT 3D en espace Lab) vers la palette visée, applique-la à toutes les images, puis réencode.
+Livrable : la vidéo recolorée en MP4 (H.264), ${o.format || 'même format que l\'original'}, avec un court récapitulatif des correspondances appliquées (avant → après).`;
   }
 
-  global.Fabrique = { promptEtalonnage, promptFond, nettoyerJSON, lireJSON, FONDS, analyserTexte, genererPlans, nouveauProjet, validerPlan, prompt0, prompt1, prompt3, prompt4, LIB, STYLE, uid };
+  function ambiance(projet, fonds) {
+    const d = decorDe(projet, fonds);
+    return (d.length ? d.join(' ; ') + '. ' : '') + 'Couleurs de l\'invitation : ' + palette(projet).join(', ') + '.';
+  }
+  global.Fabrique = { ambiance, promptEtalonnage, promptFond, nettoyerJSON, lireJSON, FONDS, analyserTexte, genererPlans, nouveauProjet, validerPlan, prompt0, prompt1, prompt3, prompt4, LIB, STYLE, uid };
 })(window);
