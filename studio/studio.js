@@ -952,18 +952,18 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
             </div>
             <div data-panneau="wan" class="pile">
               <p class="muet" style="margin:0">Le studio part de l'image du fond actuel, envoie tout à Wan 2.2 et récupère la vidéo (environ 5 minutes). Si le pod est éteint, il vous guide pour l'allumer.</p>
-              <button class="btn ia" id="fi-wan">▶ Générer avec Wan 2.2</button>
-              <span class="muet" id="fi-wan-etat">${wanOk ? '' : 'Ajoutez d\'abord l\'adresse de votre pod dans <a href="#/reglages">Réglages</a>.'}</span>
-            </div>
-          </div>
-          <div class="pile nf-bloc" id="fi-bloc-idee">
-            <p class="ia-etape">Votre idée pour Wan 2.2 <span class="muet" style="font-weight:400">(facultatif)</span></p>
+<div id="fi-bloc-idee" class="pile" style="gap:8px">
+            <b style="font-size:14px">Votre idée <span class="muet" style="font-weight:400">(facultatif)</span></b>
             <textarea id="fi-idee" rows="2" placeholder="Ex. : plus de lumière dorée, des bougies sur les côtés…">${esc(h.idee || '')}</textarea>
             <div class="nf-puces">${(IDEES[role] || IDEES.intermediaire).map(t => `<button class="puce" data-idee="${esc(t)}">+ ${esc(t)}</button>`).join('')}</div>
             <div class="ligne"><label class="muet">Mouvement</label><div class="segment" id="fi-mvt">${['calme', 'moyen', 'vivant'].map(m => `<button data-v="${m}" class="${(h.mouvement || 'calme') === m ? 'actif' : ''}">${m}</button>`).join('')}</div></div>
             <details><summary class="muet">Calques pris en compte (${calquesVisibles.length})</summary>
               <p class="muet" style="margin:6px 0">Le fond laissera de la place pour chacun. Décochez-en un s'il ne compte pas.</p>
               <div id="fi-calques" class="pile">${lignesCalques() || '<p class="muet">Aucun calque sur ce plan.</p>'}</div></details>
+              </div>
+              <button class="btn ia" id="fi-wan">▶ Générer avec Wan 2.2</button>
+              <span class="muet" id="fi-wan-etat">${wanOk ? '' : 'Ajoutez d\'abord l\'adresse de votre pod dans <a href="#/reglages">Réglages</a>.'}</span>
+            </div>
           </div>
         </div>
         <div class="pile nf-bloc nf-resultat">
@@ -993,7 +993,6 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         methode = m;
         $$('[data-m]', box).forEach(b => b.classList.toggle('actif', b.dataset.m === m));
         $$('[data-panneau]', box).forEach(d => d.style.display = d.dataset.panneau === m ? '' : 'none');
-        $('#fi-bloc-idee', box).style.display = m === 'wan' ? '' : 'none';
         if (m === 'recolorer') mesurer();
         generer();
       };
