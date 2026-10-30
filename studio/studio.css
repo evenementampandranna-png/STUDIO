@@ -251,3 +251,5 @@ textarea.edition-directe { position: absolute; z-index: 8; resize: none; overflo
 .nf-ecran video + div { background: #fff; width: 100%; padding: 6px; font-size: 11.5px; }
 .nf-resultat > .btn.plein { align-self: stretch; }
 @media (max-width: 760px) { .nf-grille { grid-template-columns: 1fr; } .nf-methodes { grid-template-columns: 1fr; } .nf-resultat { position: static; } }
+
+[hidden] { display: none !important; }
