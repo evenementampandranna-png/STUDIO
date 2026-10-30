@@ -263,3 +263,7 @@ textarea.edition-directe { position: absolute; z-index: 8; resize: none; overflo
 .bib-evt { background: #fbf7f1; border: 1px solid var(--ligne); border-radius: 12px; padding: 10px 14px; margin: 6px 0 16px; }
 .bib-evt select { min-width: 240px; }
 @media (max-width: 760px) { .nf-methodes { grid-template-columns: 1fr; } }
+
+.nf-contexte { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; background: #fbf7f1; border: 1px solid var(--ligne); border-radius: 12px; padding: 8px 12px; margin-bottom: 12px; font-size: 14px; }
+.nf-contexte select { max-width: 320px; }
+.nf-contexte .muet { flex-basis: 100%; font-size: 12.5px; }

@@ -724,7 +724,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <div class="fond-actuel"><img src="${esc(vignetteDe(pl.fond.media))}" alt=""><div style="min-width:0"><b>${esc(fondActuel ? fondActuel.nom : '—')}</b>
             <div class="muet">${nbMemeFond > 1 ? `Utilisé par ${nbMemeFond} plans` : 'Utilisé par ce plan seulement'}</div></div></div>
           <label class="champ">Choisir dans la bibliothèque<select id="p-fond">${fonds.map(f => `<option value="${esc(f.src)}" ${pl.fond.media === f.src ? 'selected' : ''}>${esc(f.nom)} (${esc(f.usage)})</option>`).join('')}</select></label>
-          <div class="ligne" style="margin-top:8px"><label class="btn petit">Importer un fond<input type="file" id="imp-fond-plan" accept="video/*" hidden></label><button class="btn petit ia" id="fond-ia">✨ Créer un fond sur mesure (IA)</button></div>
+          <div class="ligne" style="margin-top:8px"><label class="btn petit">Importer un fond<input type="file" id="imp-fond-plan" accept="video/*" hidden></label><button class="btn petit ia" id="fond-ia" title="S'ouvre dans la Bibliothèque">✨ Créer avec l'IA (Bibliothèque)</button></div>
           <div class="deux" style="margin-top:8px">
             <label class="champ">Éclaircir<input type="range" id="p-ecl" min="0" max="0.7" step="0.05" value="${pl.fond.eclaircir || 0}"></label>
             <label class="champ">Assombrir<input type="range" id="p-asb" min="0" max="0.7" step="0.05" value="${pl.fond.assombrir || 0}"></label>
@@ -752,7 +752,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         const m = await importerFichier(f, 'fond', p.id); sauverMedias();
         E.modif(true); pl.fond.media = m.src; eng.precharger().then(() => { eng._entrerPlan(); afficher(); }); toast('Fond importé et appliqué à ce plan');
       };
-      $('#fond-ia').onclick = () => modaleFondIA(E);
+      $('#fond-ia').onclick = () => allerCreateur(p, E.i, {});
       $('#empiler').onclick = () => { E.modif(true); if (eng.empilerTextes(pl)) { E.rafraichir(); rendreReglages(); toast('Textes réorganisés (↶ pour annuler)'); } else toast('Rien à réorganiser'); };
       $('#p-duree').oninput = e => { E.modif(); pl.duree = Math.max(0, Number(e.target.value) || 0); $('#t-curseur').max = Number(pl.duree) || 6; rendrePlans(); };
       $('#p-trans').onchange = e => { E.modif(true); pl.transition = pl.transition || {}; pl.transition.type = e.target.value; pl.transition.duree = pl.transition.duree || 0.8; };
@@ -851,7 +851,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     function lierFormulaire(c) {
       const rp = $('#props [data-remplacer]');
       if (rp) rp.onchange = async e => { const f = e.target.files[0]; if (!f) return; const m = await importerFichier(f, null, p.id); sauverMedias(); E.modif(true); c.media = m.src; c.type = m.type === 'video' ? 'video' : 'image'; eng.precharger().then(() => { E.rafraichir(); rendreReglages(); }); };
-      const an = $('#props [data-animer]'); if (an) an.onclick = () => modaleFondIA(E, { methode: 'animer', calque: c.id });
+      const an = $('#props [data-animer]'); if (an) an.onclick = () => allerCreateur(p, E.i, { methode: 'animer', calque: c.id });
       const va = $('#props [data-voir-anim]');
       if (va) va.onclick = () => { eng.mode = 'invitation'; eng.jouerPlan(E.i); };
       $$('#props [data-k]').forEach(inp => {
@@ -939,6 +939,32 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     confirmation: ['Cadre floral calme, beaucoup d\'espace au centre pour les boutons', 'Papier ivoire avec quelques pétales qui tombent sur les côtés'],
     remerciement: ['Pluie douce de pétales et lumière chaude', 'Bouquet de roses au bas de l\'image, colombes en haut']
   };
+  /* ---------- Chanson : tout format → fichier lisible partout ---------- */
+  // MP3 et M4A/AAC sont gardés tels quels. Les autres (WAV, FLAC, OGG, OPUS, AIFF, vidéo…) sont décodés
+  // par le navigateur puis réencodés en MP3 (lisible sur tous les téléphones).
+  async function chargerScript(url) { return new Promise((ok, ko) => { const s = document.createElement('script'); s.src = url; s.onload = ok; s.onerror = () => ko(new Error('Encodeur MP3 indisponible (connexion ?)')); document.head.appendChild(s); }); }
+  async function preparerChanson(f, suivi) {
+    const ext = (f.name.split('.').pop() || '').toLowerCase();
+    if (['mp3', 'm4a', 'aac', 'mpga'].includes(ext) || /^audio\/(mpeg|mp3|mp4|aac|x-m4a)$/.test(f.type)) return f;
+    suivi && suivi('Lecture du fichier…');
+    let audio;
+    try { const ctx = new (window.AudioContext || window.webkitAudioContext)(); audio = await ctx.decodeAudioData(await f.arrayBuffer()); ctx.close(); }
+    catch (e) { throw new Error('Ce format (' + ext.toUpperCase() + ') ne peut pas être lu par le navigateur. Convertissez-le d\'abord en MP3 (par exemple avec l\'app Musique ou un convertisseur en ligne).'); }
+    if (!window.lamejs) { suivi && suivi('Préparation de l\'encodeur…'); await chargerScript('https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js'); }
+    const can = Math.min(2, audio.numberOfChannels), taux = audio.sampleRate;
+    const enc = new lamejs.Mp3Encoder(can, taux, 160);
+    const versInt = d => { const o = new Int16Array(d.length); for (let i = 0; i < d.length; i++) { const v = Math.max(-1, Math.min(1, d[i])); o[i] = v < 0 ? v * 0x8000 : v * 0x7FFF; } return o; };
+    const g = versInt(audio.getChannelData(0)), dr = can > 1 ? versInt(audio.getChannelData(1)) : null;
+    const morceaux = [], pas = 1152 * 20;
+    for (let i = 0; i < g.length; i += pas) {
+      const b = dr ? enc.encodeBuffer(g.subarray(i, i + pas), dr.subarray(i, i + pas)) : enc.encodeBuffer(g.subarray(i, i + pas));
+      if (b.length) morceaux.push(new Uint8Array(b));
+      if (i % (pas * 40) === 0) { suivi && suivi('Conversion en MP3… ' + Math.round(i / g.length * 100) + ' %'); await new Promise(r => setTimeout(r, 0)); }
+    }
+    const fin = enc.flush(); if (fin.length) morceaux.push(new Uint8Array(fin));
+    return new File(morceaux, f.name.replace(/\.\w+$/, '') + '.mp3', { type: 'audio/mpeg' });
+  }
+
   /* ---------- Chanson de l'invitation ---------- */
   function modaleMusique(p, apres) {
     const fin = () => { enregistrer(p); if (apres) apres(); };
@@ -948,14 +974,14 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       const rendre = async () => {
         const m = p.musique;
         const c = $('#mu-corps', box);
-        if (!m) { c.innerHTML = `<label class="btn plein" style="align-self:flex-start">Choisir une chanson (MP3, M4A…)<input type="file" id="mu-f" accept="audio/*" hidden></label>`; }
+        if (!m) { c.innerHTML = `<label class="btn plein" style="align-self:flex-start">Choisir une chanson (tous formats, ou une vidéo)<input type="file" id="mu-f" accept="audio/*,video/*,.mp3,.m4a,.aac,.wav,.wave,.ogg,.oga,.opus,.flac,.wma,.aif,.aiff,.aifc,.caf,.amr,.3gp,.3ga,.webm,.weba,.mka,.mp2,.mpga,.ac3,.mp4,.m4v,.mov,.mkv,.avi" hidden></label>`; }
         else {
           c.innerHTML = `<b>${esc(m.nom || 'Chanson')}</b>
             <audio id="mu-a" controls preload="metadata" style="width:100%"></audio>
             <div class="deux"><label class="champ">Commencer à (secondes)<div class="ligne"><input type="number" id="mu-debut" min="0" step="0.5" value="${Number(m.debut) || 0}" style="width:110px"><button class="btn petit" id="mu-ici">Position actuelle</button></div></label>
             <label class="champ">Volume<input type="range" id="mu-vol" min="0" max="1" step="0.05" value="${m.volume != null ? m.volume : 0.8}"></label></div>
             <p class="muet" style="margin:0">Astuce : écoutez, mettez en pause au bon moment (après l'introduction par exemple), puis « Position actuelle ».</p>
-            <div class="ligne"><button class="btn petit" id="mu-test">▶ Écouter depuis le début choisi</button><label class="btn petit">Changer de chanson<input type="file" id="mu-f" accept="audio/*" hidden></label><button class="btn petit danger" id="mu-suppr">Retirer</button><button class="btn plein" id="mu-ok">Terminé</button></div>`;
+            <div class="ligne"><button class="btn petit" id="mu-test">▶ Écouter depuis le début choisi</button><label class="btn petit">Changer de chanson<input type="file" id="mu-f" accept="audio/*,video/*,.mp3,.m4a,.aac,.wav,.wave,.ogg,.oga,.opus,.flac,.wma,.aif,.aiff,.aifc,.caf,.amr,.3gp,.3ga,.webm,.weba,.mka,.mp2,.mpga,.ac3,.mp4,.m4v,.mov,.mkv,.avi" hidden></label><button class="btn petit danger" id="mu-suppr">Retirer</button><button class="btn plein" id="mu-ok">Terminé</button></div>`;
           const a = $('#mu-a', box); a.src = await resoudre(m.src); a.volume = m.volume != null ? m.volume : 0.8;
           modale._fermer = () => a.pause();
           $('#mu-debut', box).onchange = e => { m.debut = Math.max(0, Number(e.target.value) || 0); fin(); };
@@ -966,13 +992,37 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           $('#mu-ok', box).onclick = () => { a.pause(); fermer(); };
         }
         $('#mu-f', box).onchange = async e => {
-          const f = e.target.files[0]; if (!f) return;
-          const id = 'idb:' + uid() + '.' + (f.name.split('.').pop() || 'mp3').toLowerCase();
-          await IDB.mettre(id, f); p.musique = { src: id, nom: f.name, volume: 0.8, debut: 0 }; fin(); rendre();
+          const brut = e.target.files[0]; if (!brut) return;
+          const etat = document.createElement('div'); etat.className = 'muet'; $('#mu-corps', box).appendChild(etat);
+          try {
+            const f = await preparerChanson(brut, t => { etat.textContent = t; });
+            const id = 'idb:' + uid() + '.' + (f.name.split('.').pop() || 'mp3').toLowerCase();
+            await IDB.mettre(id, f); p.musique = { src: id, nom: brut.name, volume: 0.8, debut: 0 }; fin(); rendre();
+            if (f !== brut) toast('Chanson convertie en MP3 pour être lue sur tous les téléphones');
+          } catch (err) { etat.textContent = err.message; etat.style.color = '#a3242b'; }
         };
       };
       rendre();
     });
+  }
+
+  // Ouvre « Créer avec l'IA » hors de l'éditeur (Bibliothèque) : mesure la place des calques avec un moteur caché
+  let createurEnAttente = null;
+  function allerCreateur(p, k, ouv) { Stock.ecrire('studio.bib.evt', p.id); createurEnAttente = { id: p.id, k, ouv: ouv || {} }; location.hash = '#/bibliotheque'; }
+  async function ouvrirCreateur(p, k, ouv) {
+    const div = document.createElement('div'); div.style.cssText = 'position:fixed;left:-9999px;top:0;width:360px;height:640px';
+    document.body.appendChild(div);
+    const eng = new Moteur(div, { mode: 'edition', resolveur: resoudre, famille: FAMILLE_TEST });
+    try { await eng.setProjet(p); eng.afficherPlan(k, Math.min(3, Number(p.plans[k].duree) || 3)); } catch (e) {}
+    const bbox = Object.assign({}, eng.bbox);
+    eng.detruire(); div.remove();
+    const E = { p, i: k, eng: { bbox, precharger: () => Promise.resolve(), _entrerPlan() {} }, modif() {}, rafraichir() {}, afficher() {},
+      ajouterMedia(m) {
+        const pl = p.plans[k]; const ratio = m.l && m.h ? m.h / m.l : 1;
+        pl.calques.unshift({ id: uid(), type: m.type === 'video' ? 'video' : 'image', media: m.src, x: 50, y: 32, largeur: 46, hauteur: Math.round(Math.min(40, 46 * ratio * 720 / 1280)), debut: 0.4, forme: 'arrondi', animation: 'fondu', sortie: 'aucune', bordure: '' });
+        enregistrer(p);
+      } };
+    modaleFondIA(E, ouv || {});
   }
 
   function modaleFondIA(E, ouv) {
@@ -998,8 +1048,10 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         ${editable ? `<textarea class="ci-texte" rows="${String(c.texte || '').split('\n').length > 1 ? 2 : 1}">${esc(c.texte || '')}</textarea>` : `<span class="ci-nom">${esc(nomMedia(c.media) || '(photo ou vidéo)')}</span>`}
         <span class="muet ci-zone">${esc(zone)}</span></div>`;
     }).join('');
-    modale(`<h2 style="margin-bottom:2px">Créer avec l'IA — plan ${k + 1}</h2>
-      <p class="muet" style="margin:0 0 12px">Le studio tient compte tout seul du thème, des couleurs de l'invitation et de la place à laisser à vos ${calquesVisibles.length} calque${calquesVisibles.length > 1 ? 's' : ''}.</p>
+    modale(`<h2 style="margin-bottom:6px">✨ Créer avec l'IA</h2>
+      <div class="nf-contexte"><span>Événement : <b>${esc(p.fiche.titre || '')}</b></span>
+        <label>Plan de référence <select id="fi-plan">${p.plans.map((x, i) => `<option value="${i}" ${i === k ? 'selected' : ''}>${i + 1}. ${esc(ROLES[x.role] || x.role)}${x.calques && x.calques[0] && x.calques[0].texte ? ' — ' + esc(String(x.calques[0].texte).replace(/\s+/g, ' ').slice(0, 28)) : ''}</option>`).join('')}</select></label>
+        <span class="muet">Son fond sert de modèle (couleurs, décor) et ses ${calquesVisibles.length} calque${calquesVisibles.length > 1 ? 's' : ''} gardent leur place.</span></div>
       <div class="nf-grille">
         <div class="pile">
           <div class="pile nf-bloc">
@@ -1066,14 +1118,17 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <label class="btn petit" style="align-self:center">Importer une vidéo de l'ordinateur<input type="file" id="fi-fichier" accept="video/*" hidden></label>
           <button class="btn petit" id="fi-harmo" hidden>Harmoniser ses couleurs avec le fond actuel</button>
           ${autresPlans ? `<label class="cases"><input type="checkbox" id="fi-autres"> Aussi pour les ${autresPlans} autre${autresPlans > 1 ? 's' : ''} plan${autresPlans > 1 ? 's' : ''} qui ont ce fond</label>` : ''}
-          <button class="btn plein" id="fi-utiliser" disabled>Utiliser ce fond</button>
-          <p class="muet" style="margin:0;font-size:12.5px">Tout ce qui est créé est rangé dans la bibliothèque de cet événement.</p>
+          <label class="cases"><input type="checkbox" id="fi-surplan" checked> <span id="fi-surplan-txt">Mettre aussi sur le plan ${k + 1}</span></label>
+          <button class="btn plein" id="fi-utiliser" disabled>Ranger dans la bibliothèque</button>
+          <p class="muet" style="margin:0;font-size:12.5px">Tout ce qui est créé est rangé dans la bibliothèque de « ${esc((p.fiche.titre || '').slice(0, 40))} ».</p>
         </div>
       </div>`, (box, fermer) => {
       let fichier = null, video2 = null, paletteRef = null, statsRef = null;
       let mouvement = h.mouvement || 'calme';
       const duree = Math.max(5, Math.min(15, Math.ceil(Number(pl.duree) || 8)));
       let photoSel = ouv.calque || null, srcAnim = null, mvtAnim = 0;
+      const majSurPlan = () => { const t = $('#fi-surplan-txt', box); if (!t) return; t.textContent = methode === 'animer' ? (photoSel ? 'Remplacer la photo sur le plan ' + (k + 1) : 'Poser aussi sur le plan ' + (k + 1)) : 'Mettre aussi ce fond sur le plan ' + (k + 1); };
+      $('#fi-plan', box).onchange = e => { fermer(); ouvrirCreateur(p, Number(e.target.value), { methode, apres: ouv.apres }); };
       let departWan = h.depart_wan === 'fichier' ? 'fichier' : 'actuel', srcWan = null, imageWan = null;
       const lire = () => ({ idee: $('#fi-idee', box).value.trim(), mouvement, duree, mode: methode === 'recolorer' ? 'recolorer' : 'actuel', methode, depart_wan: departWan });
       const calquesPris = () => (pl.calques || []).filter(c => !c.masque && !exclus.has(c.id)).map(c => ({ c, b: E.eng.bbox[c.id] }));
@@ -1094,7 +1149,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         methode = m;
         $$('[data-m]', box).forEach(b => b.classList.toggle('actif', b.dataset.m === m));
         $$('[data-panneau]', box).forEach(d => d.style.display = d.dataset.panneau === m ? '' : 'none');
-        $('#fi-utiliser', box).textContent = m === 'animer' ? (photoSel ? 'Remplacer la photo par cette vidéo' : 'Poser sur le plan') : 'Utiliser ce fond';
+        majSurPlan();
         const ca = $('#fi-autres', box); if (ca) ca.closest('label').style.display = m === 'animer' ? 'none' : '';
         if (fichier && (fichier._m || 'fond') !== (m === 'animer' ? 'animer' : 'fond')) { fichier = null; $('#fi-apercu', box).innerHTML = '<span class="muet">La nouvelle vidéo s\'affichera ici.</span>'; $('#fi-utiliser', box).disabled = true; $('#fi-harmo', box).hidden = true; }
         if (m === 'recolorer') mesurer();
@@ -1168,7 +1223,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         imageWan = dataURLversBlob(c.toDataURL('image/jpeg', 0.92));
       };
       // ----- Animer une image -----
-      const majPhotos = () => { $$('[data-photo]', box).forEach(b => b.classList.toggle('actif', b.dataset.photo === photoSel)); $('.nf-photo-plus', box).classList.toggle('actif', !photoSel && !!srcAnim); $('#fi-anim-nom', box).textContent = photoSel ? 'Photo du plan choisie : elle sera remplacée par sa version animée.' : srcAnim ? srcAnim.name + ' : la vidéo sera posée sur le plan.' : 'Choisissez une photo du plan, ou ＋ pour une autre image.'; $('#fi-utiliser', box).textContent = photoSel ? 'Remplacer la photo par cette vidéo' : 'Poser sur le plan'; };
+      const majPhotos = () => { $$('[data-photo]', box).forEach(b => b.classList.toggle('actif', b.dataset.photo === photoSel)); $('.nf-photo-plus', box).classList.toggle('actif', !photoSel && !!srcAnim); $('#fi-anim-nom', box).textContent = photoSel ? 'Photo du plan choisie.' : srcAnim ? srcAnim.name : 'Choisissez une photo du plan, ou ＋ pour une autre image.'; majSurPlan(); };
       $$('[data-photo]', box).forEach(b => b.onclick = () => { photoSel = b.dataset.photo; srcAnim = null; majPhotos(); });
       $('#fi-anim-src', box).onchange = e => { const f = e.target.files[0]; if (!f) return; srcAnim = f; photoSel = null; majPhotos(); };
       $$('#fi-anim-mvt .puce', box).forEach(b => b.onclick = () => { mvtAnim = Number(b.dataset.v); $$('#fi-anim-mvt .puce', box).forEach(x => x.classList.toggle('actif', x === b)); });
@@ -1252,26 +1307,29 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       $('#fi-utiliser', box).onclick = async () => {
         if (!fichier) return;
         const anime = methode === 'animer';
+        const surPlan = $('#fi-surplan', box).checked;
         const m = await importerFichier(fichier, anime ? 'video' : 'fond', p.id);
+        const finir = t => { fermer(); toast(t); if (ouv.apres) ouv.apres(); };
         if (anime) {
           m.anime = true; m.nom = 'Image animée — plan ' + (k + 1); sauverMedias();
+          if (!surPlan) return finir('Image animée rangée dans la bibliothèque de l\'événement');
           const c = photoSel && pl.calques.find(x => x.id === photoSel);
-          if (c) { E.modif(true); c.media = m.src; c.type = 'video'; enregistrer(p); fermer(); E.eng.precharger().then(() => { E.rafraichir(); E.afficher(); }); }
-          else { fermer(); E.ajouterMedia(m); }
-          toast('Image animée posée sur le plan (et rangée dans la bibliothèque de l\'événement)');
-          return;
+          if (c) { E.modif(true); c.media = m.src; c.type = 'video'; enregistrer(p); E.eng.precharger().then(() => { E.rafraichir(); E.afficher(); }); }
+          else E.ajouterMedia(m);
+          return finir('Image animée rangée dans la bibliothèque et posée sur le plan ' + (k + 1));
         }
         const o = lire();
         Object.assign(m, { nom: 'Fond plan ' + (k + 1) + ' — ' + (p.fiche.titre || '').slice(0, 30), usage, description: o.idee || 'Fond créé pour le plan ' + (k + 1), description_en: '', zone_texte: 'voir la mise en page du plan ' + (k + 1), origine: 'ia' });
         sauverMedias();
+        if (!surPlan) return finir('Nouveau fond rangé dans la bibliothèque de l\'événement');
         E.modif(true);
         const ancien = pl.fond.media;
         if ($('#fi-autres', box) && $('#fi-autres', box).checked) p.plans.forEach(x => { if (x.fond && x.fond.media === ancien) x.fond.media = m.src; });
         pl.fond.media = m.src;
         pl.fond_ia = Object.assign(pl.fond_ia || {}, { fichier: m.src });
-        enregistrer(p); fermer();
+        enregistrer(p);
         E.eng.precharger().then(() => { E.eng._entrerPlan(); E.afficher(); });
-        toast('Nouveau fond appliqué (↶ pour revenir en arrière)');
+        finir('Nouveau fond rangé dans la bibliothèque et mis sur le plan ' + (k + 1));
       };
       choisirMethode(methode);
     });
@@ -1474,7 +1532,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <div class="ligne"><button class="btn" id="ap-gen">Lien général</button><button class="btn" id="ap-fam">Lien personnel (famille test)</button></div></div>
         <div class="carte pile"><h3>Musique du film</h3>
           <p class="muet">${p.musique ? 'Musique : ' + esc(p.musique.nom || p.musique.src) : 'Aucune musique. Utilisez une piste dont vous avez les droits.'}</p>
-          <div class="ligne"><label class="btn">${p.musique ? 'Changer' : 'Ajouter une musique'}<input type="file" id="musique" accept="audio/*" hidden></label>${p.musique ? '<button class="btn danger" id="musique-suppr">Retirer</button>' : ''}</div>
+          <div class="ligne"><label class="btn">${p.musique ? 'Changer' : 'Ajouter une musique'}<input type="file" id="musique" accept="audio/*,video/*,.mp3,.m4a,.aac,.wav,.wave,.ogg,.oga,.opus,.flac,.wma,.aif,.aiff,.aifc,.caf,.amr,.3gp,.3ga,.webm,.weba,.mka,.mp2,.mpga,.ac3,.mp4,.m4v,.mov,.mkv,.avi" hidden></label>${p.musique ? '<button class="btn danger" id="musique-suppr">Retirer</button>' : ''}</div>
           ${p.musique ? `<label class="champ">Volume<input type="range" id="volume" min="0" max="1" step="0.05" value="${p.musique.volume != null ? p.musique.volume : 0.8}"></label>` : ''}</div>
         <div class="carte pile"><h3>Film vidéo</h3>
           <p class="muet">Enregistre le film (ouverture, plans intermédiaires, remerciement) directement dans le navigateur, en temps réel. Gardez cet onglet ouvert pendant l'enregistrement. Format MP4 sur Chrome récent, sinon WebM.</p>
@@ -1504,9 +1562,12 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     $('#tele-pub').onclick = () => telecharger(p.slug + '.json', JSON.stringify(publication(p), null, 1));
     $('#tele-projet').onclick = () => telecharger(p.slug + '-projet.json', JSON.stringify(p, null, 1));
     $('#musique').onchange = async e => {
-      const f = e.target.files[0]; if (!f) return;
-      const id = 'idb:' + uid() + '.' + (f.name.split('.').pop() || 'mp3').toLowerCase();
-      await IDB.mettre(id, f); p.musique = { src: id, nom: f.name, volume: 0.8 }; enregistrer(p); ongletPublier(p);
+      const brut = e.target.files[0]; if (!brut) return;
+      try {
+        const f = await preparerChanson(brut, t => toast(t));
+        const id = 'idb:' + uid() + '.' + (f.name.split('.').pop() || 'mp3').toLowerCase();
+        await IDB.mettre(id, f); p.musique = { src: id, nom: brut.name, volume: 0.8, debut: 0 }; enregistrer(p); ongletPublier(p);
+      } catch (err) { toast(err.message); }
     };
     const ms = $('#musique-suppr'); if (ms) ms.onclick = () => { p.musique = null; enregistrer(p); ongletPublier(p); };
     const vol = $('#volume'); if (vol) vol.oninput = e => { p.musique.volume = Number(e.target.value); enregistrer(p); };
@@ -1613,7 +1674,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
             : `<b>${esc(f.nom)}</b><div class="muet">${esc(f.usage)} · ${f.duree} s · fond de base</div>`}
         </div>`;
     $('#app').innerHTML = `<div class="entete"><div><h1>Bibliothèque</h1><p>Chaque événement a ses fonds, ses photos et ses vidéos animées. Les fonds de base servent à tous.</p></div>
-      <div class="ligne"><label class="btn plein">+ Importer un fond vidéo<input type="file" id="imp-fond" accept="video/*" multiple hidden></label><label class="btn">+ Photo ou vidéo<input type="file" id="imp-media" accept="image/*,video/*" multiple hidden></label></div></div>
+      <div class="ligne"><button class="btn ia" id="bib-creer">✨ Créer avec l'IA</button><label class="btn plein">+ Importer un fond vidéo<input type="file" id="imp-fond" accept="video/*" multiple hidden></label><label class="btn">+ Photo ou vidéo<input type="file" id="imp-media" accept="image/*,video/*" multiple hidden></label></div></div>
       <div class="ligne bib-evt"><b>Événement</b><select id="bib-evt">
         ${liste.map(x => `<option value="${x.id}" ${evt === x.id ? 'selected' : ''}>${esc((x.fiche && x.fiche.titre) || x.id)}</option>`).join('')}
         <option value="" ${evt === '' ? 'selected' : ''}>Commun à tous les événements</option>
@@ -1634,6 +1695,13 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     $$('[data-k]').forEach(i => i.onchange = () => { const id = i.closest('[data-id]').dataset.id; const m = medias.find(x => x.id === id); if (m) { m[i.dataset.k] = i.value; sauverMedias(); if (i.dataset.k === 'evt') { toast('Déplacé vers ' + titre(i.value)); vueBibliotheque(); } } });
     $$('[data-suppr]').forEach(b => b.onclick = async () => { if (!confirm('Supprimer ce fichier ?')) return; const m = medias.find(x => x.id === b.dataset.suppr); medias = medias.filter(x => x !== m); sauverMedias(); if (m) await IDB.suppr(m.src); vueBibliotheque(); });
     const cibleImport = evt === '*' ? '' : evt;
+    const ouvrirIci = (id, k, ouv) => ouvrirCreateur(projets[id], k, Object.assign({}, ouv, { apres: () => vueBibliotheque() }));
+    $('#bib-creer').onclick = () => {
+      if (!evt || evt === '*' || !projets[evt]) { toast('Choisissez d\'abord l\'événement (en haut) : le fond prendra son thème et ses couleurs'); $('#bib-evt').focus(); return; }
+      const pr = projets[evt]; const k = Math.max(0, pr.plans.findIndex(x => x.role === 'intermediaire'));
+      ouvrirIci(evt, k, {});
+    };
+    if (createurEnAttente && projets[createurEnAttente.id]) { const a = createurEnAttente; createurEnAttente = null; ouvrirIci(a.id, a.k, a.ouv); }
     $('#imp-fond').onchange = e => importer([...e.target.files], 'fond', cibleImport);
     $('#imp-media').onchange = e => importer([...e.target.files], null, cibleImport);
   }
@@ -1777,8 +1845,9 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       ${etape('3b', 'Fond, photos et animations d\'un plan', `
         <ul><li><b>Fond vidéo</b> (en haut à droite) : choisissez un fond de la bibliothèque, ou <b>Importer un fond</b> directement depuis le plan. Le studio indique combien de plans utilisent déjà ce fond.</li>
         <li><b>✨ Créer un fond sur mesure (IA)</b> : quand il vous manque un fond, ou qu'un même fond revient trop souvent. Deux façons : <b>Recolorer</b> une vidéo déjà prête aux couleurs du fond actuel (gratuit, ici même ; ou avec Claude pour plus de précision), ou <b>Wan 2.2</b>, qui crée une nouvelle vidéo sur votre pod, en partant soit de l'image du fond actuel, soit de <b>votre propre photo ou vidéo</b> (le studio la recadre et la passe d'abord aux couleurs du fond actuel, puis Wan l'anime dans le thème). Pour Wan, ajoutez si vous voulez une idée et le mouvement : le studio ajoute tout seul le thème, les couleurs et la place à laisser à chaque calque (liste dans « Calques pris en compte »). La vidéo s'affiche à droite ; « Harmoniser ses couleurs » la rapproche du fond actuel si besoin, puis <b>Utiliser ce fond</b>.</li>
-        <li><b>Animer une image</b> : dans « ✨ Créer un fond sur mesure (IA) », choix <b>Animer une image</b>, ou bouton « ✨ Animer cette photo » dans le panneau d'une photo. Choisissez la photo du plan (ou ＋ une autre image) et le mouvement (naturel, zoom lent, léger vent, pétales, lumière). Wan 2.2 en fait une vidéo de 5 s en gardant les visages identiques ; elle remplace la photo sur le plan (ou s'y ajoute), au-dessus du fond.</li>
-        <li><b>♪ Chanson</b> : bouton « ♪ Ajouter une chanson » sous l'aperçu. Choisissez le fichier, réglez le volume et le moment où elle commence (« Position actuelle » pour sauter l'introduction). Elle joue avec « ▶ Toute l'invitation », chez l'invité et dans le film exporté.</li>
+        <li><b>✨ Créer avec l'IA</b> se trouve dans la <a href="#/bibliotheque">Bibliothèque</a> : choisissez l'événement en haut, puis « ✨ Créer avec l'IA ». Choisissez le plan de référence (son fond sert de modèle, ses calques gardent leur place), créez, puis « Ranger dans la bibliothèque » ; cochez « Mettre aussi sur le plan » pour l'y poser directement. Depuis un plan, le bouton « ✨ Créer avec l'IA (Bibliothèque) » vous y emmène avec le bon événement et le bon plan.</li>
+        <li><b>Animer une image</b> : dans « ✨ Créer avec l'IA », choix <b>Animer une image</b>, ou bouton « ✨ Animer cette photo » dans le panneau d'une photo. Choisissez la photo du plan (ou ＋ une autre image) et le mouvement (naturel, zoom lent, léger vent, pétales, lumière). Wan 2.2 en fait une vidéo de 5 s en gardant les visages identiques ; elle remplace la photo sur le plan (ou s'y ajoute), au-dessus du fond.</li>
+        <li><b>♪ Chanson</b> : bouton « ♪ Ajouter une chanson » sous l'aperçu. Choisissez le fichier (tous les formats : MP3, M4A, WAV, FLAC, OGG, AIFF… et même une vidéo, dont on garde le son ; les formats moins courants sont convertis en MP3 tout seuls), réglez le volume et le moment où elle commence (« Position actuelle » pour sauter l'introduction). Elle joue avec « ▶ Toute l'invitation », chez l'invité et dans le film exporté.</li>
         <li><b>Bibliothèque par événement</b> : tout ce que vous créez ou importez dans un événement (fonds IA, images animées, photos) est rangé dans sa bibliothèque, et seuls ses fichiers sont proposés dans ses plans (avec les fonds de base et les fichiers communs). Dans <a href="#/bibliotheque">Bibliothèque</a>, choisissez l'événement en haut ; « Réglages » d'un fichier permet de le déplacer vers un autre événement.</li>
         <li><b>Wan 2.2</b> (gratuit, open source) : il tourne sur votre pod RunPod (ComfyUI). Le studio lui envoie l'image du fond actuel et le prompt, puis récupère la vidéo (5 s, environ 5 minutes) : vous n'avez rien à copier ni à télécharger. L'adresse du pod se règle une seule fois dans Réglages.</li>
         <li><b>Démarrer le pod</b> : cliquez simplement sur « ▶ Générer avec Wan 2.2 ». Si le pod est éteint, le studio ouvre un assistant avec les liens à cliquer (Start sur RunPod, puis le terminal pour l'arrêt automatique) et coche chaque étape tout seul ; la génération démarre d'elle-même quand Wan 2.2 est prêt (5 à 20 min après Start). Le même assistant est dans Réglages → « Démarrer le pod ».</li>
