@@ -160,5 +160,27 @@
   }
   const COMMANDE_VEILLE = 'curl -fsSL https://evenementampandranna-png.github.io/STUDIO/outils/veille.sh | sh';
 
-  global.Comfy = { etatVeille, signalVeille, COMMANDE_VEILLE, WORKFLOW_5B, WORKFLOW_14B, WORKFLOWS, tester, generer, preparer, nettoyerUrl };
+  // ----- Assistant de démarrage : où en est le pod ? -----
+  function idPod(base) { const m = /^https:\/\/([a-z0-9]+)-8188\.proxy\.runpod\.net/i.exec(nettoyerUrl(base || '')); return m ? m[1] : ''; }
+  async function joignable(base) {
+    try { const c = new AbortController(); const t = setTimeout(() => c.abort(), 6000); const r = await fetch(nettoyerUrl(base) + '/system_stats', { signal: c.signal, cache: 'no-store' }); clearTimeout(t); return r.ok; } catch (e) { return false; }
+  }
+  // Les modèles du workflow sont-ils présents ? (ComfyUI démarre avant la fin des téléchargements)
+  async function modelesPrets(base, wf) {
+    const besoins = {};
+    for (const n of Object.values(wf || {})) {
+      for (const [k, v] of Object.entries(n.inputs || {})) if (/_name$/.test(k) && typeof v === 'string' && /\.(safetensors|pt|pth|ckpt|gguf)$/i.test(v)) (besoins[n.class_type] = besoins[n.class_type] || []).push([k, v]);
+    }
+    const manquants = [];
+    for (const [classe, liste] of Object.entries(besoins)) {
+      const r = await fetch(nettoyerUrl(base) + '/object_info/' + classe, { cache: 'no-store' });
+      if (!r.ok) { manquants.push(...liste.map(x => x[1])); continue; }
+      const req = ((await r.json())[classe] || {}).input || {};
+      const champs = Object.assign({}, req.required, req.optional);
+      for (const [k, v] of liste) { const opts = (champs[k] || [])[0]; if (!Array.isArray(opts) || !opts.includes(v)) manquants.push(v); }
+    }
+    return manquants;
+  }
+
+  global.Comfy = { idPod, joignable, modelesPrets, etatVeille, signalVeille, COMMANDE_VEILLE, WORKFLOW_5B, WORKFLOW_14B, WORKFLOWS, tester, generer, preparer, nettoyerUrl };
 })(window);

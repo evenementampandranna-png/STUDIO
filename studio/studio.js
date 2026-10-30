@@ -1088,6 +1088,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         if (!cf.url) { toast('Collez d\'abord l\'adresse de votre pod RunPod dans Réglages'); return; }
         if (mode() === 'recolorer') { toast('Wan 2.2 crée des vidéos, il ne recolore pas : utilisez « Recolorer toute la vidéo »'); return; }
         const b = $('#fi-wan', box), etat = $('#fi-wan-etat', box); b.disabled = true;
+        etat.textContent = 'Vérification du pod…';
+        if (!(await podPret())) { b.disabled = false; etat.textContent = 'Pod pas prêt : cliquez à nouveau sur Générer quand vous voulez.'; return; }
         try {
           const o = lire();
           const calques = (pl.calques || []).filter(c => !c.masque && !exclus.has(c.id)).map(c => ({ c, b: E.eng.bbox[c.id] }));
@@ -1536,6 +1538,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         </div>
         <div class="carte pile"><h3>Wan 2.2 sur RunPod (ComfyUI)</h3>
           <p class="muet">Pour que le bouton « Générer avec Wan 2.2 » du fond sur mesure envoie la demande à votre pod et récupère la vidéo tout seul.</p>
+          <div class="ligne"><button class="btn plein" id="cf-assistant">▶ Démarrer le pod (étapes guidées)</button><span class="muet">Les liens à cliquer, pas à pas.</span></div>
           <label class="champ">Adresse de votre pod ComfyUI<input type="url" id="cf-url" value="${esc((reglages.comfy || {}).url || '')}" placeholder="https://xxxxxxxx-8188.proxy.runpod.net"></label>
           <div class="ligne"><button class="btn plein" id="cf-ok">Enregistrer</button><button class="btn" id="cf-test">Tester</button><span class="muet" id="cf-etat"></span></div>
           <label class="champ">Modèle utilisé<select id="cf-modele">
@@ -1573,11 +1576,12 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     const lireCf = () => { const wf = $('#cf-wf').value.trim(); let modele = $('#cf-modele').value; if (wf && modele !== 'perso' && lireCf.change) modele = 'perso'; reglages.comfy = { url: Comfy.nettoyerUrl($('#cf-url').value), workflow: wf, modele }; sauverReglages(); };
     $('#cf-wf').oninput = () => { if ($('#cf-wf').value.trim()) $('#cf-modele').value = 'perso'; };
     $('#cf-ok').onclick = () => { lireCf(); toast('Enregistré'); };
+    $('#cf-assistant').onclick = async () => { lireCf(); if (!(reglages.comfy || {}).url) { toast('Collez d\'abord l\'adresse de votre pod'); return; } if (await assistantPod({ raison: 'Préparons le pod.' })) route(); };
     $('#cf-copier-veille').onclick = () => copier(Comfy.COMMANDE_VEILLE);
     $('#cf-notif').checked = !!(window.Notification && Notification.permission === 'granted');
     $('#cf-notif').onchange = e => { if (e.target.checked && window.Notification) Notification.requestPermission().then(p => { e.target.checked = p === 'granted'; }); };
     (async () => { const el = $('#cf-veille'); const cf = reglages.comfy || {}; if (!cf.url) { el.textContent = 'État : renseignez d\'abord l\'adresse du pod.'; return; }
-      try { const e = await Comfy.etatVeille(cf.url); el.innerHTML = e.etat === 'arret' ? 'État : le pod s\'est arrêté (' + esc(e.raison) + ').' : '<span class="badge ok">Surveillance active</span> ' + (e.etat === 'actif' ? 'le pod travaille' : 'inactif depuis ' + e.inactif + ' s'); }
+      try { const e = await Comfy.etatVeille(cf.url); el.innerHTML = e.etat === 'arret' ? 'État : le pod s\'est arrêté (' + esc(e.raison) + ').' : '<span class="badge ok">Surveillance active</span> ' + (e.etat === 'actif' ? 'le pod travaille' : e.etat === 'telechargement' ? 'le pod télécharge les modèles' : 'inactif depuis ' + e.inactif + ' s'); }
       catch (err) { el.innerHTML = '<span class="badge alerte">Surveillance non installée</span> ou pod arrêté : collez la commande ci-dessous dans le terminal du pod.'; } })();
     $('#cf-test').onclick = async () => { lireCf(); $('#cf-etat').textContent = 'Test…'; try { $('#cf-etat').textContent = 'Connexion réussie : ' + await Comfy.tester(reglages.comfy.url); } catch (e) { $('#cf-etat').textContent = e.message; } };
     $('#fb-ok').onclick = () => { const v = $('#fb').value.trim(); if (!v) { reglages.firebase = null; sauverReglages(); return toast('Firebase désactivé'); } try { const t = v.replace(/^[^{]*/, '').replace(/[^}]*$/, ''); reglages.firebase = JSON.parse(t.replace(/(\w+)\s*:/g, '"$1":').replace(/""/g, '"').replace(/'/g, '"')); sauverReglages(); toast('Firebase enregistré'); } catch (e) { toast('Configuration illisible'); } };
@@ -1618,7 +1622,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <ul><li><b>Fond vidéo</b> (en haut à droite) : choisissez un fond de la bibliothèque, ou <b>Importer un fond</b> directement depuis le plan. Le studio indique combien de plans utilisent déjà ce fond.</li>
         <li><b>✨ Créer un fond sur mesure (IA)</b> : quand il vous manque un fond, ou qu'un même fond revient trop souvent. La fenêtre montre d'abord <b>les calques du plan</b> (textes, boutons, photos) avec leur contenu et leur place : ils sont décrits un par un dans le prompt, pour que le nouveau fond leur laisse de l'espace. Corrigez un texte ou décochez un calque si besoin. Choisissez ensuite le <b>point de départ</b> : le fond actuel (l'IA crée un autre fond du même thème, proche de son décor), ou <b>une autre vidéo ou image d'inspiration</b>, même sans rapport avec le thème, que l'IA transforme aux couleurs du fond actuel ou de toute l'invitation. Votre idée est <b>facultative</b>. Troisième choix : <b>Recolorer une vidéo déjà prête</b> (étalonnage). Le studio mesure la palette du fond actuel et prépare le prompt pour Claude, qui recolore la vidéo élément par élément et vous rend le MP4. Ou bien cliquez <b>Recolorer toute la vidéo</b> pour le faire directement dans le studio, gratuitement (réglez l'intensité, vérifiez avec Aperçu avant / après). Copiez le prompt, cliquez <b>Télécharger la vidéo de fond actuelle</b> et joignez-la au prompt dans ChatGPT (ou Sora, Veo, Kling, Runway) : l'IA s'en sert comme modèle. Importez ensuite la nouvelle vidéo : elle remplace le fond du plan et rejoint la bibliothèque. Le prompt se régénère à chaque changement.</li>
         <li><b>Wan 2.2</b> (gratuit, open source) : il crée des vidéos à partir d'un texte ou d'une image, mais il tourne sur un ordinateur avec une bonne carte graphique (ComfyUI), pas dans le navigateur. Dans « Créer un fond sur mesure », choisissez « Le fond actuel du plan », copiez le prompt de l'onglet <b>Directement pour … Wan 2.2</b> et téléchargez <b>l'image du fond seul</b> (704 × 1280) comme image de départ. Wan 2.2 rend des vidéos de 5 secondes : le studio les fait boucler. Il ne sait pas recolorer une vidéo existante : pour cela, utilisez « Recolorer toute la vidéo » dans le studio. <b>Avec un pod RunPod</b> : collez l'adresse du pod dans Réglages, puis le bouton <b>▶ Générer avec Wan 2.2 sur mon RunPod</b> envoie le prompt et l'image du fond seul, attend la fin (souvent 3 à 10 minutes) et place la vidéo à l'étape 5.</li>
-        <li><b>Arrêt automatique du pod RunPod</b> : après chaque démarrage du pod, collez dans son terminal JupyterLab la commande donnée dans Réglages. Ensuite, si le pod ne travaille plus depuis 1 minute, le studio affiche « Arrêter ou continuer ? ». Sans réponse dans les 30 secondes, le pod s'arrête tout seul (même studio fermé). Pour le relancer : RunPod → Pods → ▶ Start.</li>
+        <li><b>Démarrer le pod</b> : cliquez simplement sur « ▶ Générer avec Wan 2.2 ». Si le pod est éteint, le studio ouvre un assistant avec les liens à cliquer (Start sur RunPod, puis le terminal pour l'arrêt automatique) et coche chaque étape tout seul ; la génération démarre d'elle-même quand Wan 2.2 est prêt (5 à 20 min après Start). Le même assistant est dans Réglages → « Démarrer le pod ».</li>
+        <li><b>Arrêt automatique du pod RunPod</b> : après chaque démarrage du pod, collez dans son terminal JupyterLab la commande donnée par l'assistant (ou dans Réglages). Ensuite, si le pod ne travaille plus depuis 1 minute, le studio affiche « Arrêter ou continuer ? ». Sans réponse dans les 30 secondes, le pod s'arrête tout seul (même studio fermé). Pour le relancer : RunPod → Pods → ▶ Start.</li>
         <li><b>+ Photo / vidéo</b> : choisissez un fichier sur l'ordinateur ou le téléphone ; il est posé tout de suite sur le plan. Réglez sa taille, sa forme (ronde, arrondie), sa bordure.</li>
         <li><b>Animation</b> d'un texte ou d'une photo : un effet d'<b>entrée</b> (fondu, lettre par lettre, mot par mot, zoom, rebond, flou, glissement…) et un effet de <b>sortie</b>, chacun avec son moment et sa durée. <b>▶ Voir l'animation</b> pour vérifier.</li>
         <li><b>Éviter les chevauchements de textes</b> : remet les textes du plan les uns sous les autres, sans qu'ils se touchent.</li></ul>`)}
@@ -1650,6 +1655,93 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <tr><td>Changement d'ordinateur</td><td>Réglages → Exporter tous les projets, puis Importer une sauvegarde sur l'autre ordinateur.</td></tr>
         </tbody></table>`)}
       </div>`;
+  }
+
+  /* ================= Assistant « Démarrer le pod » ================= */
+  // Guide pas à pas avec les liens à cliquer ; chaque étape se coche toute seule.
+  // Renvoie une promesse : true quand tout est prêt, false si l'utilisateur ferme.
+  function assistantPod(opts) {
+    opts = opts || {};
+    const cf = reglages.comfy || {};
+    const base = cf.url, id = Comfy.idPod(base);
+    const wf = cf.modele === 'perso' ? null : (Comfy.WORKFLOWS[cf.modele || '14b'] || Comfy.WORKFLOW_14B);
+    const lienPod = id ? 'https://console.runpod.io/pods?id=' + id : 'https://console.runpod.io/pods';
+    const lienJup = id ? 'https://' + id + '-8888.proxy.runpod.net/lab' : '';
+    if (assistantPod.ouvert) assistantPod.ouvert.remove();
+    const d = document.createElement('div'); d.className = 'assistant-pod'; assistantPod.ouvert = d;
+    d.innerHTML = `<div class="ap-boite">
+      <button class="modale-fermer ap-fermer" aria-label="Fermer">×</button>
+      <h3 style="margin:0">Démarrer le pod Wan 2.2</h3>
+      <p class="muet" style="margin:0">${esc(opts.raison || 'Le pod est éteint.')} Suivez les étapes : chacune se coche toute seule dès qu'elle est faite.</p>
+      <ol class="ap-etapes">
+        <li data-e="1"><span class="ap-coche"></span><div><b>Allumer le pod</b>
+          <div>${id ? '' : 'Ouvrez votre pod sur RunPod. '}<a class="btn petit plein" href="${lienPod}" target="_blank" rel="noopener">Ouvrir mon pod sur RunPod ↗</a></div>
+          <div class="muet">Dans la page qui s'ouvre, cliquez sur le bouton violet <b>▶ Start</b>. Revenez ensuite ici (ne fermez pas cette fenêtre).
+          Si RunPod dit qu'aucune carte n'est libre, réessayez quelques minutes plus tard.</div>
+          <div class="ap-etat muet"></div></div></li>
+        ${id ? `<li data-e="2"><span class="ap-coche"></span><div><b>Activer l'arrêt automatique</b> <span class="muet">(pendant que le pod démarre)</span>
+          <div class="muet">1. <a href="${lienJup}" target="_blank" rel="noopener">Ouvrir le terminal du pod (JupyterLab) ↗</a> — disponible 1 à 2 minutes après Start.<br>
+          2. Dans JupyterLab, cliquez sur la tuile <b>Terminal</b> (ou menu File → New → Terminal).<br>
+          3. Copiez cette commande, collez-la dans le terminal (clic droit → Coller, ou Ctrl+V) et appuyez sur <b>Entrée</b> :</div>
+          <div class="ligne"><input type="text" readonly value="${esc(Comfy.COMMANDE_VEILLE)}" style="flex:1;font-family:ui-monospace,monospace;font-size:12px"><button class="btn petit" data-copier>Copier</button></div>
+          <div class="ap-etat muet"></div></div></li>` : ''}
+        <li data-e="3"><span class="ap-coche"></span><div><b>Attendre que Wan 2.2 soit prêt</b>
+          <div class="muet">Le pod télécharge les modèles à chaque démarrage : comptez <b>5 à 20 minutes</b>. Rien à faire, le studio vérifie tout seul.</div>
+          <div class="ap-etat muet"></div></div></li>
+      </ol>
+      <div class="ap-fin muet"></div>
+      <div class="ligne"><button class="btn" data-fermer>${opts.suite ? 'Annuler' : 'Fermer'}</button><span class="muet ap-chrono"></span></div>
+    </div>`;
+    document.body.appendChild(d);
+    const $e = n => $('[data-e="' + n + '"]', d);
+    const marquer = (n, ok, texte) => { const li = $e(n); if (!li) return; li.classList.toggle('fait', !!ok); if (texte != null) $('.ap-etat', li).textContent = texte; };
+    const copie = $('[data-copier]', d); if (copie) copie.onclick = () => copier(Comfy.COMMANDE_VEILLE);
+    const debut = Date.now();
+    let fini = false, minuterie;
+    return new Promise(resoudre => {
+      const fermer = ok => { if (fini) return; fini = true; clearTimeout(minuterie); d.remove(); if (assistantPod.ouvert === d) assistantPod.ouvert = null; resoudre(ok); };
+      $('.ap-fermer', d).onclick = () => fermer(false); $('[data-fermer]', d).onclick = () => fermer(false);
+      const tour = async () => {
+        if (fini) return;
+        const s = Math.round((Date.now() - debut) / 1000);
+        $('.ap-chrono', d).textContent = 'Vérification automatique… ' + Math.floor(s / 60) + ' min ' + String(s % 60).padStart(2, '0');
+        const up = await Comfy.joignable(base);
+        marquer(1, up, up ? 'Pod allumé.' : 'En attente : le pod ne répond pas encore.');
+        let veille = !id;
+        if (id) {
+          if (up) { try { const e = await Comfy.etatVeille(base); veille = e.etat !== 'arret'; } catch (e) { veille = false; } }
+          marquer(2, veille, veille ? 'Arrêt automatique activé.' : (up ? 'Pas encore activé : collez la commande dans le terminal.' : ''));
+        }
+        let modeles = false;
+        if (up) {
+          if (!wf) modeles = true;
+          else { try { const m = await Comfy.modelesPrets(base, wf); modeles = !m.length; marquer(3, modeles, modeles ? 'Wan 2.2 est prêt.' : 'Téléchargement en cours (' + m.length + ' fichier' + (m.length > 1 ? 's' : '') + ' encore manquant' + (m.length > 1 ? 's' : '') + ')…'); } catch (e) { marquer(3, false, 'ComfyUI démarre…'); } }
+          if (!wf) marquer(3, true, 'ComfyUI répond.');
+        } else marquer(3, false, '');
+        if (up && modeles && veille) {
+          $('.ap-fin', d).innerHTML = '<b style="color:#2e7d32">✓ Tout est prêt.</b> ' + (opts.suite ? 'La génération démarre…' : 'Vous pouvez générer vos fonds.');
+          setTimeout(() => fermer(true), opts.suite ? 1200 : 2500); return;
+        }
+        if (up && modeles && !veille) $('.ap-fin', d).innerHTML = 'Wan 2.2 est prêt. Activez l\'arrêt automatique (étape 2) pour ne pas payer un pod qui ne fait rien. <button class="btn petit" data-sans>Continuer sans</button>';
+        const sans = $('[data-sans]', d); if (sans) sans.onclick = () => fermer(true);
+        minuterie = setTimeout(tour, 5000);
+      };
+      tour();
+    });
+  }
+  // Avant toute génération : si le pod n'est pas prêt, ouvrir l'assistant.
+  async function podPret() {
+    const cf = reglages.comfy || {};
+    if (!cf.url) { toast('Collez d\'abord l\'adresse de votre pod dans Réglages'); location.hash = '#/reglages'; return false; }
+    const up = await Comfy.joignable(cf.url);
+    if (up) {
+      const wf = cf.modele === 'perso' ? null : (Comfy.WORKFLOWS[cf.modele || '14b'] || Comfy.WORKFLOW_14B);
+      let manque = [];
+      if (wf) { try { manque = await Comfy.modelesPrets(cf.url, wf); } catch (e) {} }
+      if (!manque.length) return true;
+      return assistantPod({ suite: true, raison: 'Le pod est allumé mais Wan 2.2 n\'est pas encore prêt.' });
+    }
+    return assistantPod({ suite: true, raison: 'Le pod est éteint.' });
   }
 
   /* ================= Veille du pod RunPod ================= */

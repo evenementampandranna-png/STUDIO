@@ -30,6 +30,37 @@ def file_active():
     except Exception:
         return None   # ComfyUI ne répond pas (démarrage) : on ne compte pas comme inactif
 
+MODELES = os.path.join(RACINE, 'models')
+TELECHARGEURS = ('aria2c', 'wget', 'huggingface-cli', 'hf_transfer', 'hf download', 'civitai', 'git lfs', 'git-lfs')
+taille_avant = None
+
+def taille_modeles():
+    total = 0
+    for dossier, _, fichiers in os.walk(MODELES, followlinks=False):
+        for f in fichiers:
+            try: total += os.path.getsize(os.path.join(dossier, f))
+            except OSError: pass
+    return total
+
+def telechargeur_actif():
+    moi = str(os.getpid())
+    for pid in os.listdir('/proc'):
+        if not pid.isdigit() or pid == moi: continue
+        try:
+            with open('/proc/%s/cmdline' % pid, 'rb') as f: cmd = f.read().replace(b'\0', b' ').decode('utf-8', 'ignore')
+        except OSError: continue
+        if 'veille' in cmd: continue
+        if any(t in cmd for t in TELECHARGEURS) or ('curl' in cmd and ('-o' in cmd or '-O' in cmd) and 'models' in cmd): return True
+    return False
+
+def telechargement():
+    # Le pod télécharge les modèles au démarrage : ce n'est pas de l'inactivité.
+    global taille_avant
+    t = taille_modeles()
+    grandit = taille_avant is not None and t > taille_avant
+    taille_avant = t
+    return grandit or telechargeur_actif()
+
 def ecrire(etat):
     os.makedirs(os.path.dirname(ETAT), exist_ok=True)
     tmp = ETAT + '.tmp'
@@ -46,13 +77,14 @@ def arreter(raison):
 while True:
     maintenant = time.time()
     actif = file_active()
-    if actif or (actif is None and maintenant - debut < 600):
-        derniere_activite = maintenant   # ComfyUI muet pendant les 10 premières minutes : il démarre peut-être
+    charge = telechargement()
+    if actif or charge or (actif is None and maintenant - debut < 600):
+        derniere_activite = maintenant   # génération, téléchargement des modèles, ou ComfyUI encore en démarrage
     if mtime(ARRETER) > debut:
         arreter('demande du studio'); break
     base = max(derniere_activite, mtime(CONTINUER))
     inactif = maintenant - base
-    ecrire({'etat': 'actif' if actif else 'inactif', 'inactif': round(inactif), 'alerte': ALERTE,
+    ecrire({'etat': 'actif' if actif else ('telechargement' if charge else 'inactif'), 'inactif': round(inactif), 'alerte': ALERTE,
             'arret': ALERTE + REPONSE, 'heure': maintenant})
     if inactif >= ALERTE + REPONSE:
         arreter('aucune réponse'); break
