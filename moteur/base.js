@@ -5,7 +5,8 @@
     if (!conf || !conf.url || !conf.anon) throw new Error('Base non configurée');
     const r = await fetch(conf.url.replace(/\/+$/, '') + '/rest/v1/rpc/' + fn, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', apikey: conf.anon, Authorization: 'Bearer ' + conf.anon },
+      // clé « anon » (JWT, commence par eyJ) : aussi en Authorization ; clé « publishable » (sb_publishable_…) : apikey seulement
+      headers: Object.assign({ 'Content-Type': 'application/json', apikey: conf.anon }, /^eyJ/.test(conf.anon) ? { Authorization: 'Bearer ' + conf.anon } : {}),
       body: JSON.stringify(args || {})
     });
     const t = await r.text();
