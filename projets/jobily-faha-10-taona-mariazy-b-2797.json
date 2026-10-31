@@ -1,0 +1,1026 @@
+{
+ "id": "a9v545fx",
+ "slug": "jobily-faha-10-taona-mariazy-b-2797",
+ "version": 1,
+ "cree": "2026-10-31T05:08:21.094Z",
+ "modifie": "2026-10-31T11:07:32.275Z",
+ "fiche": {
+  "titre": "Jobily faha-10 taona mariazy — Batemy",
+  "type": "Jobily mariazy + Batemy",
+  "langue": "mg",
+  "hotes": [
+   {
+    "nom_complet": "ANDRIATSIDIKANA Dimbinirina Pierre",
+    "surnom": "Tsidy"
+   },
+   {
+    "nom_complet": "RANDRIATSIMITOVIZAKA Njarasoa",
+    "surnom": "Njara"
+   }
+  ],
+  "celebres": [
+   {
+    "nom_complet": "ANDRIATSIDIKANA Mihaja Kaël",
+    "occasion": "Batemy"
+   }
+  ],
+  "date": "2026-11-07",
+  "heure": "08:00",
+  "lieux": [
+   {
+    "nom": "Ekar Kristy Mpanjaka Manjakaray",
+    "role": "ceremonie",
+    "maps": "https://www.google.com/maps/search/?api=1&query=Ekar%20Kristy%20Mpanjaka%20Manjakaray%20Antananarivo",
+    "adresse": ""
+   },
+   {
+    "nom": "Espace Fenitra, By Pass",
+    "role": "reception",
+    "maps": "https://www.google.com/maps/search/?api=1&query=Espace%20Fenitra%2C%20By%20Pass%20Antananarivo",
+    "adresse": ""
+   }
+  ],
+  "date_limite": "2026-10-31",
+  "contacts": [
+   {
+    "nom": "Tsidy",
+    "telephone": "034 22 174 97"
+   },
+   {
+    "nom": "Njara",
+    "telephone": "034 27 541 47"
+   }
+  ],
+  "phrases": [
+   "ANDRIATSIDIKANA Dimbinirina Pierre sy RANDRIATSIMITOVIZAKA Njarasoa dia faly manasa anareo hanotrona ny fanamasinana ny jobily faha-folo taonan'ny mariazinay, sy ny Batemin'ny zanakay ANDRIATSIDIKANA Mihaja Kaël.",
+   "Hatao ny Sabotsy 7 Novambra 2026, amin'ny 8 ora maraina, ao amin'ny Ekar Kristy Mpanjaka Manjakaray.",
+   "Aorian'izay, dia mahafaly anay ny manasa olona {places} avy aminareo hiara-hikorana sy hizara hafaliana aminay ao amin'ny Espace Fenitra, By Pass.",
+   "Raha misy tsy fahafahana, iangaviana mba hampandre mialohan'ny 31 Oktobra 2026."
+  ],
+  "remerciement": "",
+  "a_verifier": [
+   "phrase de remerciement à fournir"
+  ]
+ },
+ "style": {
+  "police_titre": "Great Vibes",
+  "police_texte": "Cormorant Garamond",
+  "couleur": "#7a1f2b",
+  "couleur2": "#9c6b3f"
+ },
+ "musique": {
+  "src": "medias/ldkwg44s.mp3",
+  "nom": "WhatsApp Audio 2026-10-30 at 15.42.25.mpeg",
+  "volume": 0.45,
+  "debut": 0
+ },
+ "mise_en_page": true,
+ "plans": [
+  {
+   "id": "x3d6lky3",
+   "role": "ouverture",
+   "duree": 4.5,
+   "fond": {
+    "media": "fonds/fond_1.mp4",
+    "boucle": true,
+    "assombrir": 0,
+    "eclaircir": 0
+   },
+   "transition": {
+    "type": "aucune",
+    "duree": 0.8
+   },
+   "calques": [
+    {
+     "id": "jy4pkgri",
+     "type": "bouton",
+     "texte": "Dingano ›",
+     "action": "passer",
+     "x": 84,
+     "y": 4,
+     "largeur": 26,
+     "taille": 2,
+     "couleur": "#7a1f2b",
+     "style": "lien",
+     "debut": 0,
+     "trad": {
+      "fr": "Invitation ›",
+      "en": "Invitation ›",
+      "de": "Einladung ›",
+      "it": "Invito ›",
+      "es": "Invitación ›",
+      "pt": "Convite ›",
+      "zh": "邀请函 ›",
+      "ar": "دعوة ›",
+      "ru": "Приглашение ›",
+      "ja": "ご招待 ›"
+     }
+    }
+   ]
+  },
+  {
+   "id": "4k9vc5ga",
+   "role": "intermediaire",
+   "duree": 6,
+   "fond": {
+    "media": "fonds/fond_2.mp4",
+    "boucle": true,
+    "assombrir": 0,
+    "eclaircir": 0
+   },
+   "transition": {
+    "type": "fondu",
+    "duree": 0.8
+   },
+   "calques": [
+    {
+     "id": "5a5ki540",
+     "type": "texte",
+     "texte": "Jobily faha-10 taona mariazy",
+     "x": 50,
+     "y": 45.7,
+     "largeur": 68,
+     "police": "Great Vibes",
+     "taille": 5.2,
+     "couleur": "#7a1f2b",
+     "gras": false,
+     "align": "center",
+     "ombre": true,
+     "debut": 0.3,
+     "fin": "",
+     "animation": "ecriture",
+     "trad": {
+      "fr": "10e anniversaire de mariage",
+      "en": "10th Wedding Anniversary",
+      "de": "10. Hochzeitstag",
+      "it": "10° anniversario di matrimonio",
+      "es": "10.º aniversario de boda",
+      "pt": "10.º aniversário de casamento",
+      "zh": "结婚十周年纪念",
+      "ar": "الذكرى العاشرة للزواج",
+      "ru": "10-я годовщина свадьбы",
+      "ja": "結婚10周年記念"
+     }
+    },
+    {
+     "id": "0o1m3sx1",
+     "type": "texte",
+     "texte": "Batemy",
+     "x": 50,
+     "y": 57.4,
+     "largeur": 60,
+     "police": "Cormorant Garamond",
+     "taille": 3.4,
+     "couleur": "#9c6b3f",
+     "gras": false,
+     "align": "center",
+     "ombre": true,
+     "debut": 2.2,
+     "fin": "",
+     "animation": "fondu-montee",
+     "majuscules": true,
+     "trad": {
+      "fr": "Baptême",
+      "en": "Baptism",
+      "de": "Taufe",
+      "it": "Battesimo",
+      "es": "Bautizo",
+      "pt": "Batizado",
+      "zh": "洗礼仪式",
+      "ar": "المعمودية",
+      "ru": "Крещение",
+      "ja": "洗礼式"
+     }
+    }
+   ]
+  },
+  {
+   "id": "heoyea8o",
+   "role": "intermediaire",
+   "duree": 7,
+   "fond": {
+    "media": "fonds/fond_2.mp4",
+    "boucle": true,
+    "assombrir": 0,
+    "eclaircir": 0
+   },
+   "transition": {
+    "type": "fondu",
+    "duree": 0.8
+   },
+   "calques": [
+    {
+     "id": "bcse129b",
+     "type": "texte",
+     "texte": "ANDRIATSIDIKANA Dimbinirina Pierre\nsy\nRANDRIATSIMITOVIZAKA Njarasoa",
+     "x": 50,
+     "y": 35.7,
+     "largeur": 60,
+     "police": "Cormorant Garamond",
+     "taille": 3,
+     "couleur": "#7a1f2b",
+     "gras": true,
+     "align": "center",
+     "ombre": true,
+     "debut": 0.3,
+     "fin": "",
+     "animation": "fondu-montee",
+     "interligne": 1.3,
+     "trad": {
+      "fr": "ANDRIATSIDIKANA Dimbinirina Pierre\net\nRANDRIATSIMITOVIZAKA Njarasoa",
+      "en": "ANDRIATSIDIKANA Dimbinirina Pierre\nand\nRANDRIATSIMITOVIZAKA Njarasoa",
+      "de": "ANDRIATSIDIKANA Dimbinirina Pierre\nund\nRANDRIATSIMITOVIZAKA Njarasoa",
+      "it": "ANDRIATSIDIKANA Dimbinirina Pierre\ne\nRANDRIATSIMITOVIZAKA Njarasoa",
+      "es": "ANDRIATSIDIKANA Dimbinirina Pierre\ny\nRANDRIATSIMITOVIZAKA Njarasoa",
+      "pt": "ANDRIATSIDIKANA Dimbinirina Pierre\ne\nRANDRIATSIMITOVIZAKA Njarasoa",
+      "zh": "ANDRIATSIDIKANA Dimbinirina Pierre\n与\nRANDRIATSIMITOVIZAKA Njarasoa",
+      "ar": "ANDRIATSIDIKANA Dimbinirina Pierre\nو\nRANDRIATSIMITOVIZAKA Njarasoa",
+      "ru": "ANDRIATSIDIKANA Dimbinirina Pierre\nи\nRANDRIATSIMITOVIZAKA Njarasoa",
+      "ja": "ANDRIATSIDIKANA Dimbinirina Pierre\nと\nRANDRIATSIMITOVIZAKA Njarasoa"
+     }
+    },
+    {
+     "id": "96f0xflz",
+     "type": "texte",
+     "texte": "dia faly manasa anareo hanotrona ny fanamasinana ny jobily faha-folo taonan'ny mariazinay,",
+     "x": 50,
+     "y": 60.4,
+     "largeur": 60,
+     "police": "Cormorant Garamond",
+     "taille": 3.8,
+     "couleur": "#7a1f2b",
+     "gras": false,
+     "align": "center",
+     "ombre": true,
+     "debut": 1.6,
+     "fin": "",
+     "animation": "fondu-montee",
+     "trad": {
+      "fr": "ont la joie de vous inviter à célébrer et à bénir le dixième anniversaire de leur mariage,",
+      "en": "joyfully invite you to join them in celebrating and blessing their tenth wedding anniversary,",
+      "de": "freuen sich, Sie herzlich zur Segnung ihres zehnten Hochzeitstages einzuladen,",
+      "it": "sono lieti di invitarvi a celebrare insieme la benedizione del loro decimo anniversario di matrimonio,",
+      "es": "se complacen en invitarles a celebrar y bendecir su décimo aniversario de matrimonio,",
+      "pt": "têm a alegria de vos convidar para celebrar e receber a bênção pelo décimo aniversário do seu casamento,",
+      "zh": "诚挚邀请您与我们一同庆祝并祈福结婚十周年纪念，",
+      "ar": "يسرّهما دعوتكم لمشاركتهما الاحتفال ومباركة الذكرى العاشرة لزواجهما،",
+      "ru": "с радостью приглашают вас разделить с ними торжество и благословение в честь десятой годовщины их свадьбы,",
+      "ja": "私たちは、結婚10周年を迎えるにあたり、皆さまとともにお祝いし、祝福を受ける機会にご招待いたします。"
+     }
+    }
+   ]
+  },
+  {
+   "id": "oskln6vd",
+   "role": "intermediaire",
+   "duree": 4.5,
+   "fond": {
+    "media": "fonds/fond_3.mp4",
+    "boucle": true,
+    "assombrir": 0,
+    "eclaircir": 0
+   },
+   "transition": {
+    "type": "fondu",
+    "duree": 0.8
+   },
+   "calques": [
+    {
+     "id": "hh5vo8vp",
+     "type": "texte",
+     "texte": "sy ny Batemin'ny zanakay",
+     "x": 56,
+     "y": 41.4,
+     "largeur": 60,
+     "police": "Cormorant Garamond",
+     "taille": 4,
+     "couleur": "#7a1f2b",
+     "gras": false,
+     "align": "center",
+     "ombre": true,
+     "debut": 0.3,
+     "fin": "",
+     "animation": "fondu-montee",
+     "trad": {
+      "fr": "ainsi que le baptême de leur enfant",
+      "en": "and the baptism of their child",
+      "de": "sowie zur Taufe ihres Kindes",
+      "it": "e il battesimo del loro bambino",
+      "es": "así como el bautizo de su hijo",
+      "pt": "bem como o batizado do seu filho",
+      "zh": "以及我们孩子的洗礼仪式",
+      "ar": "وكذلك معمودية طفلهما",
+      "ru": "а также крещение их ребёнка",
+      "ja": "また、私たちの子どもの洗礼式も執り行います"
+     }
+    },
+    {
+     "id": "alel8b9y",
+     "type": "texte",
+     "texte": "ANDRIATSIDIKANA Mihaja Kaël",
+     "x": 56,
+     "y": 56.9,
+     "largeur": 66,
+     "police": "Great Vibes",
+     "taille": 6,
+     "couleur": "#7a1f2b",
+     "gras": false,
+     "align": "center",
+     "ombre": true,
+     "debut": 1.3,
+     "fin": "",
+     "animation": "ecriture",
+     "trad": {
+      "fr": "ANDRIATSIDIKANA Mihaja Kaël",
+      "en": "ANDRIATSIDIKANA Mihaja Kaël",
+      "de": "ANDRIATSIDIKANA Mihaja Kaël",
+      "it": "ANDRIATSIDIKANA Mihaja Kaël",
+      "es": "ANDRIATSIDIKANA Mihaja Kaël",
+      "pt": "ANDRIATSIDIKANA Mihaja Kaël",
+      "zh": "ANDRIATSIDIKANA Mihaja Kaël",
+      "ar": "ANDRIATSIDIKANA Mihaja Kaël",
+      "ru": "ANDRIATSIDIKANA Mihaja Kaël",
+      "ja": "ANDRIATSIDIKANA Mihaja Kaël"
+     }
+    }
+   ]
+  },
+  {
+   "id": "eyz7jpex",
+   "role": "intermediaire",
+   "duree": 6.5,
+   "fond": {
+    "media": "fonds/fond_3.mp4",
+    "boucle": true,
+    "assombrir": 0,
+    "eclaircir": 0
+   },
+   "transition": {
+    "type": "fondu",
+    "duree": 0.8
+   },
+   "calques": [
+    {
+     "id": "spbqb4rx",
+     "type": "texte",
+     "texte": "Hatao ny Sabotsy 7 Novambra 2026, amin'ny 8 ora maraina, ao amin'ny Ekar Kristy Mpanjaka Manjakaray.",
+     "x": 56,
+     "y": 50,
+     "largeur": 60,
+     "police": "Cormorant Garamond",
+     "taille": 3.5,
+     "couleur": "#7a1f2b",
+     "gras": false,
+     "align": "center",
+     "ombre": true,
+     "debut": 0.4,
+     "fin": "",
+     "animation": "fondu-montee",
+     "trad": {
+      "fr": "Le samedi 7 novembre 2026 à 8 heures du matin, à l'Ekar Kristy Mpanjaka Manjakaray.",
+      "en": "Saturday, November 7, 2026, at 8:00 a.m., at Ekar Kristy Mpanjaka Manjakaray.",
+      "de": "Am Samstag, den 7. November 2026, um 8:00 Uhr, in der Ekar Kristy Mpanjaka Manjakaray.",
+      "it": "Sabato 7 novembre 2026, alle ore 8:00, presso Ekar Kristy Mpanjaka Manjakaray.",
+      "es": "El sábado 7 de noviembre de 2026, a las 8:00 de la mañana, en Ekar Kristy Mpanjaka Manjakaray.",
+      "pt": "Sábado, 7 de novembro de 2026, às 8h00, na Ekar Kristy Mpanjaka Manjakaray.",
+      "zh": "2026年11月7日（星期六）上午8点，在 Ekar Kristy Mpanjaka Manjakaray 举行。",
+      "ar": "يوم السبت 7 نوفمبر 2026، الساعة الثامنة صباحًا، في Ekar Kristy Mpanjaka Manjakaray.",
+      "ru": "В субботу, 7 ноября 2026 года, в 8:00 утра, в Ekar Kristy Mpanjaka Manjakaray.",
+      "ja": "2026年11月7日（土）午前8時より、Ekar Kristy Mpanjaka Manjakaray にて執り行います。"
+     }
+    }
+   ]
+  },
+  {
+   "id": "laneb1kc",
+   "role": "intermediaire",
+   "duree": 7.5,
+   "fond": {
+    "media": "fonds/fond_4.mp4",
+    "boucle": true,
+    "assombrir": 0,
+    "eclaircir": 0
+   },
+   "transition": {
+    "type": "fondu",
+    "duree": 0.8
+   },
+   "calques": [
+    {
+     "id": "yazp8pzk",
+     "type": "texte",
+     "texte": "Aorian'izay, dia mahafaly anay ny manasa olona {places} avy aminareo hiara-hikorana sy hizara hafaliana aminay ao amin'ny Espace Fenitra, By Pass.",
+     "x": 52,
+     "y": 44,
+     "largeur": 70,
+     "police": "Cormorant Garamond",
+     "taille": 3.5,
+     "couleur": "#7a1f2b",
+     "gras": false,
+     "align": "center",
+     "ombre": true,
+     "debut": 0.4,
+     "fin": "",
+     "animation": "fondu-montee",
+     "trad": {
+      "fr": "À l'issue de la cérémonie, nous serons heureux d'accueillir {places} personnes de votre famille pour partager un moment de fête et de joie à l'Espace Fenitra, By Pass.",
+      "en": "Following the ceremony, we would be delighted to welcome {places} guests from your family to celebrate and share this joyful occasion with us at Espace Fenitra, By Pass.",
+      "de": "Im Anschluss an die Zeremonie freuen wir uns, {places} Gäste aus Ihrer Familie zu einem gemeinsamen Fest voller Freude im Espace Fenitra, By Pass, begrüßen zu dürfen.",
+      "it": "Al termine della cerimonia, saremo felici di accogliere {places} ospiti della vostra famiglia per festeggiare insieme e condividere la gioia presso Espace Fenitra, By Pass.",
+      "es": "Después de la ceremonia, estaremos encantados de recibir a {places} invitados de su familia para celebrar y compartir nuestra alegría en Espace Fenitra, By Pass.",
+      "pt": "Após a cerimónia, teremos todo o gosto em receber {places} convidados da vossa família para festejar e partilhar a nossa alegria no Espace Fenitra, By Pass.",
+      "zh": "仪式结束后，我们诚邀您家中的 {places} 位亲友前往 Espace Fenitra, By Pass，与我们共度欢乐时光。",
+      "ar": "بعد المراسم، يسعدنا استقبال {places} من أفراد عائلتكم للاحتفال ومشاركتنا فرحتنا في Espace Fenitra, By Pass.",
+      "ru": "После церемонии мы будем рады принять {places} гостей из вашей семьи, чтобы вместе отпраздновать это радостное событие в Espace Fenitra, By Pass.",
+      "ja": "式典の後、Espace Fenitra, By Pass にて、ご家族から {places} 名様をお迎えし、ともに喜びを分かち合えることを楽しみにしております。"
+     }
+    }
+   ]
+  },
+  {
+   "id": "qi9vd98h",
+   "role": "confirmation",
+   "duree": 0,
+   "fond": {
+    "media": "fonds/fond_4.mp4",
+    "boucle": true,
+    "assombrir": 0,
+    "eclaircir": 0
+   },
+   "transition": {
+    "type": "fondu",
+    "duree": 0.8
+   },
+   "calques": [
+    {
+     "id": "uueucekf",
+     "type": "texte",
+     "texte": "Ho an'i {famille}",
+     "x": 52,
+     "y": 11.3,
+     "largeur": 78,
+     "police": "Great Vibes",
+     "taille": 4.2,
+     "couleur": "#7a1f2b",
+     "gras": false,
+     "align": "center",
+     "ombre": true,
+     "debut": 0.2,
+     "fin": "",
+     "animation": "fondu-montee",
+     "condition": "famille",
+     "trad": {
+      "fr": "À l'attention de {famille}",
+      "en": "For {famille}",
+      "de": "Für {famille}",
+      "it": "Per {famille}",
+      "es": "Para {famille}",
+      "pt": "Para {famille}",
+      "zh": "致 {famille}",
+      "ar": "إلى {famille}",
+      "ru": "Для семьи {famille}",
+      "ja": "{famille} 様へ"
+     }
+    },
+    {
+     "id": "ov0ab9nf",
+     "type": "texte",
+     "texte": "Manasa olona {places}",
+     "x": 52,
+     "y": 20,
+     "largeur": 72,
+     "police": "Cormorant Garamond",
+     "taille": 3,
+     "couleur": "#7a1f2b",
+     "gras": true,
+     "align": "center",
+     "ombre": true,
+     "debut": 0.4,
+     "fin": "",
+     "animation": "fondu-montee",
+     "condition": "famille",
+     "trad": {
+      "fr": "Inviter {places} personnes",
+      "en": "Invite {places} guests",
+      "de": "{places} Gäste einladen",
+      "it": "Invita {places} ospiti",
+      "es": "Invitar a {places}",
+      "pt": "Convidar {places} pessoas",
+      "zh": "邀请 {places} 位宾客",
+      "ar": "دعوة {places} ضيوف",
+      "ru": "Пригласить {places} гостей",
+      "ja": "{places} 名様をご招待"
+     }
+    },
+    {
+     "id": "yrduw8yy",
+     "type": "texte",
+     "texte": "Raha misy tsy fahafahana, iangaviana mba hampandre mialohan'ny 31 Oktobra 2026.",
+     "x": 52,
+     "y": 28.5,
+     "largeur": 70,
+     "police": "Cormorant Garamond",
+     "taille": 2.7,
+     "couleur": "#7a1f2b",
+     "gras": false,
+     "align": "center",
+     "ombre": true,
+     "debut": 0.6,
+     "fin": "",
+     "animation": "fondu-montee",
+     "trad": {
+      "fr": "En cas d'empêchement, merci de nous prévenir avant le 31 octobre 2026.",
+      "en": "If you are unable to attend, kindly let us know before October 31, 2026.",
+      "de": "Sollten Sie verhindert sein, bitten wir um eine kurze Nachricht bis zum 31. Oktober 2026.",
+      "it": "In caso di impossibilità a partecipare, vi preghiamo di avvisarci entro il 31 ottobre 2026.",
+      "es": "Si no pueden asistir, les rogamos que nos avisen antes del 31 de octubre de 2026.",
+      "pt": "Caso não possam comparecer, agradecemos que nos avisem até 31 de outubro de 2026.",
+      "zh": "如无法出席，敬请于2026年10月31日前告知我们。",
+      "ar": "في حال تعذّر الحضور، نرجو إبلاغنا قبل 31 أكتوبر 2026.",
+      "ru": "Если вы не сможете прийти, просим сообщить нам об этом до 31 октября 2026 года.",
+      "ja": "ご出席が難しい場合は、2026年10月31日までにお知らせください。"
+     }
+    },
+    {
+     "id": "4357uhqd",
+     "type": "texte",
+     "texte": "Andro sisa",
+     "x": 52,
+     "y": 36.7,
+     "largeur": 70,
+     "police": "Cormorant Garamond",
+     "taille": 2.4,
+     "couleur": "#9c6b3f",
+     "gras": false,
+     "align": "center",
+     "ombre": true,
+     "debut": 0.8,
+     "fin": "",
+     "animation": "fondu-montee",
+     "majuscules": true,
+     "trad": {
+      "fr": "Jours restants",
+      "en": "Days to go",
+      "de": "Noch verbleibende Tage",
+      "it": "Giorni rimanenti",
+      "es": "Días restantes",
+      "pt": "Dias restantes",
+      "zh": "剩余天数",
+      "ar": "الأيام المتبقية",
+      "ru": "Осталось дней",
+      "ja": "開催まであと"
+     }
+    },
+    {
+     "id": "pvslggr7",
+     "type": "texte",
+     "texte": "{compte_a_rebours}",
+     "x": 52,
+     "y": 41.4,
+     "largeur": 78,
+     "police": "Cormorant Garamond",
+     "taille": 2.6,
+     "couleur": "#7a1f2b",
+     "gras": true,
+     "align": "center",
+     "ombre": true,
+     "debut": 0.8,
+     "fin": "",
+     "animation": "fondu",
+     "trad": {
+      "fr": "{compte_a_rebours}",
+      "en": "{compte_a_rebours}",
+      "de": "{compte_a_rebours}",
+      "it": "{compte_a_rebours}",
+      "es": "{compte_a_rebours}",
+      "pt": "{compte_a_rebours}",
+      "zh": "{compte_a_rebours}",
+      "ar": "{compte_a_rebours}",
+      "ru": "{compte_a_rebours}",
+      "ja": "{compte_a_rebours}"
+     }
+    },
+    {
+     "id": "xbpibzhq",
+     "type": "compteur",
+     "texte": "Olon-dehibe",
+     "action": "",
+     "x": 52,
+     "y": 48.62500000000001,
+     "largeur": 66,
+     "taille": 2.3,
+     "couleur": "#7a1f2b",
+     "style": "plein",
+     "debut": 0,
+     "condition": "famille",
+     "champ": "adultes",
+     "min": 0,
+     "defaut": 1,
+     "trad": {
+      "fr": "Adultes",
+      "en": "Adults",
+      "de": "Erwachsene",
+      "it": "Adulti",
+      "es": "Adultos",
+      "pt": "Adultos",
+      "zh": "成人",
+      "ar": "البالغون",
+      "ru": "Взрослые",
+      "ja": "大人"
+     }
+    },
+    {
+     "id": "ce550cc0",
+     "type": "compteur",
+     "texte": "Ankizy",
+     "action": "",
+     "x": 52,
+     "y": 55.12500000000001,
+     "largeur": 66,
+     "taille": 2.3,
+     "couleur": "#7a1f2b",
+     "style": "plein",
+     "debut": 0,
+     "condition": "famille",
+     "champ": "enfants",
+     "min": 0,
+     "defaut": 0,
+     "trad": {
+      "fr": "Enfants",
+      "en": "Children",
+      "de": "Kinder",
+      "it": "Bambini",
+      "es": "Niños",
+      "pt": "Crianças",
+      "zh": "儿童",
+      "ar": "الأطفال",
+      "ru": "Дети",
+      "ja": "子ども"
+     }
+    },
+    {
+     "id": "sxzfhqvc",
+     "type": "bouton",
+     "texte": "Ho tonga izahay",
+     "action": "confirmer",
+     "x": 52,
+     "y": 62.62500000000001,
+     "largeur": 66,
+     "taille": 2.4,
+     "couleur": "#7a1f2b",
+     "style": "plein",
+     "debut": 0,
+     "condition": "famille",
+     "trad": {
+      "fr": "Nous serons présents",
+      "en": "We will attend",
+      "de": "Wir nehmen teil",
+      "it": "Saremo presenti",
+      "es": "Asistiremos",
+      "pt": "Estaremos presentes",
+      "zh": "我们将出席",
+      "ar": "سنحضر",
+      "ru": "Мы будем",
+      "ja": "出席します"
+     }
+    },
+    {
+     "id": "qzhcf5ad",
+     "type": "bouton",
+     "texte": "Tsy ho afaka izahay",
+     "action": "refuser",
+     "x": 52,
+     "y": 69.125,
+     "largeur": 66,
+     "taille": 2.1,
+     "couleur": "#7a1f2b",
+     "style": "contour",
+     "debut": 0,
+     "condition": "famille",
+     "trad": {
+      "fr": "Nous ne pourrons pas venir",
+      "en": "We cannot attend",
+      "de": "Wir können nicht kommen",
+      "it": "Non potremo esserci",
+      "es": "No podremos asistir",
+      "pt": "Não poderemos comparecer",
+      "zh": "我们无法出席",
+      "ar": "لن نتمكن من الحضور",
+      "ru": "Мы не сможем прийти",
+      "ja": "欠席します"
+     }
+    },
+    {
+     "id": "ywvdw11s",
+     "type": "bouton",
+     "texte": "Hamaly amin'ny WhatsApp",
+     "action": "whatsapp",
+     "x": 52,
+     "y": 53.62500000000001,
+     "largeur": 66,
+     "taille": 2.4,
+     "couleur": "#7a1f2b",
+     "style": "plein",
+     "debut": 0,
+     "condition": "general",
+     "cible": 0,
+     "trad": {
+      "fr": "Répondre sur WhatsApp",
+      "en": "Reply on WhatsApp",
+      "de": "Auf WhatsApp antworten",
+      "it": "Rispondi su WhatsApp",
+      "es": "Responder por WhatsApp",
+      "pt": "Responder no WhatsApp",
+      "zh": "通过 WhatsApp 回复",
+      "ar": "الرد عبر واتساب",
+      "ru": "Ответить в WhatsApp",
+      "ja": "WhatsAppで返信"
+     }
+    },
+    {
+     "id": "bu8m141m",
+     "type": "bouton",
+     "texte": "Sarintany · Ekar Kristy",
+     "action": "map",
+     "x": 35,
+     "y": 76.625,
+     "largeur": 33,
+     "taille": 1.8,
+     "couleur": "#7a1f2b",
+     "style": "contour",
+     "debut": 0,
+     "cible": 0,
+     "trad": {
+      "fr": "Itinéraire · Ekar Kristy",
+      "en": "Map · Ekar Kristy",
+      "de": "Karte · Ekar Kristy",
+      "it": "Mappa · Ekar Kristy",
+      "es": "Mapa · Ekar Kristy",
+      "pt": "Mapa · Ekar Kristy",
+      "zh": "地图 · Ekar Kristy",
+      "ar": "الخريطة · Ekar Kristy",
+      "ru": "Карта · Ekar Kristy",
+      "ja": "地図 · Ekar Kristy"
+     }
+    },
+    {
+     "id": "wlc43ge0",
+     "type": "bouton",
+     "texte": "Sarintany · Espace Fenitra",
+     "action": "map",
+     "x": 69,
+     "y": 76.625,
+     "largeur": 33,
+     "taille": 1.8,
+     "couleur": "#7a1f2b",
+     "style": "contour",
+     "debut": 0,
+     "cible": 1,
+     "trad": {
+      "fr": "Itinéraire · Espace Fenitra",
+      "en": "Map · Espace Fenitra",
+      "de": "Karte · Espace Fenitra",
+      "it": "Mappa · Espace Fenitra",
+      "es": "Mapa · Espace Fenitra",
+      "pt": "Mapa · Espace Fenitra",
+      "zh": "地图 · Espace Fenitra",
+      "ar": "الخريطة · Espace Fenitra",
+      "ru": "Карта · Espace Fenitra",
+      "ja": "地図 · Espace Fenitra"
+     }
+    },
+    {
+     "id": "grpmsym0",
+     "type": "bouton",
+     "texte": "Antsoy Tsidy",
+     "action": "appeler",
+     "x": 35,
+     "y": 83.125,
+     "largeur": 33,
+     "taille": 1.8,
+     "couleur": "#7a1f2b",
+     "style": "contour",
+     "debut": 0,
+     "cible": 0,
+     "trad": {
+      "fr": "Appeler Tsidy",
+      "en": "Call Tsidy",
+      "de": "Tsidy anrufen",
+      "it": "Chiama Tsidy",
+      "es": "Llamar a Tsidy",
+      "pt": "Ligar a Tsidy",
+      "zh": "致电 Tsidy",
+      "ar": "اتصل بـ Tsidy",
+      "ru": "Позвонить Tsidy",
+      "ja": "Tsidyに電話"
+     }
+    },
+    {
+     "id": "ig5nqqcc",
+     "type": "bouton",
+     "texte": "Antsoy Njara",
+     "action": "appeler",
+     "x": 69,
+     "y": 83.125,
+     "largeur": 33,
+     "taille": 1.8,
+     "couleur": "#7a1f2b",
+     "style": "contour",
+     "debut": 0,
+     "cible": 1,
+     "trad": {
+      "fr": "Appeler Njara",
+      "en": "Call Njara",
+      "de": "Njara anrufen",
+      "it": "Chiama Njara",
+      "es": "Llamar a Njara",
+      "pt": "Ligar a Njara",
+      "zh": "致电 Njara",
+      "ar": "اتصل بـ Njara",
+      "ru": "Позвонить Njara",
+      "ja": "Njaraに電話"
+     }
+    }
+   ]
+  },
+  {
+   "id": "nhvjgj14",
+   "role": "remerciement",
+   "duree": 6,
+   "fond": {
+    "media": "fonds/fond_2.mp4",
+    "boucle": true,
+    "assombrir": 0,
+    "eclaircir": 0
+   },
+   "transition": {
+    "type": "fondu",
+    "duree": 0.8
+   },
+   "calques": [
+    {
+     "id": "lojqwt3k",
+     "type": "texte",
+     "texte": "Misaotra betsaka",
+     "x": 50,
+     "y": 33.7,
+     "largeur": 64,
+     "police": "Great Vibes",
+     "taille": 7,
+     "couleur": "#7a1f2b",
+     "gras": false,
+     "align": "center",
+     "ombre": true,
+     "debut": 0.3,
+     "fin": "",
+     "animation": "ecriture",
+     "trad": {
+      "fr": "Un grand merci",
+      "en": "Thank you so much",
+      "de": "Vielen herzlichen Dank",
+      "it": "Grazie di cuore",
+      "es": "Muchas gracias",
+      "pt": "Muito obrigado",
+      "zh": "衷心感谢",
+      "ar": "شكرًا جزيلًا",
+      "ru": "Большое спасибо",
+      "ja": "心より感謝申し上げます"
+     }
+    },
+    {
+     "id": "95vwgprd",
+     "type": "texte",
+     "texte": "Voninahitra ho anay ny fahatongavanareo",
+     "x": 50,
+     "y": 50,
+     "largeur": 60,
+     "police": "Cormorant Garamond",
+     "taille": 3.6,
+     "couleur": "#7a1f2b",
+     "gras": false,
+     "align": "center",
+     "ombre": true,
+     "debut": 1.6,
+     "fin": "",
+     "animation": "fondu-montee",
+     "trad": {
+      "fr": "Votre présence sera un honneur pour nous",
+      "en": "Your presence would be a great honor",
+      "de": "Ihre Anwesenheit wäre uns eine große Ehre",
+      "it": "La vostra presenza sarà per noi un grande onore",
+      "es": "Será un honor contar con su presencia",
+      "pt": "Será uma honra contar com a vossa presença",
+      "zh": "您的到来将是我们的荣幸",
+      "ar": "يشرفنا حضوركم ومشاركتكم فرحتنا",
+      "ru": "Для нас большая честь видеть вас среди гостей",
+      "ja": "皆さまにお越しいただければ幸いです"
+     }
+    },
+    {
+     "id": "uexm1soe",
+     "type": "texte",
+     "texte": "Tsidy sy Njara",
+     "x": 50,
+     "y": 60.6,
+     "largeur": 60,
+     "police": "Great Vibes",
+     "taille": 5,
+     "couleur": "#7a1f2b",
+     "gras": false,
+     "align": "center",
+     "ombre": true,
+     "debut": 2.6,
+     "fin": "",
+     "animation": "fondu-montee",
+     "trad": {
+      "fr": "Tsidy et Njara",
+      "en": "Tsidy and Njara",
+      "de": "Tsidy und Njara",
+      "it": "Tsidy e Njara",
+      "es": "Tsidy y Njara",
+      "pt": "Tsidy e Njara",
+      "zh": "Tsidy 与 Njara",
+      "ar": "Tsidy وNjara",
+      "ru": "Tsidy и Njara",
+      "ja": "Tsidy と Njara"
+     }
+    },
+    {
+     "id": "1t4cha2y",
+     "type": "bouton",
+     "texte": "Zarao",
+     "action": "partager",
+     "x": 50,
+     "y": 74,
+     "largeur": 52,
+     "taille": 2.4,
+     "couleur": "#7a1f2b",
+     "style": "plein",
+     "debut": 0,
+     "trad": {
+      "fr": "Partager",
+      "en": "Share",
+      "de": "Teilen",
+      "it": "Condividi",
+      "es": "Compartir",
+      "pt": "Partilhar",
+      "zh": "分享",
+      "ar": "مشاركة",
+      "ru": "Поделиться",
+      "ja": "共有する"
+     }
+    },
+    {
+     "id": "801v8uhu",
+     "type": "bouton",
+     "texte": "Jereo indray",
+     "action": "revoir",
+     "x": 50,
+     "y": 81,
+     "largeur": 52,
+     "taille": 2.1,
+     "couleur": "#7a1f2b",
+     "style": "contour",
+     "debut": 0,
+     "trad": {
+      "fr": "Revoir l'invitation",
+      "en": "View again",
+      "de": "Erneut ansehen",
+      "it": "Rivedi l'invito",
+      "es": "Ver de nuevo",
+      "pt": "Ver novamente",
+      "zh": "再次查看",
+      "ar": "إعادة المشاهدة",
+      "ru": "Посмотреть снова",
+      "ja": "もう一度見る"
+     }
+    }
+   ]
+  }
+ ],
+ "langues": [
+  "mg",
+  "fr",
+  "en",
+  "de",
+  "it",
+  "es",
+  "pt",
+  "zh",
+  "ar",
+  "ru",
+  "ja"
+ ],
+ "vitrine": false,
+ "vitrine_noms": false,
+ "reponses_generales": [],
+ "liens": {},
+ "publication": {
+  "date": "2026-10-31T11:07:32.277Z",
+  "firebase": null,
+  "supabase": {
+   "url": "https://cbbnfdzqkpttxtwrucrk.supabase.co",
+   "anon": "sb_publishable_lMpq36SYDbynUZ3d1sJrYg_RPsCe5jX"
+  }
+ }
+}
