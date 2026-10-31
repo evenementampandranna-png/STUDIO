@@ -1509,10 +1509,11 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <button class="btn" id="modele-xls">Modèle Excel vide</button>
         ${reglages.firebase ? '<button class="btn" id="charger-rep">Charger les réponses (Firebase)</button>' : ''}
       </div>
+      <datalist id="cats-invites">${[...new Set((p.fiche.langue === 'mg' ? ["Fianakaviana avy amin'ny ray", "Fianakaviana avy amin'ny reny", 'Namana', 'Mpiara-miasa', 'Mpiray fiangonana', 'Mpifanolobodirindrina'] : ['Famille du père', 'Famille de la mère', 'Amis', 'Collègues', 'Église', 'Voisins']).concat(fs.map(f => f.categorie).filter(Boolean)))].map(c => `<option value="${esc(c)}">`).join('')}</datalist>
       <div class="carte" style="padding:10px"><div class="tableau-boite"><table class="tableau">
         <thead><tr><th>Famille</th><th>Catégorie</th><th>Places</th><th>Adultes</th><th>Enfants</th><th>Téléphone</th><th>Statut</th><th>Table</th><th>Lien</th><th></th></tr></thead>
         <tbody>${fs.map((f, k) => `<tr data-k="${k}">
-          <td><input type="text" data-k="nom" value="${esc(f.nom)}"></td><td><input type="text" data-k="categorie" value="${esc(f.categorie || '')}" style="width:100px"></td>
+          <td><input type="text" data-k="nom" value="${esc(f.nom)}"></td><td><input type="text" data-k="categorie" list="cats-invites" value="${esc(f.categorie || '')}" style="width:150px" placeholder="Choisir…"></td>
           <td><input type="number" data-k="places" min="1" value="${f.places || 1}" style="width:64px"></td><td><input type="number" data-k="adultes" min="0" value="${f.adultes || 0}" style="width:64px"></td><td><input type="number" data-k="enfants" min="0" value="${f.enfants || 0}" style="width:64px"></td>
           <td><input type="text" data-k="telephone" value="${esc(f.telephone || '')}" style="width:130px"></td>
           <td><select data-k="statut"><option value="attente" ${!f.statut || f.statut === 'attente' ? 'selected' : ''}>En attente</option><option value="vient" ${f.statut === 'vient' ? 'selected' : ''}>Vient</option><option value="non" ${f.statut === 'non' ? 'selected' : ''}>Ne vient pas</option></select></td>

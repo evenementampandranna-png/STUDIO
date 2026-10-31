@@ -52,6 +52,7 @@
   .carte { background: var(--carte); border: 1px solid var(--ligne); border-radius: 14px; padding: 14px; margin-top: 16px; }
   .carte h3 { margin: 0 0 6px; font-size: 15px; }
   .muet { color: var(--gris); font-size: 13px; }
+  .cat-ligne { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; }
   dialog { border: 0; border-radius: 16px; padding: 0; width: min(460px, calc(100vw - 32px)); box-shadow: 0 20px 60px rgba(0,0,0,.3); }
   dialog::backdrop { background: rgba(30, 10, 10, .45); }
   dialog form { padding: 18px; display: flex; flex-direction: column; gap: 10px; }
@@ -71,8 +72,8 @@
 <div id="erreur" hidden></div>
 <dialog id="dlg"><form method="dialog" id="dlg-form"></form></dialog>
 <div id="toast"></div>
-<script src="../config.js?v=202610311343"></script>
-<script src="../moteur/base.js?v=202610311343"></script>
+<script src="../config.js?v=202610311419"></script>
+<script src="../moteur/base.js?v=202610311419"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
 <script>
 (async function () {
@@ -114,12 +115,28 @@
   /* ---- Affichage ---- */
   const somme = (l, k) => l.reduce((s, f) => s + (Number(f[k]) || 0), 0);
   const STAT = { vient: 'Vient', non: 'Ne vient pas', attente: 'En attente' };
+  /* ---- Catégories : proposées d'office, modifiables, et celles déjà utilisées ---- */
+  const PRESETS = mg
+    ? ["Fianakaviana avy amin'ny ray", "Fianakaviana avy amin'ny reny", 'Namana', 'Mpiara-miasa', 'Mpiray fiangonana', 'Mpifanolobodirindrina']
+    : ['Famille du père', 'Famille de la mère', 'Amis', 'Collègues', 'Église', 'Voisins'];
+  const cleCat = 'hote.cat.' + slug;
+  const lireCat = () => { try { return JSON.parse(localStorage.getItem(cleCat)) || null; } catch (e) { return null; } };
+  const ecrireCat = l => { try { localStorage.setItem(cleCat, JSON.stringify(l)); } catch (e) {} };
+  function categories() {
+    const base = lireCat() || PRESETS;
+    const utilisees = (D.familles || []).map(f => (f.categorie || '').trim()).filter(Boolean);
+    return [...new Set(base.concat(utilisees))];
+  }
+  let filtreCat = '';
   function rendre() {
     const fs = D.familles || [], rs = D.reponses || [];
     const vient = fs.filter(f => f.statut === 'vient'), non = fs.filter(f => f.statut === 'non'), att = fs.filter(f => f.statut !== 'vient' && f.statut !== 'non');
     const generaux = rs.filter(r => !r.code && r.presence === 'oui');
     const persVient = somme(vient, 'adultes') + somme(vient, 'enfants') + somme(generaux, 'adultes') + somme(generaux, 'enfants');
-    const visibles = fs.filter(f => (filtre === 'tous' || (filtre === 'attente' ? (f.statut !== 'vient' && f.statut !== 'non') : f.statut === filtre)) && (!cherche || (f.nom + ' ' + (f.categorie || '') + ' ' + (f.table || '')).toLowerCase().includes(cherche)));
+    const parCat = c => fs.filter(f => (f.categorie || '') === c);
+    const catsUtil = categories().filter(c => parCat(c).length).concat(parCat('').length ? [''] : []);
+    if (filtreCat !== '' && filtreCat !== '∅' && !catsUtil.includes(filtreCat)) filtreCat = '';
+    const visibles = fs.filter(f => (!filtreCat || (filtreCat === '∅' ? !f.categorie : f.categorie === filtreCat))).filter(f => (filtre === 'tous' || (filtre === 'attente' ? (f.statut !== 'vient' && f.statut !== 'non') : f.statut === filtre)) && (!cherche || (f.nom + ' ' + (f.categorie || '') + ' ' + (f.table || '')).toLowerCase().includes(cherche)));
     $('#app').innerHTML = `
       <div class="stats">
         <div class="stat"><b>${fs.length}</b><span>familles invitées · ${somme(fs, 'places')} places</span></div>
@@ -133,8 +150,9 @@
     $$('[data-o]').forEach(b => b.onclick = () => { onglet = b.dataset.o; rendre(); });
     const v = $('#vue');
     if (onglet === 'invites') {
-      v.innerHTML = `<div class="outils"><button class="btn plein" id="ajouter">+ Ajouter une famille</button><button class="btn" id="importer">Importer Excel</button><button class="btn" id="exporter">Exporter Excel</button>
+      v.innerHTML = `<div class="outils"><button class="btn plein" id="ajouter">+ Ajouter une famille</button><button class="btn" id="gerer-cat">Catégories</button><button class="btn" id="importer">Importer Excel</button><button class="btn" id="exporter">Exporter Excel</button>
           <input type="search" id="cherche" placeholder="Rechercher un nom, une table…" value="${esc(cherche)}"></div>
+        ${catsUtil.length > 1 || (catsUtil.length === 1 && catsUtil[0]) ? `<div class="puces" style="margin-bottom:8px"><button class="puce ${!filtreCat ? 'actif' : ''}" data-c="">Toutes les catégories</button>${catsUtil.map(c => { const l = parCat(c), v = l.filter(f => f.statut === 'vient'); return `<button class="puce ${filtreCat === (c || '∅') ? 'actif' : ''}" data-c="${esc(c || '∅')}">${esc(c || 'Sans catégorie')} · ${l.length}${v.length ? ' <span style="opacity:.75">(' + (somme(v, 'adultes') + somme(v, 'enfants')) + ' viennent)</span>' : ''}</button>`; }).join('')}</div>` : ''}
         <div class="puces" style="margin-bottom:10px">${[['tous', 'Tous'], ['vient', 'Viennent'], ['non', 'Ne viennent pas'], ['attente', 'En attente']].map(([k, t]) => `<button class="puce ${filtre === k ? 'actif' : ''}" data-f="${k}">${t}</button>`).join('')}</div>
         <div class="liste">${visibles.map(f => `<div class="fam" data-code="${esc(f.code)}">
             <div><div class="nom">${esc(f.nom)}</div><div class="details">${[f.categorie, f.places + ' place' + (f.places > 1 ? 's' : ''), f.statut === 'vient' ? (f.adultes || 0) + ' adulte(s), ' + (f.enfants || 0) + ' enfant(s)' : '', f.table ? 'Table ' + f.table : '', f.telephone].filter(Boolean).map(esc).join(' · ')}</div>
@@ -147,6 +165,8 @@
       $('#exporter').onclick = exporter;
       $('#cherche').oninput = e => { cherche = e.target.value.toLowerCase().trim(); const pos = e.target.selectionStart; rendre(); const c = $('#cherche'); c.focus(); c.setSelectionRange(pos, pos); };
       $$('[data-f]').forEach(b => b.onclick = () => { filtre = b.dataset.f; rendre(); });
+      $$('[data-c]').forEach(b => b.onclick = () => { filtreCat = b.dataset.c; rendre(); });
+      $('#gerer-cat').onclick = gererCategories;
       $$('.fam').forEach(el => {
         const f = fs.find(x => x.code === el.dataset.code);
         $$('[data-a]', el).forEach(b => b.onclick = async () => {
@@ -176,19 +196,52 @@
     const d = $('#dlg'), fo = $('#dlg-form');
     fo.innerHTML = `<h3>${n ? 'Ajouter une famille' : 'Modifier'}</h3>
       <label>Nom de la famille<input name="nom" required value="${esc(f.nom)}" placeholder="Ex. Fianakaviana Rakoto"></label>
-      <div class="deux"><label>Catégorie<input name="categorie" value="${esc(f.categorie || '')}" placeholder="Famille, amis…"></label><label>Places<input name="places" type="number" min="1" value="${f.places || 1}"></label></div>
+      <label>Catégorie<select name="categorie" id="f-cat"><option value="">— Sans catégorie —</option>${categories().map(c => `<option ${(f.categorie || (n && filtreCat !== '∅' ? filtreCat : '')) === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}<option value="__nouvelle">＋ Nouvelle catégorie…</option></select></label>
+      <label id="f-cat-nouv" hidden>Nom de la nouvelle catégorie<input name="nouvelle_cat" placeholder="${mg ? 'Ohatra : Mpianatra niara-nianatra' : 'Ex. : Anciens camarades de classe'}"></label>
+      <label>Places (personnes invitées)<input name="places" type="number" min="1" value="${f.places || 1}"></label>
       <div class="deux"><label>Téléphone (WhatsApp)<input name="telephone" inputmode="tel" value="${esc(f.telephone || '')}" placeholder="034 00 000 00"></label><label>Table<input name="table" value="${esc(f.table || '')}"></label></div>
       <label>Réponse<select name="statut">${Object.entries(STAT).map(([k, t]) => `<option value="${k}" ${(f.statut || 'attente') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
       <div class="deux"><label>Adultes qui viennent<input name="adultes" type="number" min="0" value="${f.adultes || 0}"></label><label>Enfants qui viennent<input name="enfants" type="number" min="0" value="${f.enfants || 0}"></label></div>
       <div class="outils" style="margin:6px 0 0;justify-content:flex-end"><button class="btn" value="annuler" formnovalidate>Annuler</button><button class="btn plein" value="ok">Enregistrer</button></div>`;
+    $('#f-cat').onchange = e => { const nv = e.target.value === '__nouvelle'; $('#f-cat-nouv').hidden = !nv; if (nv) $('#f-cat-nouv input').focus(); };
     d.showModal();
     d.onclose = async () => {
       if (d.returnValue !== 'ok') return;
       const x = Object.fromEntries(new FormData(fo).entries());
       if (!x.nom.trim()) return;
+      if (x.categorie === '__nouvelle') { x.categorie = (x.nouvelle_cat || '').trim(); if (x.categorie) ecrireCat([...new Set(categories().concat(x.categorie))]); }
+      delete x.nouvelle_cat;
       try { await envoyer([Object.assign({}, f, x, { nom: x.nom.trim(), places: Number(x.places) || 1, adultes: Number(x.adultes) || 0, enfants: Number(x.enfants) || 0 })]); toast(n ? 'Famille ajoutée' : 'Enregistré'); }
       catch (e) { toast(e.message); }
     };
+  }
+  function gererCategories() {
+    const d = $('#dlg'), fo = $('#dlg-form');
+    const fs = D.familles || [];
+    const ligne = c => { const l = fs.filter(f => f.categorie === c), v = l.filter(f => f.statut === 'vient');
+      return `<div class="cat-ligne" data-cat="${esc(c)}"><input value="${esc(c)}" aria-label="Nom de la catégorie"><span class="muet">${l.length} fam.${v.length ? ' · ' + (somme(v, 'adultes') + somme(v, 'enfants')) + ' viennent' : ''}</span><button type="button" class="btn petit danger" data-suppr-cat>✕</button></div>`; };
+    fo.innerHTML = `<h3>Catégories</h3>
+      <p class="muet" style="margin:0">Renommez une catégorie en modifiant son nom : toutes ses familles suivent. ✕ la retire (ses familles passent « sans catégorie »).</p>
+      <div id="cats" style="display:flex;flex-direction:column;gap:6px">${categories().map(ligne).join('')}</div>
+      <div class="outils" style="margin:0"><input id="cat-nouv" placeholder="Nouvelle catégorie" style="flex:1"><button type="button" class="btn" id="cat-ajout">＋ Ajouter</button></div>
+      <div class="outils" style="margin:6px 0 0;justify-content:flex-end"><button type="button" class="btn" id="cat-defaut">Remettre les catégories proposées</button><button class="btn plein" value="ok">Terminé</button></div>`;
+    const enregistrerNoms = async () => {
+      const renommer = [];
+      const noms = $$('.cat-ligne', fo).map(l => { const ancien = l.dataset.cat, nouveau = $('input', l).value.trim() || ancien; if (nouveau !== ancien) fs.filter(f => f.categorie === ancien).forEach(f => renommer.push(Object.assign({}, f, { categorie: nouveau }))); return nouveau; });
+      ecrireCat([...new Set(noms)]);
+      if (renommer.length) { try { await envoyer(renommer); toast(renommer.length + ' famille(s) mises à jour'); } catch (e) { toast(e.message); } }
+    };
+    $('#cat-ajout', fo).onclick = () => { const v = $('#cat-nouv', fo).value.trim(); if (!v) return; $('#cats', fo).insertAdjacentHTML('beforeend', ligne(v)); $('#cat-nouv', fo).value = ''; lier(); };
+    $('#cat-defaut', fo).onclick = () => { const exist = $$('.cat-ligne', fo).map(l => l.dataset.cat); PRESETS.filter(c => !exist.includes(c)).forEach(c => $('#cats', fo).insertAdjacentHTML('beforeend', ligne(c))); lier(); };
+    const lier = () => $$('[data-suppr-cat]', fo).forEach(b => b.onclick = async () => {
+      const l = b.closest('.cat-ligne'), c = l.dataset.cat, fams = fs.filter(f => f.categorie === c);
+      if (fams.length && !confirm(`Retirer « ${c} » ? Ses ${fams.length} famille(s) passeront « sans catégorie ».`)) return;
+      l.remove();
+      if (fams.length) { try { await envoyer(fams.map(f => Object.assign({}, f, { categorie: '' }))); } catch (e) { toast(e.message); } }
+    });
+    lier();
+    d.showModal();
+    d.onclose = async () => { await enregistrerNoms(); rendre(); };
   }
   function importer() {
     if (!window.XLSX) return toast('Lecture Excel en cours de chargement, réessayez');
