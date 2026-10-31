@@ -37,9 +37,10 @@
 <button id="son" aria-label="Son">♪</button>
 <div id="bandeau" role="dialog"></div>
 <div id="erreur"></div>
-<script src="../config.js?v=202610301553"></script>
-<script src="../moteur/moteur.js?v=202610301553"></script>
-<script src="../moteur/fabrique.js?v=202610301553"></script>
+<script src="../config.js?v=202610310756"></script>
+<script src="../moteur/moteur.js?v=202610310756"></script>
+<script src="../moteur/fabrique.js?v=202610310756"></script>
+<script src="../moteur/base.js?v=202610310756"></script>
 <script>
 (async function () {
   const q = new URLSearchParams(location.search);
@@ -70,7 +71,10 @@
   $('#btn-ouvrir').textContent = fiche.langue === 'mg' ? 'Sokafy ny fanasana' : "Ouvrir l'invitation";
 
   let famille = null;
+  const sbConf = !apercu && projet.publication && projet.publication.supabase;
   if (code && projet.liens && projet.liens[code]) famille = Object.assign({ code }, projet.liens[code]);
+  // Familles ajoutées ensuite par l'organisateur (espace organisateur) : lues dans la base
+  if (code && sbConf) { try { const f = await Base.rpc(sbConf, 'inv_famille', { p_evt: projet.id, p_code: code }); if (f) famille = Object.assign({}, famille || {}, f); } catch (e) { console.warn('Base', e); } }
   if (apercu && q.get('test') === '1') famille = { code: 'TEST', nom: 'Fianakaviana Rakoto', places: 4, adultes: 2, enfants: 2 };
 
   /* ---- Date limite ---- */
@@ -140,7 +144,14 @@
     if (fiche.langue === 'mg') return presence ? `Salama! ${nom}: ho tonga izahay. Olon-dehibe ${form.adultes || 0}, ankizy ${form.enfants || 0}. Misaotra!` : `Salama! ${nom}: miala tsiny fa tsy ho afaka izahay. Misaotra tamin'ny fanasana!`;
     return presence ? `Bonjour ! ${nom} : nous serons présents. Adultes ${form.adultes || 0}, enfants ${form.enfants || 0}. Merci !` : `Bonjour ! ${nom} : nous ne pourrons malheureusement pas venir. Merci pour l'invitation !`;
   }
+  let erreurBase = '';
   async function enregistrer(presence, form) {
+    if (sbConf) {
+      try {
+        await Base.rpc(sbConf, 'inv_repondre', { p_evt: projet.id, p_code: famille ? famille.code : null, p_nom: famille ? famille.nom : (form.nom || form.famille || ''), p_presence: presence ? 'oui' : 'non', p_adultes: Number(form.adultes) || 0, p_enfants: Number(form.enfants) || 0, p_message: form.message || '' });
+        return true;
+      } catch (e) { console.warn(e); erreurBase = e.message; if (/places/.test(e.message)) return 'places'; }
+    }
     if (!db) return false;
     try {
       await db.collection('evenements').doc(projet.id).collection('reponses').add({ fid: famille ? famille.code : 'general', famille: famille ? famille.nom : '', presence: presence ? 'oui' : 'non', adultes: Number(form.adultes) || 0, enfants: Number(form.enfants) || 0, source: 'lien', date: new Date().toISOString() });
@@ -174,6 +185,7 @@
     if (action === 'confirmer' || action === 'refuser') {
       const oui = action === 'confirmer';
       const ok = await enregistrer(oui, form);
+      if (ok === 'places') { bandeau(`<b>${fiche.langue === 'mg' ? 'Mihoatra ny toerana natokana ho anareo' : 'Trop de personnes'}</b><div style="margin-top:6px">${fiche.langue === 'mg' ? 'Toerana ' + (famille.places || '') + ' no natokana ho an\'ny fianakavianareo.' : (famille.places || '') + ' place(s) prévue(s) pour votre famille.'}</div><div class="actions"><button data-fermer>OK</button></div>`); return; }
       const k = contacts[0];
       const lienWa = k ? 'https://wa.me/' + tel(k.telephone) + '?text=' + encodeURIComponent(messageReponse(oui, form)) : '';
       const merci = fiche.langue === 'mg' ? (oui ? 'Misaotra! Voaray ny valinteninareo.' : 'Misaotra nampahafantatra.') : (oui ? 'Merci ! Votre réponse est enregistrée.' : 'Merci de nous avoir prévenus.');

@@ -87,6 +87,8 @@
   }
   function dataURLversBlob(d) { const [t, b] = d.split(','); const bin = atob(b); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new Blob([u], { type: t.match(/:(.*?);/)[1] }); }
   const codeFamille = () => { const a = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 8; i++) s += a[Math.floor(Math.random() * a.length)]; return s; };
+  // Compte et dépôt déduits de l'adresse du site (ex. evenementampandranna-png.github.io/STUDIO)
+  function depotDuSite() { const m = /^([a-z0-9-]+)\.github\.io$/i.exec(location.hostname); const r = location.pathname.split('/').filter(Boolean)[0]; return m && r ? { owner: m[1], repo: r } : { owner: '', repo: '' }; }
   function urlSite() {
     const g = reglages.github || {};
     if (g.owner && g.repo) return `https://${g.owner.toLowerCase()}.github.io/${g.repo}/`;
@@ -939,6 +941,35 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     confirmation: ['Cadre floral calme, beaucoup d\'espace au centre pour les boutons', 'Papier ivoire avec quelques pétales qui tombent sur les côtés'],
     remerciement: ['Pluie douce de pétales et lumière chaude', 'Bouquet de roses au bas de l\'image, colombes en haut']
   };
+  /* ---------- Brouillons : chaque vidéo créée est gardée tout de suite ---------- */
+  // Les générations Wan en cours sont notées : si l'ordinateur s'éteint ou si la connexion coupe,
+  // la vidéo est récupérée sur le pod au prochain démarrage du studio et rangée en brouillon.
+  const Travaux = {
+    liste() { return Stock.lire('studio.travaux', []); },
+    ajouter(t) { const l = this.liste().filter(x => x.id !== t.id); l.push(Object.assign({ date: Date.now() }, t)); Stock.ecrire('studio.travaux', l); },
+    retirer(id) { Stock.ecrire('studio.travaux', this.liste().filter(x => x.id !== id)); }
+  };
+  async function sauverBrouillon(f, type, evt, nom) {
+    const m = await importerFichier(f, type, evt);
+    Object.assign(m, { brouillon: true, nom: nom || m.nom }, type === 'video' ? { anime: true } : { origine: 'ia', usage: 'programme' });
+    sauverMedias();
+    return m;
+  }
+  async function reprendreTravaux() {
+    for (const t of Travaux.liste()) {
+      if (Date.now() - t.date > 48 * 3600e3) { Travaux.retirer(t.id); continue; }
+      try {
+        const r = await Comfy.recuperer(t.base, t.id);
+        if (!r) continue;
+        await sauverBrouillon(new File([r.blob], r.nom.split('/').pop(), { type: r.blob.type || 'video/mp4' }), t.type, t.evt, (t.nom || 'Vidéo') + ' (récupérée)');
+        Travaux.retirer(t.id);
+        toast('Une vidéo créée pendant la coupure a été récupérée : Bibliothèque → brouillons');
+        if (/bibliotheque/.test(location.hash)) vueBibliotheque();
+      } catch (e) { if (e.definitif) Travaux.retirer(t.id); }
+    }
+  }
+  setTimeout(reprendreTravaux, 3000); setInterval(() => { if (Travaux.liste().length) reprendreTravaux(); }, 60000);
+
   /* ---------- Chanson : tout format → fichier lisible partout ---------- */
   // MP3 et M4A/AAC sont gardés tels quels. Les autres (WAV, FLAC, OGG, OPUS, AIFF, vidéo…) sont décodés
   // par le navigateur puis réencodés en MP3 (lisible sur tous les téléphones).
@@ -1249,8 +1280,11 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           const prompt = `Bring this photo to life with ${ANIM_MVT[mvtAnim][1]}. ${idee ? 'Detail: ' + idee + '. ' : ''}Keep everything identical to the photo: same people, same faces and expressions, same clothes, same hands, same background and colors; only natural, subtle, realistic motion. Static framing, smooth, no flicker, no cuts, no new objects, no text.`;
           let wf = Comfy.WORKFLOWS[cf.modele || '14b'] || Comfy.WORKFLOW_14B;
           if (cf.modele === 'perso') { try { wf = Fabrique.lireJSON(cf.workflow); } catch (e) { throw new Error('Le workflow collé dans Réglages est illisible'); } }
-          const res = await Comfy.generer(cf.url, wf, { imageBlob, prompt, negatif: 'deformed face, distorted face, morphing, extra fingers, deformed hands, blurry, text, watermark, flicker', secondes: 5, maxImages: (cf.modele || '14b') === '14b' ? 81 : 121, largeur: W, hauteur: H }, t => { etat.textContent = t; });
-          montrer(new File([res.blob], 'anime-plan-' + (k + 1) + '-' + res.nom.split('/').pop(), { type: res.blob.type || 'video/mp4' }), 'Image animée par Wan 2.2');
+          let idTravail = null; const nomB = 'Image animée — plan ' + (k + 1);
+          const res = await Comfy.generer(cf.url, wf, { imageBlob, prompt, negatif: 'deformed face, distorted face, morphing, extra fingers, deformed hands, blurry, text, watermark, flicker', secondes: 5, maxImages: (cf.modele || '14b') === '14b' ? 81 : 121, largeur: W, hauteur: H, surLance: id => { idTravail = id; Travaux.ajouter({ id, base: cf.url, evt: p.id, type: 'video', nom: nomB }); } }, t => { etat.textContent = t; });
+          const fa = new File([res.blob], 'anime-plan-' + (k + 1) + '-' + res.nom.split('/').pop(), { type: res.blob.type || 'video/mp4' });
+          fa._media = await sauverBrouillon(fa, 'video', p.id, nomB); if (idTravail) Travaux.retirer(idTravail);
+          montrer(fa, 'Image animée par Wan 2.2 · déjà gardée en brouillon');
           etat.textContent = 'Vidéo reçue, voir à droite.';
         } catch (e) { etat.textContent = e.message; }
         b.disabled = false;
@@ -1270,8 +1304,11 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           const imageBlob = departWan === 'fichier' ? imageWan : await imageFondSeul();
           let wf = Comfy.WORKFLOWS[cf.modele || '14b'] || Comfy.WORKFLOW_14B;
           if (cf.modele === 'perso') { try { wf = Fabrique.lireJSON(cf.workflow); } catch (e) { throw new Error('Le workflow collé dans Réglages est illisible'); } }
-          const r = await Comfy.generer(cf.url, wf, { imageBlob, prompt, negatif: 'text, letters, words, numbers, watermark, logo, people, faces', secondes: 5, maxImages: (cf.modele || '14b') === '14b' ? 81 : 121 }, t => { etat.textContent = t; });
-          montrer(new File([r.blob], 'wan-plan-' + (k + 1) + '-' + r.nom.split('/').pop(), { type: r.blob.type || 'video/mp4' }), 'Créée par Wan 2.2');
+          let idTravail = null; const nomB = 'Fond Wan — plan ' + (k + 1);
+          const r = await Comfy.generer(cf.url, wf, { imageBlob, prompt, negatif: 'text, letters, words, numbers, watermark, logo, people, faces', secondes: 5, maxImages: (cf.modele || '14b') === '14b' ? 81 : 121, surLance: id => { idTravail = id; Travaux.ajouter({ id, base: cf.url, evt: p.id, type: 'fond', nom: nomB }); } }, t => { etat.textContent = t; });
+          const fw = new File([r.blob], 'wan-plan-' + (k + 1) + '-' + r.nom.split('/').pop(), { type: r.blob.type || 'video/mp4' });
+          fw._media = await sauverBrouillon(fw, 'fond', p.id, nomB); if (idTravail) Travaux.retirer(idTravail);
+          montrer(fw, 'Créée par Wan 2.2 · déjà gardée en brouillon');
           etat.textContent = 'Vidéo reçue, voir à droite.';
         } catch (e) { etat.textContent = e.message; }
         b.disabled = false;
@@ -1296,7 +1333,9 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           const lut = await preparer();
           b.textContent = 'Recoloration…';
           const r = await Etalonnage.recolorer(urlV2.u, lut, { progres: v => { $('#fi-barre', box).style.width = Math.round(v * 100) + '%'; b.textContent = 'Recoloration… ' + Math.round(v * 100) + ' %'; } });
-          montrer(new File([r.blob], video2.name.replace(/\.\w+$/, '') + '-recolore.' + r.extension, { type: r.blob.type }), 'Recolorée aux couleurs du fond actuel');
+          const fr = new File([r.blob], video2.name.replace(/\.\w+$/, '') + '-recolore.' + r.extension, { type: r.blob.type });
+          fr._media = await sauverBrouillon(fr, methode === 'animer' ? 'video' : 'fond', p.id, 'Recolorée — plan ' + (k + 1));
+          montrer(fr, 'Recolorée aux couleurs du fond actuel · déjà gardée en brouillon');
         } catch (e) { toast(e.message); }
         b.disabled = false; b.textContent = libelle;
       };
@@ -1308,7 +1347,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         if (!fichier) return;
         const anime = methode === 'animer';
         const surPlan = $('#fi-surplan', box).checked;
-        const m = await importerFichier(fichier, anime ? 'video' : 'fond', p.id);
+        const m = fichier._media && medias.includes(fichier._media) ? fichier._media : await importerFichier(fichier, anime ? 'video' : 'fond', p.id);
+        delete m.brouillon;
         const finir = t => { fermer(); toast(t); if (ouv.apres) ouv.apres(); };
         if (anime) {
           m.anime = true; m.nom = 'Image animée — plan ' + (k + 1); sauverMedias();
@@ -1361,7 +1401,34 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
   }
 
   /* ---------- Invités ---------- */
-  function ongletInvites(p) {
+  /* ---------- Synchronisation avec la base des invités (espace organisateur) ---------- */
+  const lienHote = p => urlSite() + 'hote/?p=' + encodeURIComponent(p.slug) + '#' + (p.cle_hote || '');
+  const enBase = f => ({ code: f.code, nom: f.nom || '', categorie: f.categorie || '', places: Number(f.places) || 1, telephone: f.telephone || '', table: f.table || '', statut: f.statut || 'attente', adultes: Number(f.adultes) || 0, enfants: Number(f.enfants) || 0 });
+  async function syncInvites(p, pousserTout) {
+    const sb = reglages.supabase; if (!sb || !p.cle_hote) return false;
+    p.familles = p.familles || [];
+    p.familles.forEach(f => { if (!f.code) f.code = codeFamille(); });
+    for (const c of p.supprimes || []) { try { await Base.rpc(sb, 'inv_hote_supprimer', { p_evt: p.id, p_cle: p.cle_hote, p_code: c }); } catch (e) {} }
+    p.supprimes = [];
+    const d = await Base.rpc(sb, 'inv_hote_lire', { p_evt: p.id, p_cle: p.cle_hote });
+    const distant = new Map((d.familles || []).map(f => [f.code, f]));
+    // La base fait foi (réponses des invités, ajouts de l'organisateur) ; les familles créées dans le studio et absentes de la base y sont envoyées
+    const locales = p.familles.filter(f => !distant.has(f.code));
+    const fusion = (d.familles || []).map(r => Object.assign({}, p.familles.find(f => f.code === r.code) || { id: uid() }, r));
+    p.familles = fusion.concat(locales);
+    p.reponses_generales = (d.reponses || []).filter(r => !r.code);
+    const aEnvoyer = pousserTout ? p.familles : locales;
+    if (aEnvoyer.length) await Base.rpc(sb, 'inv_hote_familles', { p_evt: p.id, p_cle: p.cle_hote, p_familles: aEnvoyer.map(enBase) });
+    enregistrer(p);
+    return true;
+  }
+  let syncT = null;
+  function pousserFamille(p, f) {
+    const sb = reglages.supabase; if (!sb || !p.cle_hote || !p.publie) return;
+    clearTimeout(syncT); syncT = setTimeout(() => Base.rpc(sb, 'inv_hote_familles', { p_evt: p.id, p_cle: p.cle_hote, p_familles: [enBase(f)] }).catch(e => toast('Base des invités : ' + e.message)), 600);
+  }
+
+  function ongletInvites(p, dejaSync) {
     p.familles = p.familles || [];
     const fs = p.familles;
     const somme = (l, k) => l.reduce((s, f) => s + (Number(f[k]) || 0), 0);
@@ -1402,13 +1469,14 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     $('#msg-envoi').oninput = e => { p.message_envoi = e.target.value; enregistrer(p); };
     $$('[data-cap]').forEach(i => i.onchange = () => { p.tables = p.tables || {}; p.tables[i.dataset.cap] = Number(i.value) || 0; enregistrer(p); ongletInvites(p); });
     $('#copier-gen').onclick = () => copier(lienGeneral(p));
-    $('#add-fam').onclick = () => { fs.push({ id: uid(), code: codeFamille(), nom: 'Nouvelle famille', categorie: '', places: 2, adultes: 2, enfants: 0, telephone: '', statut: 'attente' }); enregistrer(p); ongletInvites(p); };
+    if (!dejaSync && reglages.supabase && p.cle_hote && p.publie) syncInvites(p).then(ok => { if (ok && $('#add-fam')) ongletInvites(p, true); }).catch(e => toast('Base des invités : ' + e.message));
+    $('#add-fam').onclick = () => { const f = { id: uid(), code: codeFamille(), nom: 'Nouvelle famille', categorie: '', places: 2, adultes: 2, enfants: 0, telephone: '', statut: 'attente' }; fs.push(f); enregistrer(p); pousserFamille(p, f); ongletInvites(p, true); };
     $$('.tableau tbody tr[data-k]').forEach(tr => {
       const f = fs[Number(tr.dataset.k)];
       $$('[data-k]', tr).forEach(inp => inp.onchange = () => {
         f[inp.dataset.k] = inp.type === 'number' ? Number(inp.value) : inp.value;
         if (inp.dataset.k === 'adultes' || inp.dataset.k === 'enfants') { f.places = Math.max(Number(f.places) || 0, (Number(f.adultes) || 0) + (Number(f.enfants) || 0)); }
-        enregistrer(p); if (inp.dataset.k === 'statut' || inp.dataset.k === 'adultes' || inp.dataset.k === 'enfants') ongletInvites(p);
+        enregistrer(p); pousserFamille(p, f); if (inp.dataset.k === 'statut' || inp.dataset.k === 'adultes' || inp.dataset.k === 'enfants') ongletInvites(p, true);
       });
       $$('[data-a]', tr).forEach(b => b.onclick = () => {
         const a = b.dataset.a;
@@ -1416,7 +1484,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         if (a === 'copier') copier(lienFamille(p, f));
         if (a === 'wa') { const msg = p.message_envoi.replace(/\{famille\}/g, f.nom).replace(/\{lien\}/g, lienFamille(p, f)); window.open((f.telephone ? 'https://wa.me/' + telWa(f.telephone) : 'https://wa.me/') + '?text=' + encodeURIComponent(msg), '_blank'); }
         if (a === 'voir') { Stock.ecrire('studio.apercu', publication(p, true)); window.open('../i/?apercu=1&f=' + encodeURIComponent(f.code), '_blank'); }
-        if (a === 'suppr') { if (confirm('Supprimer ' + f.nom + ' ?')) { fs.splice(Number(tr.dataset.k), 1); enregistrer(p); ongletInvites(p); } }
+        if (a === 'suppr') { if (confirm('Supprimer ' + f.nom + ' ?')) { fs.splice(Number(tr.dataset.k), 1); if (f.code && p.cle_hote) { p.supprimes = (p.supprimes || []).concat(f.code); if (reglages.supabase && p.publie) syncInvites(p).catch(() => {}); } enregistrer(p); ongletInvites(p, true); } }
       });
     });
     $('#modele-xls').onclick = () => {
@@ -1498,14 +1566,16 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     (p.familles || []).forEach(f => { if (!f.code) f.code = codeFamille(); pub.liens[f.code] = { nom: f.nom, places: f.places, adultes: f.adultes, enfants: f.enfants }; });
     delete pub.familles; delete pub.historique_ia; delete pub.message_envoi;
     if (pub.fiche) delete pub.fiche.texte_source;
-    pub.publication = { date: new Date().toISOString(), firebase: reglages.firebase || null };
+    pub.publication = { date: new Date().toISOString(), firebase: reglages.firebase || null, supabase: reglages.supabase || null };
+    delete pub.cle_hote; delete pub.supprimes;
     if (!apercu) pub.plans.forEach(pl => { (pl.calques || []).forEach(c => { if (c.media && /^idb:/.test(c.media)) c.media = 'medias/' + c.media.slice(4); }); if (pl.fond && /^idb:/.test(pl.fond.media)) pl.fond.media = 'medias/' + pl.fond.media.slice(4); });
     if (!apercu && pub.musique && /^idb:/.test(pub.musique.src)) pub.musique.src = 'medias/' + pub.musique.src.slice(4);
     return pub;
   }
   const enJS = (slug, obj) => 'window.PROJETS = window.PROJETS || {};\nwindow.PROJETS[' + JSON.stringify(slug) + '] = ' + JSON.stringify(obj) + ';\n';
-  function anonymiser(pub) {
+  function anonymiser(pub, garderNoms) {
     const d = JSON.parse(JSON.stringify(pub));
+    if (garderNoms) { d.liens = { DEMO: { nom: 'Fianakaviana Rakoto', places: 4, adultes: 2, enfants: 2 } }; d.publication.firebase = null; d.publication.supabase = null; d.demo = true; return d; }
     const faux = ['Hery', 'Fanja', 'Toky', 'Lova'];
     const remp = [];
     (d.fiche.hotes || []).forEach((h, i) => { remp.push([h.nom_complet, faux[i] || 'Ami']); remp.push([h.surnom, faux[i] || 'Ami']); h.nom_complet = faux[i]; h.surnom = faux[i]; });
@@ -1543,7 +1613,15 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       <div class="pile">
         <div class="carte pile"><h3>Publier en ligne</h3>
           ${pret ? `<p class="muet">Dépôt : <b>${esc(g.owner)}/${esc(g.repo)}</b>. La publication envoie l'invitation${fichiersIdb.length ? ` et ${fichiersIdb.length} fichier(s) importé(s)` : ''} sur GitHub Pages (1 à 10 minutes avant d'être visible).</p>
-            <label class="cases"><label><input type="checkbox" id="demo" ${p.vitrine ? 'checked' : ''}> Publier aussi en démo anonymisée sur la vitrine</label></label>
+            <div class="carte pile" style="padding:10px;background:#fbf7f1;margin:0">
+              <label class="cases"><input type="checkbox" id="demo" ${p.vitrine ? 'checked' : ''}> <b>Montrer aussi sur la vitrine du site</b> (page d'accueil, pour les visiteurs)</label>
+              <div class="pile" id="demo-opts" style="gap:4px;margin-left:24px;${p.vitrine ? '' : 'display:none'}">
+                <label class="cases"><input type="radio" name="demo-mode" value="anonyme" ${p.vitrine_noms ? '' : 'checked'}> Noms et téléphones remplacés par des exemples (recommandé)</label>
+                <label class="cases"><input type="radio" name="demo-mode" value="noms" ${p.vitrine_noms ? 'checked' : ''}> Telle quelle, avec les vrais noms (seulement avec l'accord du client)</label>
+                <span class="muet">Les visiteurs voient le film et peuvent la parcourir ; leurs réponses ne sont jamais enregistrées.</span>
+              </div>
+              ${p.vitrine_publiee ? '<button class="btn petit danger" id="demo-retirer" style="align-self:flex-start">Retirer de la vitrine</button>' : ''}
+            </div>
             <button class="btn plein" id="publier">Publier l'invitation</button><div id="pub-etat" class="muet"></div>`
             : `<div class="alerte-boite">Publication automatique non configurée. Allez dans <a href="#/reglages">Réglages</a> pour relier votre dépôt GitHub (une seule fois).</div>
             <p class="muet">En attendant, vous pouvez télécharger le fichier de publication et l'envoyer à Claude.</p>`}
@@ -1551,14 +1629,22 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <button class="btn" id="tele-projet">Sauvegarder le projet complet (.json)</button>
         </div>
         <div class="carte pile"><h3>Liens</h3>
+          ${p.publie ? `<div class="ok-boite">Publiée le ${esc(new Date(p.publie).toLocaleString('fr-FR'))}. Après une modification, republiez pour mettre les liens à jour.</div>` : `<div class="alerte-boite"><b>Pas encore publiée</b> : ces liens afficheront « Invitation introuvable » tant que vous n'aurez pas cliqué sur « Publier l'invitation ».</div>`}
           <p class="muet">Lien général (groupes, réseaux sociaux) :</p>
           <div class="ligne"><input type="text" readonly value="${esc(lienGeneral(p))}" style="flex:1"><button class="btn petit" id="cp-gen">Copier</button></div>
           <div class="ligne"><a class="btn petit" target="_blank" href="https://wa.me/?text=${encodeURIComponent(lienGeneral(p))}">Partager sur WhatsApp</a><a class="btn petit" target="_blank" href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(lienGeneral(p))}">Partager sur Facebook</a></div>
-          <p class="muet">Liens personnels : onglet Invités.</p></div>
+          <p class="muet">Liens personnels : onglet Invités.</p>
+          <h3 style="margin-top:10px">Lien organisateur (pour votre client)</h3>
+          ${!reglages.supabase ? `<p class="muet">Pour donner à votre client un lien où il ajoute ses invités et voit qui vient : activez la <a href="#/reglages">base des invités</a> (Réglages, une seule fois), puis publiez.</p>`
+            : !p.cle_hote || !p.publie ? `<p class="muet">Il apparaîtra ici après la prochaine publication.</p>`
+            : `<p class="muet">Votre client y ajoute ses invités (ou importe son Excel), envoie les liens par WhatsApp et voit en direct qui vient et combien. <b>Lien privé</b> : à ne donner qu'à l'organisateur.</p>
+              <div class="ligne"><input type="text" readonly value="${esc(lienHote(p))}" style="flex:1"><button class="btn petit" id="cp-hote">Copier</button><a class="btn petit" target="_blank" href="${esc(lienHote(p))}">Ouvrir</a></div>
+              <div class="ligne"><a class="btn petit" target="_blank" href="https://wa.me/?text=${encodeURIComponent((p.fiche.langue === 'mg' ? 'Ity ny rohy hitantananao ny vahiny (aza zaraina): ' : 'Voici votre lien pour gérer vos invités (à garder pour vous) : ') + lienHote(p))}">Envoyer au client sur WhatsApp</a></div>`}</div>
       </div></div>`;
     $('#ap-gen').onclick = () => { Stock.ecrire('studio.apercu', publication(p, true)); window.open('../i/?apercu=1', '_blank'); };
     $('#ap-fam').onclick = () => { Stock.ecrire('studio.apercu', publication(p, true)); window.open('../i/?apercu=1&test=1', '_blank'); };
     $('#cp-gen').onclick = () => copier(lienGeneral(p));
+    const ch = $('#cp-hote'); if (ch) ch.onclick = () => copier(lienHote(p));
     $('#tele-pub').onclick = () => telecharger(p.slug + '.json', JSON.stringify(publication(p), null, 1));
     $('#tele-projet').onclick = () => telecharger(p.slug + '-projet.json', JSON.stringify(p, null, 1));
     $('#musique').onchange = async e => {
@@ -1585,16 +1671,34 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       } catch (e) { console.error(e); $('#film-etat').textContent = 'Erreur : ' + e.message; }
       b.disabled = false;
     };
+    const dm = $('#demo'); if (dm) dm.onchange = () => { $('#demo-opts').style.display = dm.checked ? '' : 'none'; };
+    const dr = $('#demo-retirer'); if (dr) dr.onclick = async () => {
+      if (!confirm('Retirer cette invitation de la vitrine du site ?')) return;
+      try {
+        let index = []; try { index = JSON.parse(await GitHub.lireTexte('vitrine/index.json')) || []; } catch (e) {}
+        index = index.filter(x => x.slug !== 'demo-' + p.slug);
+        await GitHub.envoyer('vitrine/index.json', JSON.stringify(index, null, 1), 'Vitrine : retrait ' + p.fiche.titre);
+        await GitHub.envoyer('vitrine/index.js', 'window.VITRINE = ' + JSON.stringify(index, null, 1) + ';\n', 'Vitrine : retrait (js)');
+        p.vitrine = false; p.vitrine_publiee = false; enregistrer(p); ongletPublier(p); toast('Retirée de la vitrine (visible dans quelques minutes)');
+      } catch (e) { toast('Échec : ' + e.message); }
+    };
     const pb = $('#publier');
     if (pb) pb.onclick = async () => {
       pb.disabled = true;
       const etat = $('#pub-etat');
       try {
         p.vitrine = $('#demo').checked;
+        p.vitrine_noms = ($('input[name=demo-mode]:checked') || {}).value === 'noms';
         for (const id of [...new Set(fichiersIdb)]) {
           etat.textContent = 'Envoi de ' + id.slice(4) + '…';
           const blob = await IDB.lire(id);
           if (blob) await GitHub.envoyer('medias/' + id.slice(4), blob, 'Média ' + id.slice(4));
+        }
+        if (reglages.supabase) {
+          etat.textContent = 'Base des invités…';
+          if (!p.cle_hote) p.cle_hote = Base.cle();
+          await Base.rpc(reglages.supabase, 'inv_studio_publier', { p_evt: p.id, p_cle: p.cle_hote, p_titre: p.fiche.titre || '', p_slug: p.slug, p_langue: p.fiche.langue || 'fr' });
+          await syncInvites(p);
         }
         etat.textContent = 'Envoi de l\'invitation…';
         const pub = publication(p);
@@ -1602,19 +1706,25 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         await GitHub.envoyer('projets/' + p.slug + '.js', enJS(p.slug, pub), 'Invitation ' + p.fiche.titre + ' (js)');
         if (p.vitrine) {
           etat.textContent = 'Mise à jour de la vitrine…';
-          const demo = anonymiser(pub);
+          const demo = anonymiser(pub, p.vitrine_noms);
           await GitHub.envoyer('projets/demo-' + p.slug + '.json', JSON.stringify(demo, null, 1), 'Démo ' + p.fiche.titre);
           await GitHub.envoyer('projets/demo-' + p.slug + '.js', enJS('demo-' + p.slug, demo), 'Démo ' + p.fiche.titre + ' (js)');
           let index = [];
           try { index = JSON.parse(await GitHub.lireTexte('vitrine/index.json')) || []; } catch (e) { index = []; }
           index = index.filter(x => x.slug !== 'demo-' + p.slug);
           const fondV = (p.plans.find(x => x.role !== 'ouverture') || p.plans[0]).fond.media;
-          index.unshift({ slug: 'demo-' + p.slug, titre: demo.fiche.titre, type: demo.fiche.type, langue: demo.fiche.langue, vignette: /^idb:/.test(fondV) ? 'medias/' + fondV.slice(4).replace(/\.\w+$/, '.jpg') : fondV.replace(/\.mp4$/, '.jpg'), date: new Date().toISOString().slice(0, 10) });
+          // vignette : celle du fond (fond de base) ou l'image du fond importé, envoyée à côté de la vidéo
+          let vignette = /^idb:/.test(fondV) ? 'medias/' + fondV.slice(4).replace(/\.\w+$/, '.jpg') : fondV.replace(/\.mp4$/, '.jpg');
+          if (/^idb:/.test(fondV)) { const mv = medias.find(x => x.src === fondV); if (mv && /^data:/.test(mv.vignette || '')) await GitHub.envoyer(vignette, dataURLversBlob(mv.vignette), 'Vignette ' + p.fiche.titre); else vignette = 'fonds/fond_2.jpg'; }
+          index.unshift({ slug: 'demo-' + p.slug, titre: demo.fiche.titre, type: demo.fiche.type, langue: demo.fiche.langue, vignette, date: new Date().toISOString().slice(0, 10) });
           await GitHub.envoyer('vitrine/index.json', JSON.stringify(index, null, 1), 'Vitrine : ' + p.fiche.titre);
           await GitHub.envoyer('vitrine/index.js', 'window.VITRINE = ' + JSON.stringify(index, null, 1) + ';\n', 'Vitrine : ' + p.fiche.titre + ' (js)');
         }
+        if (p.vitrine) p.vitrine_publiee = true;
         p.publie = new Date().toISOString(); enregistrer(p);
-        etat.innerHTML = `<div class="ok-boite">Publié. Visible dans quelques minutes : <a target="_blank" href="${esc(lienGeneral(p))}">${esc(lienGeneral(p))}</a></div>`;
+        ongletPublier(p);
+        $('#pub-etat').innerHTML = `<div class="ok-boite">Publié. Visible dans quelques minutes : <a target="_blank" href="${esc(lienGeneral(p))}">${esc(lienGeneral(p))}</a>${p.cle_hote && reglages.supabase ? '<br>Le lien organisateur est prêt (carte Liens).' : ''}</div>`;
+        return;
       } catch (e) { console.error(e); etat.innerHTML = `<div class="erreur-boite">Échec : ${esc(e.message)}</div>`; }
       pb.disabled = false;
     };
@@ -1665,6 +1775,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <video src="" data-src="${esc(f.src)}" muted loop playsinline style="width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:8px;background:#eee" poster="${esc(/^data:/.test(f.vignette) ? f.vignette : BASE + f.vignette)}"></video>
           ${f.src.startsWith('idb:') ? `
             <input type="text" data-k="nom" value="${esc(f.nom)}">
+            ${f.brouillon ? `<div class="ligne"><span class="badge alerte">Brouillon</span><button class="btn petit plein" data-garder="${f.id}">Garder</button></div>` : ''}
             ${evt === '*' ? `<span class="badge">${esc(titre(f.evt))}</span>` : ''}
             <details><summary class="muet" style="cursor:pointer">Réglages</summary><div class="pile" style="margin-top:6px">
             ${choixEvt(f)}
@@ -1685,11 +1796,14 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       <h3 style="margin-top:24px">Photos et vidéos ${evt === '*' ? '' : evt ? 'de cet événement' : 'communes'} <span class="muet" style="font-weight:400">(${autres.length})</span></h3>
       ${autres.length ? `<div class="grille" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))">${autres.map(m => `<div class="carte pile" data-id="${m.id}" style="padding:10px">
         ${m.type === 'video' ? `<video src="" data-src="${esc(m.src)}" muted loop playsinline poster="${esc(m.vignette)}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:#eee"></video>` : `<img src="${esc(m.vignette)}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px">`}
-        <b style="font-size:13px">${esc(m.nom)}</b>${m.anime ? '<span class="badge">image animée</span>' : ''}${evt === '*' ? `<span class="badge">${esc(titre(m.evt))}</span>` : ''}
+        <b style="font-size:13px">${esc(m.nom)}</b>${m.anime ? '<span class="badge">image animée</span>' : ''}${m.brouillon ? `<div class="ligne"><span class="badge alerte">Brouillon</span><button class="btn petit plein" data-garder="${m.id}">Garder</button></div>` : ''}${evt === '*' ? `<span class="badge">${esc(titre(m.evt))}</span>` : ''}
         <details><summary class="muet" style="cursor:pointer">Réglages</summary><div class="pile" style="margin-top:6px">${choixEvt(m)}<button class="btn petit danger" data-suppr="${m.id}">Supprimer</button></div></details></div>`).join('')}</div>` : '<p class="muet">Aucune photo ou vidéo ici.</p>'}
       <h3 style="margin-top:24px">Fonds de base <span class="muet" style="font-weight:400">(pour tous les événements)</span></h3>
       <div class="grille" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">${Fabrique.FONDS.map(carteFond).join('')}</div>
       <p class="muet" style="margin-top:20px">Les fichiers importés restent dans ce navigateur jusqu'à la publication, qui les envoie sur GitHub.</p>`;
+    $$('[data-garder]').forEach(b => b.onclick = () => { const m = medias.find(x => x.id === b.dataset.garder); if (m) { delete m.brouillon; sauverMedias(); toast('Gardé dans la bibliothèque'); vueBibliotheque(); } });
+    const nbB = medias.filter(m => m.brouillon && garde(m)).length;
+    if (nbB) $('.bib-evt').insertAdjacentHTML('beforeend', `<div class="muet" style="flex-basis:100%">${nbB} brouillon${nbB > 1 ? 's' : ''} : les vidéos créées sont gardées automatiquement dès qu'elles arrivent (même si l'ordinateur s'éteint ensuite). « Garder » les range définitivement ; sinon supprimez-les.</div>`);
     $('#bib-evt').onchange = e => { Stock.ecrire('studio.bib.evt', e.target.value); vueBibliotheque(); };
     $$('video[data-src]').forEach(v => { resoudre(v.dataset.src).then(u => { v.src = u; }); v.onmouseenter = () => v.play(); v.onmouseleave = () => v.pause(); v.onclick = () => v.paused ? v.play() : v.pause(); });
     $$('[data-k]').forEach(i => i.onchange = () => { const id = i.closest('[data-id]').dataset.id; const m = medias.find(x => x.id === id); if (m) { m[i.dataset.k] = i.value; sauverMedias(); if (i.dataset.k === 'evt') { toast('Déplacé vers ' + titre(i.value)); vueBibliotheque(); } } });
@@ -1746,14 +1860,27 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       <div class="ia-grille">
         <div class="carte pile"><h3>Publication sur GitHub Pages</h3>
           <p class="muet">Permet au bouton « Publier » d'envoyer les invitations en ligne, gratuitement. Le jeton reste uniquement dans ce navigateur.</p>
-          <div class="deux"><label class="champ">Compte GitHub<input type="text" id="g-owner" value="${esc(g.owner)}" placeholder="randnjara"></label><label class="champ">Dépôt<input type="text" id="g-repo" value="${esc(g.repo)}" placeholder="STUDIO"></label></div>
+          <div class="deux"><label class="champ">Compte GitHub<input type="text" id="g-owner" value="${esc(g.owner || depotDuSite().owner)}" placeholder="votre-compte"></label><label class="champ">Dépôt<input type="text" id="g-repo" value="${esc(g.repo || depotDuSite().repo)}" placeholder="STUDIO"></label></div>
           <label class="champ">Jeton d'accès (fine-grained token, droit « Contents : Read and write » sur ce dépôt)<input type="password" id="g-token" value="${esc(g.token)}" placeholder="github_pat_…"></label>
           <div class="ligne"><button class="btn plein" id="g-ok">Enregistrer</button><button class="btn" id="g-test">Tester</button><span class="muet" id="g-etat"></span></div>
           <details><summary class="muet" style="cursor:pointer">Comment obtenir le jeton ?</summary><ol class="muet">
-            <li>Sur github.com : photo de profil → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token.</li>
-            <li>Repository access : Only select repositories → choisir le dépôt du studio.</li>
+            <li><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Ouvrir la page de création du jeton ↗</a> (connecté au compte <b>${esc(depotDuSite().owner || 'du site')}</b>), ou sur github.com : photo de profil → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token.</li>
+            <li>Repository access : Only select repositories → choisir le dépôt du studio (<b>${esc(depotDuSite().repo || 'STUDIO')}</b>).</li>
             <li>Permissions → Repository permissions → Contents : Read and write.</li>
             <li>Generate token, copier le jeton et le coller ici.</li></ol></details>
+        </div>
+        <div class="carte pile"><h3>Base des invités et espace organisateur (Supabase, gratuit)</h3>
+          <p class="muet">Active le <b>lien organisateur</b> : votre client y ajoute ses invités, voit qui vient et combien. Les réponses des invités y arrivent directement.</p>
+          <label class="champ">Adresse du projet (Project URL)<input type="url" id="sb-url" value="${esc((reglages.supabase || {}).url || '')}" placeholder="https://xxxxxxxx.supabase.co"></label>
+          <label class="champ">Clé publique (anon / publishable key)<input type="text" id="sb-anon" value="${esc((reglages.supabase || {}).anon || '')}" placeholder="eyJhbGciOi… ou sb_publishable_…"></label>
+          <div class="ligne"><button class="btn plein" id="sb-ok">Enregistrer</button><button class="btn" id="sb-test">Tester</button><span class="muet" id="sb-etat"></span></div>
+          <details><summary class="muet" style="cursor:pointer">Installation (une seule fois, 5 minutes)</summary><ol class="muet">
+            <li>Créez un compte gratuit sur <a href="https://supabase.com/dashboard" target="_blank" rel="noopener">supabase.com ↗</a>, puis <b>New project</b> (région la plus proche : par exemple Europe).</li>
+            <li>Dans le projet : <b>SQL Editor</b> → <b>New query</b> → collez le script (bouton ci-dessous) → <b>Run</b>.</li>
+            <li><b>Project Settings → API</b> (ou <b>Connect</b>) : copiez la <b>Project URL</b> et la clé <b>anon public</b> (ou « publishable ») dans les deux champs ci-dessus, puis Enregistrer et Tester.</li>
+            <li>Republiez vos invitations : le lien organisateur apparaît dans l'onglet Film et publication.</li></ol>
+            <button class="btn petit" id="sb-sql">Copier le script SQL</button>
+            <p class="muet">La formule gratuite se met en pause après 7 jours sans aucune visite ; une invitation en cours reçoit des visites, sinon réactivez-la d'un clic dans Supabase.</p></details>
         </div>
         <div class="carte pile"><h3>Réponses des invités (Firebase, facultatif)</h3>
           <p class="muet">Sans Firebase, les invités envoient leur réponse par WhatsApp (message prérempli). Avec Firebase, les réponses arrivent directement dans l'onglet Invités.</p>
@@ -1808,6 +1935,16 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       try { const e = await Comfy.etatVeille(cf.url); el.innerHTML = e.etat === 'arret' ? 'État : le pod s\'est arrêté (' + esc(e.raison) + ').' : '<span class="badge ok">Surveillance active</span> ' + (e.etat === 'actif' ? 'le pod travaille' : e.etat === 'telechargement' ? 'le pod télécharge les modèles' : 'inactif depuis ' + e.inactif + ' s'); }
       catch (err) { el.innerHTML = '<span class="badge alerte">Surveillance non installée</span> ou pod arrêté : collez la commande ci-dessous dans le terminal du pod.'; } })();
     $('#cf-test').onclick = async () => { lireCf(); $('#cf-etat').textContent = 'Test…'; try { $('#cf-etat').textContent = 'Connexion réussie : ' + await Comfy.tester(reglages.comfy.url); } catch (e) { $('#cf-etat').textContent = e.message; } };
+    const lireSb = () => { const u = $('#sb-url').value.trim().replace(/\/+$/, ''), a = $('#sb-anon').value.trim(); reglages.supabase = u && a ? { url: u, anon: a } : null; sauverReglages(); };
+    $('#sb-ok').onclick = () => { lireSb(); toast(reglages.supabase ? 'Base des invités enregistrée' : 'Base des invités désactivée'); };
+    $('#sb-test').onclick = async () => {
+      lireSb(); const e = $('#sb-etat');
+      if (!reglages.supabase) { e.textContent = 'Renseignez l\'adresse et la clé.'; return; }
+      e.textContent = 'Test…';
+      try { await Base.rpc(reglages.supabase, 'inv_famille', { p_evt: 'test', p_code: 'test' }); e.innerHTML = '<span class="badge ok">Connexion réussie</span> le script est bien installé.'; }
+      catch (err) { e.textContent = /function|schema cache|Could not find/i.test(err.message) ? 'Connecté, mais le script SQL n\'est pas encore installé (étape 2).' : 'Échec : ' + err.message; }
+    };
+    $('#sb-sql').onclick = async () => { try { copier(await (await fetch('../outils/supabase.sql?v=' + Date.now())).text()); toast('Script copié : collez-le dans Supabase → SQL Editor'); } catch (e) { toast('Script introuvable'); } };
     $('#fb-ok').onclick = () => { const v = $('#fb').value.trim(); if (!v) { reglages.firebase = null; sauverReglages(); return toast('Firebase désactivé'); } try { const t = v.replace(/^[^{]*/, '').replace(/[^}]*$/, ''); reglages.firebase = JSON.parse(t.replace(/(\w+)\s*:/g, '"$1":').replace(/""/g, '"').replace(/'/g, '"')); sauverReglages(); toast('Firebase enregistré'); } catch (e) { toast('Configuration illisible'); } };
     $('#exp-tout').onclick = () => telecharger('studio-sauvegarde.json', JSON.stringify({ projets, medias: medias.map(m => Object.assign({}, m)) }, null, 1));
     $('#imp-tout').onchange = async e => { try { const j = JSON.parse(await e.target.files[0].text()); Object.assign(projets, j.projets || {}); sauverProjets(); toast('Sauvegarde importée'); } catch (err) { toast('Fichier invalide'); } };
@@ -1866,14 +2003,23 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       ${etape(5, 'Les invités', `
         <ol><li>Onglet <b>Invités</b> → <b>Modèle Excel vide</b>, remplissez-le (Famille, Catégorie, Adultes, Enfants, Téléphone, Table), puis <b>Importer Excel</b>. Ou <b>+ Famille</b> une par une.</li>
         <li>Chaque famille reçoit un lien personnel : <b>Copier</b>, <b>WhatsApp</b> (message prérempli, modifiable en bas de page) ou <b>Voir</b>.</li>
-        <li>Quand une famille répond (WhatsApp), changez son <b>Statut</b> : Vient / Ne vient pas. Les chiffres en haut se mettent à jour.</li>
+        <li>Avec la <b>base des invités</b> (Réglages, une seule fois) : les réponses arrivent toutes seules, et la liste se synchronise avec l'espace organisateur du client. Sans elle, les familles répondent par WhatsApp : changez alors leur <b>Statut</b> à la main.</li>
         <li>Écrivez un numéro dans la colonne <b>Table</b> : le plan de tables affiche le remplissage de chaque table.</li></ol>`)}
       ${etape(6, 'Film, publication et envoi', `
         <ol><li>Onglet <b>Film et publication</b> → <b>Ajouter une musique</b> (dont vous avez les droits).</li>
         <li><b>Enregistrer le film</b> : laissez l'onglet ouvert pendant toute la durée du film ; le MP4 se télécharge à la fin. Utilisez Chrome sur ordinateur.</li>
         <li><b>Aperçu</b> : vérifiez le lien général et le lien personnel.</li>
-        <li><b>Publier l'invitation</b> (si GitHub est relié dans Réglages). Cochez « démo anonymisée » pour l'ajouter à la vitrine. Les liens marchent quelques minutes après.</li>
-        <li>Envoyez le film et le lien général dans les groupes, et le lien personnel à chaque famille depuis l'onglet Invités. Republiez après chaque ajout de famille.</li></ol>`)}
+        <li><b>Publier l'invitation</b> (GitHub relié dans Réglages, une seule fois). Tant que ce n'est pas fait, les liens affichent « Invitation introuvable ». Les liens marchent 1 à 10 minutes après la publication.</li>
+        <li><b>Deux liens pour le client</b> (carte Liens) :
+          <ul><li><b>Lien des invités</b> : le lien général (groupes, réseaux sociaux) et les liens personnels de chaque famille. Les invités y voient l'invitation et confirment.</li>
+          <li><b>Lien organisateur</b> (privé, base des invités activée) : le client y ajoute ses invités ou importe son Excel, envoie chaque lien par WhatsApp, et voit en direct qui vient, combien d'adultes et d'enfants, et les messages. Pas besoin de republier quand il ajoute des invités.</li></ul></li>
+        <li><b>Vitrine du site</b> : cochez « Montrer aussi sur la vitrine » avant de publier. Par défaut les noms et téléphones sont remplacés par des exemples ; « telle quelle » seulement avec l'accord du client. « Retirer de la vitrine » l'enlève.</li>
+        <li>Envoyez le film et le lien général dans les groupes, et le lien personnel à chaque famille.</li></ol>`)}
+      ${etape('6b', 'Enregistrement automatique', `
+        <ul><li>Tout ce que vous faites dans un événement est enregistré au fur et à mesure dans ce navigateur (« Enregistré » en haut à droite).</li>
+        <li>Chaque vidéo créée (Wan 2.2, image animée, recoloration) est gardée en <b>brouillon</b> dans la bibliothèque de l'événement dès qu'elle arrive.</li>
+        <li>Si l'ordinateur s'éteint ou si la connexion coupe pendant une génération Wan 2.2, le pod continue : au prochain démarrage du studio, la vidéo est récupérée toute seule et rangée en brouillon (si le pod est encore allumé, dans les 48 h).</li>
+        <li>Dans la Bibliothèque, « Garder » range un brouillon définitivement. Pensez aussi à <b>Réglages → Exporter une sauvegarde</b> de temps en temps.</li></ul>`)}
       ${etape(7, 'En cas de problème', `
         <table class="tableau"><thead><tr><th>Ce que vous voyez</th><th>Que faire</th></tr></thead><tbody>
         <tr><td>« La réponse collée est incomplète ou abîmée »</td><td>Dans ChatGPT, utilisez le bouton « Copier » du bloc de code, pas la sélection à la souris. Vérifiez que la réponse est complète (elle finit par } ).</td></tr>

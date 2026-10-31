@@ -120,30 +120,38 @@
       throw new Error('ComfyUI a refusé le workflow : ' + ((j.error && j.error.message) || r.status) + (ne ? ' — ' + ne : '') + '. Vérifiez les noms des fichiers de modèle, ou collez votre propre workflow dans les Réglages.');
     }
     const id = j.prompt_id, debut = Date.now();
+    if (o.surLance) { try { o.surLance(id); } catch (e) {} }
     for (;;) {
       await new Promise(res => setTimeout(res, 4000));
       const min = Math.floor((Date.now() - debut) / 60000), s = Math.floor((Date.now() - debut) / 1000) % 60;
       suivi(`Wan 2.2 travaille… ${min} min ${String(s).padStart(2, '0')} s (souvent 3 à 10 minutes)`);
       if (Date.now() - debut > 45 * 60000) throw new Error('Trop long (plus de 45 minutes) : regardez la file d\'attente dans ComfyUI.');
-      const h = await appel(base, '/history/' + id);
-      if (!h.ok) continue;
-      const hist = (await h.json())[id];
-      if (!hist) continue;
-      if (hist.status && hist.status.status_str === 'error') {
-        const m = (hist.status.messages || []).find(x => x[0] === 'execution_error');
-        throw new Error('Erreur dans ComfyUI : ' + (m ? m[1].exception_message : 'voir ComfyUI'));
-      }
-      const fichiers = [];
-      Object.values(hist.outputs || {}).forEach(out => ['videos', 'gifs', 'images', 'animated'].forEach(k => (Array.isArray(out[k]) ? out[k] : []).forEach(f => { if (f && f.filename) fichiers.push(f); })));
-      const video = fichiers.find(f => /\.(mp4|webm|mov)$/i.test(f.filename)) || fichiers.find(f => /\.(webp|gif)$/i.test(f.filename));
-      if (!video) { if (hist.status && hist.status.completed) throw new Error('Terminé, mais aucune vidéo trouvée : ajoutez un nœud « Save Video » au workflow.'); continue; }
-      suivi('Téléchargement de la vidéo…');
-      const q = new URLSearchParams({ filename: video.filename, subfolder: video.subfolder || '', type: video.type || 'output' });
-      const v = await appel(base, '/view?' + q.toString());
-      if (!v.ok) throw new Error('Téléchargement impossible (' + v.status + ')');
-      const blob = await v.blob();
-      return { blob, nom: video.filename };
+      let r = null;
+      try { r = await recuperer(base, id, suivi); } catch (e) { if (e.definitif) throw e; continue; }
+      if (r) return r;
     }
+  }
+  // Une génération lancée : renvoie la vidéo si elle est prête, null si elle est encore en cours.
+  // Sert aussi à récupérer une vidéo après une coupure (ordinateur éteint, connexion perdue).
+  async function recuperer(base, id, suivi) {
+    const h = await appel(base, '/history/' + id);
+    if (!h.ok) return null;
+    const hist = (await h.json())[id];
+    if (!hist) return null;
+    const fin = m => { const e = new Error(m); e.definitif = true; return e; };
+    if (hist.status && hist.status.status_str === 'error') {
+      const m = (hist.status.messages || []).find(x => x[0] === 'execution_error');
+      throw fin('Erreur dans ComfyUI : ' + (m ? m[1].exception_message : 'voir ComfyUI'));
+    }
+    const fichiers = [];
+    Object.values(hist.outputs || {}).forEach(out => ['videos', 'gifs', 'images', 'animated'].forEach(k => (Array.isArray(out[k]) ? out[k] : []).forEach(f => { if (f && f.filename) fichiers.push(f); })));
+    const video = fichiers.find(f => /\.(mp4|webm|mov)$/i.test(f.filename)) || fichiers.find(f => /\.(webp|gif)$/i.test(f.filename));
+    if (!video) { if (hist.status && hist.status.completed) throw fin('Terminé, mais aucune vidéo trouvée : ajoutez un nœud « Save Video » au workflow.'); return null; }
+    suivi && suivi('Téléchargement de la vidéo…');
+    const q = new URLSearchParams({ filename: video.filename, subfolder: video.subfolder || '', type: video.type || 'output' });
+    const v = await appel(base, '/view?' + q.toString());
+    if (!v.ok) throw new Error('Téléchargement impossible (' + v.status + ')');
+    return { blob: await v.blob(), nom: video.filename };
   }
 
   // ----- Veille du pod : état, continuer, arrêter -----
@@ -182,5 +190,5 @@
     return manquants;
   }
 
-  global.Comfy = { idPod, joignable, modelesPrets, etatVeille, signalVeille, COMMANDE_VEILLE, WORKFLOW_5B, WORKFLOW_14B, WORKFLOWS, tester, generer, preparer, nettoyerUrl };
+  global.Comfy = { recuperer, idPod, joignable, modelesPrets, etatVeille, signalVeille, COMMANDE_VEILLE, WORKFLOW_5B, WORKFLOW_14B, WORKFLOWS, tester, generer, preparer, nettoyerUrl };
 })(window);

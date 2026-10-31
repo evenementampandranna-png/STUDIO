@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Espace organisateur</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --vin: #7a1f2b; --vin-clair: #f4e6e6; --papier: #faf6f0; --carte: #ffffff; --ligne: #eadfd3; --texte: #2b2124; --gris: #75696b; --vert: #2e7d32; --vert-clair: #e8f4e9; --rouge: #a3242b; --rouge-clair: #fbeaea; --ambre: #9a6a12; --ambre-clair: #fbf3e2; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--papier); color: var(--texte); font: 15px/1.45 Inter, system-ui, sans-serif; }
+  header { background: var(--vin); color: #fff; padding: 22px 16px 26px; }
+  header .bloc, main { max-width: 980px; margin: 0 auto; }
+  header small { opacity: .8; letter-spacing: .08em; text-transform: uppercase; font-size: 11.5px; font-weight: 600; }
+  header h1 { font: 700 28px/1.15 'Cormorant Garamond', serif; margin: 6px 0 4px; }
+  header p { margin: 0; opacity: .85; font-size: 14px; }
+  main { padding: 0 16px 60px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: -16px 0 16px; }
+  .stat { background: var(--carte); border: 1px solid var(--ligne); border-radius: 14px; padding: 12px 14px; box-shadow: 0 4px 14px rgba(60, 20, 20, .06); }
+  .stat b { display: block; font-size: 26px; line-height: 1.1; }
+  .stat span { color: var(--gris); font-size: 12.5px; }
+  .stat.vient b { color: var(--vert); } .stat.non b { color: var(--rouge); } .stat.attente b { color: var(--ambre); }
+  .onglets { display: flex; gap: 6px; border-bottom: 1px solid var(--ligne); margin-bottom: 12px; }
+  .onglets button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 10px 12px; font: 600 14px Inter, sans-serif; color: var(--gris); cursor: pointer; }
+  .onglets button.actif { color: var(--vin); border-color: var(--vin); }
+  .outils { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+  .outils input[type=search] { flex: 1 1 200px; }
+  input, select, textarea { font: inherit; padding: 9px 11px; border: 1px solid var(--ligne); border-radius: 10px; background: #fff; color: var(--texte); min-width: 0; }
+  textarea { width: 100%; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--ligne); background: #fff; color: var(--texte); border-radius: 999px; padding: 8px 14px; font: 600 13.5px Inter, sans-serif; cursor: pointer; text-decoration: none; white-space: nowrap; }
+  .btn.plein { background: var(--vin); border-color: var(--vin); color: #fff; }
+  .btn.petit { padding: 5px 10px; font-size: 12.5px; }
+  .btn.wa { background: #1f9d55; border-color: #1f9d55; color: #fff; }
+  .btn.danger { color: var(--rouge); }
+  .puces { display: flex; gap: 6px; flex-wrap: wrap; }
+  .puce { border: 1px solid var(--ligne); background: #fff; border-radius: 999px; padding: 5px 11px; font: 500 12.5px Inter, sans-serif; cursor: pointer; color: var(--gris); }
+  .puce.actif { background: var(--vin); border-color: var(--vin); color: #fff; }
+  .liste { display: flex; flex-direction: column; gap: 8px; }
+  .fam { background: var(--carte); border: 1px solid var(--ligne); border-radius: 14px; padding: 12px 14px; display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: center; }
+  .fam .nom { font-weight: 700; font-size: 15.5px; }
+  .fam .details { color: var(--gris); font-size: 13px; }
+  .fam .actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
+  .badge { display: inline-block; border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 600; }
+  .badge.vient { background: var(--vert-clair); color: var(--vert); } .badge.non { background: var(--rouge-clair); color: var(--rouge); } .badge.attente { background: var(--ambre-clair); color: var(--ambre); }
+  .rep { background: var(--carte); border: 1px solid var(--ligne); border-radius: 14px; padding: 10px 14px; }
+  .rep .haut { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .vide { color: var(--gris); padding: 28px; text-align: center; background: var(--carte); border: 1px dashed var(--ligne); border-radius: 14px; }
+  .carte { background: var(--carte); border: 1px solid var(--ligne); border-radius: 14px; padding: 14px; margin-top: 16px; }
+  .carte h3 { margin: 0 0 6px; font-size: 15px; }
+  .muet { color: var(--gris); font-size: 13px; }
+  dialog { border: 0; border-radius: 16px; padding: 0; width: min(460px, calc(100vw - 32px)); box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+  dialog::backdrop { background: rgba(30, 10, 10, .45); }
+  dialog form { padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+  dialog h3 { margin: 0; font: 700 22px 'Cormorant Garamond', serif; }
+  dialog label { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; font-weight: 600; color: var(--gris); }
+  .deux { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  #toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%) translateY(80px); background: #2b2124; color: #fff; padding: 10px 16px; border-radius: 999px; font-size: 14px; transition: transform .25s; z-index: 50; max-width: calc(100vw - 32px); }
+  #toast.vu { transform: translateX(-50%) translateY(0); }
+  #erreur { max-width: 520px; margin: 60px auto; padding: 0 16px; text-align: center; }
+  .etat-sync { font-size: 12px; color: var(--gris); margin-left: auto; }
+  @media (max-width: 560px) { header h1 { font-size: 24px; } .stat b { font-size: 22px; } }
+</style>
+</head>
+<body>
+<header><div class="bloc"><small>Espace organisateur · privé</small><h1 id="titre">Chargement…</h1><p id="sous-titre"></p></div></header>
+<main id="app"></main>
+<div id="erreur" hidden></div>
+<dialog id="dlg"><form method="dialog" id="dlg-form"></form></dialog>
+<div id="toast"></div>
+<script src="../config.js?v=202610310756"></script>
+<script src="../moteur/base.js?v=202610310756"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+<script>
+(async function () {
+  const $ = (s, r) => (r || document).querySelector(s), $$ = (s, r) => [...(r || document).querySelectorAll(s)];
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  let tt; const toast = t => { const e = $('#toast'); e.textContent = t; e.classList.add('vu'); clearTimeout(tt); tt = setTimeout(() => e.classList.remove('vu'), 2600); };
+  const erreur = t => { $('#app').hidden = true; const e = $('#erreur'); e.hidden = false; e.innerHTML = t; $('#titre').textContent = 'Espace organisateur'; };
+  const q = new URLSearchParams(location.search);
+  const slug = q.get('p'), cle = decodeURIComponent((location.hash || '').slice(1));
+  if (!slug || !cle) return erreur('<h2>Lien incomplet</h2><p class="muet">Ouvrez le lien organisateur complet reçu du studio (il se termine par une longue clé après le signe #).</p>');
+
+  /* ---- L'invitation publiée (titre, langue, base) ---- */
+  let projet = null;
+  try { const r = await fetch('../projets/' + encodeURIComponent(slug) + '.json?v=' + Date.now()); if (r.ok) projet = await r.json(); } catch (e) {}
+  if (!projet) return erreur('<h2>Invitation introuvable</h2><p class="muet">L\'invitation n\'est pas encore publiée, ou le lien est incorrect.</p>');
+  const conf = projet.publication && projet.publication.supabase;
+  if (!conf) return erreur('<h2>Espace organisateur non activé</h2><p class="muet">Le studio doit activer la base des invités (Réglages → Base des invités) puis republier l\'invitation.</p>');
+  const fiche = projet.fiche || {};
+  const mg = fiche.langue === 'mg';
+  document.title = 'Organisateur — ' + (fiche.titre || '');
+  $('#titre').textContent = fiche.titre || 'Invitation';
+  const dateTxt = fiche.date ? new Date(fiche.date + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : '';
+  $('#sous-titre').textContent = [dateTxt, fiche.date_limite ? 'réponses jusqu\'au ' + new Date(fiche.date_limite + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' }) : ''].filter(Boolean).join(' · ');
+  const base = location.href.replace(/hote\/.*$/, '');
+  const lienFamille = f => base + 'i/?p=' + encodeURIComponent(slug) + '&f=' + encodeURIComponent(f.code);
+  const lienGeneral = base + 'i/?p=' + encodeURIComponent(slug);
+  const tel = n => String(n || '').replace(/\D/g, '').replace(/^0/, '261');
+  const MSG = mg ? 'Salama {famille}! Faly manasa anareo izahay. Ity ny fanasana: {lien}' : 'Bonjour {famille} ! Nous avons le plaisir de vous inviter. Voici votre invitation : {lien}';
+  let modele = localStorage.getItem('hote.msg.' + slug) || MSG;
+
+  /* ---- Données ---- */
+  let D = { familles: [], reponses: [] }, filtre = 'tous', cherche = '', onglet = 'invites';
+  const lire = async (silencieux) => {
+    try { D = await Base.rpc(conf, 'inv_hote_lire', { p_evt: projet.id, p_cle: cle }); rendre(); $('.etat-sync') && ($('.etat-sync').textContent = 'À jour · ' + new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })); }
+    catch (e) { if (/invalide/.test(e.message)) return erreur('<h2>Lien organisateur invalide</h2><p class="muet">Demandez au studio le lien organisateur à jour.</p>'); if (!silencieux) toast('Connexion impossible : ' + e.message); }
+  };
+  const envoyer = async liste => { await Base.rpc(conf, 'inv_hote_familles', { p_evt: projet.id, p_cle: cle, p_familles: liste }); await lire(true); };
+
+  /* ---- Affichage ---- */
+  const somme = (l, k) => l.reduce((s, f) => s + (Number(f[k]) || 0), 0);
+  const STAT = { vient: 'Vient', non: 'Ne vient pas', attente: 'En attente' };
+  function rendre() {
+    const fs = D.familles || [], rs = D.reponses || [];
+    const vient = fs.filter(f => f.statut === 'vient'), non = fs.filter(f => f.statut === 'non'), att = fs.filter(f => f.statut !== 'vient' && f.statut !== 'non');
+    const generaux = rs.filter(r => !r.code && r.presence === 'oui');
+    const persVient = somme(vient, 'adultes') + somme(vient, 'enfants') + somme(generaux, 'adultes') + somme(generaux, 'enfants');
+    const visibles = fs.filter(f => (filtre === 'tous' || (filtre === 'attente' ? (f.statut !== 'vient' && f.statut !== 'non') : f.statut === filtre)) && (!cherche || (f.nom + ' ' + (f.categorie || '') + ' ' + (f.table || '')).toLowerCase().includes(cherche)));
+    $('#app').innerHTML = `
+      <div class="stats">
+        <div class="stat"><b>${fs.length}</b><span>familles invitées · ${somme(fs, 'places')} places</span></div>
+        <div class="stat vient"><b>${persVient}</b><span>personnes viennent (${somme(vient, 'adultes') + somme(generaux, 'adultes')} adultes, ${somme(vient, 'enfants') + somme(generaux, 'enfants')} enfants)</span></div>
+        <div class="stat vient"><b>${vient.length}</b><span>familles ont confirmé</span></div>
+        <div class="stat non"><b>${non.length}</b><span>ne viennent pas</span></div>
+        <div class="stat attente"><b>${att.length}</b><span>en attente de réponse</span></div>
+      </div>
+      <div class="onglets"><button data-o="invites" class="${onglet === 'invites' ? 'actif' : ''}">Invités (${fs.length})</button><button data-o="reponses" class="${onglet === 'reponses' ? 'actif' : ''}">Réponses (${rs.length})</button><button data-o="envoi" class="${onglet === 'envoi' ? 'actif' : ''}">Envoi</button><span class="etat-sync"></span></div>
+      <div id="vue"></div>`;
+    $$('[data-o]').forEach(b => b.onclick = () => { onglet = b.dataset.o; rendre(); });
+    const v = $('#vue');
+    if (onglet === 'invites') {
+      v.innerHTML = `<div class="outils"><button class="btn plein" id="ajouter">+ Ajouter une famille</button><button class="btn" id="importer">Importer Excel</button><button class="btn" id="exporter">Exporter Excel</button>
+          <input type="search" id="cherche" placeholder="Rechercher un nom, une table…" value="${esc(cherche)}"></div>
+        <div class="puces" style="margin-bottom:10px">${[['tous', 'Tous'], ['vient', 'Viennent'], ['non', 'Ne viennent pas'], ['attente', 'En attente']].map(([k, t]) => `<button class="puce ${filtre === k ? 'actif' : ''}" data-f="${k}">${t}</button>`).join('')}</div>
+        <div class="liste">${visibles.map(f => `<div class="fam" data-code="${esc(f.code)}">
+            <div><div class="nom">${esc(f.nom)}</div><div class="details">${[f.categorie, f.places + ' place' + (f.places > 1 ? 's' : ''), f.statut === 'vient' ? (f.adultes || 0) + ' adulte(s), ' + (f.enfants || 0) + ' enfant(s)' : '', f.table ? 'Table ' + f.table : '', f.telephone].filter(Boolean).map(esc).join(' · ')}</div>
+              ${f.message ? `<div class="details">« ${esc(f.message)} »</div>` : ''}</div>
+            <span class="badge ${f.statut === 'vient' || f.statut === 'non' ? f.statut : 'attente'}">${STAT[f.statut] || STAT.attente}</span>
+            <div class="actions">${f.telephone ? '<button class="btn petit wa" data-a="wa">Envoyer sur WhatsApp</button>' : ''}<button class="btn petit" data-a="copier">Copier son lien</button><button class="btn petit" data-a="modifier">Modifier</button><button class="btn petit danger" data-a="suppr">Supprimer</button></div>
+          </div>`).join('') || `<div class="vide">${fs.length ? 'Aucune famille ne correspond.' : 'Aucun invité pour l\'instant. Ajoutez vos familles une par une, ou importez un fichier Excel (colonnes : Famille, Catégorie, Places, Téléphone, Table).'}</div>`}</div>`;
+      $('#ajouter').onclick = () => formulaire(null);
+      $('#importer').onclick = importer;
+      $('#exporter').onclick = exporter;
+      $('#cherche').oninput = e => { cherche = e.target.value.toLowerCase().trim(); const pos = e.target.selectionStart; rendre(); const c = $('#cherche'); c.focus(); c.setSelectionRange(pos, pos); };
+      $$('[data-f]').forEach(b => b.onclick = () => { filtre = b.dataset.f; rendre(); });
+      $$('.fam').forEach(el => {
+        const f = fs.find(x => x.code === el.dataset.code);
+        $$('[data-a]', el).forEach(b => b.onclick = async () => {
+          const a = b.dataset.a;
+          if (a === 'copier') { await copier(lienFamille(f)); }
+          if (a === 'wa') window.open('https://wa.me/' + tel(f.telephone) + '?text=' + encodeURIComponent(modele.replace('{famille}', f.nom).replace('{lien}', lienFamille(f))), '_blank');
+          if (a === 'modifier') formulaire(f);
+          if (a === 'suppr' && confirm('Supprimer « ' + f.nom + ' » de la liste des invités ?')) { try { await Base.rpc(conf, 'inv_hote_supprimer', { p_evt: projet.id, p_cle: cle, p_code: f.code }); toast('Supprimé'); lire(true); } catch (e) { toast(e.message); } }
+        });
+      });
+    } else if (onglet === 'reponses') {
+      v.innerHTML = `<div class="liste">${rs.map(r => `<div class="rep"><div class="haut"><b>${esc(r.nom || 'Sans nom')}${r.code ? '' : ' <span class="muet">(lien général)</span>'}</b><span class="badge ${r.presence === 'oui' ? 'vient' : 'non'}">${r.presence === 'oui' ? 'Vient' : 'Ne vient pas'}</span></div>
+          <div class="muet">${new Date(r.date).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}${r.presence === 'oui' ? ' · ' + (r.adultes || 0) + ' adulte(s), ' + (r.enfants || 0) + ' enfant(s)' : ''}</div>${r.message ? `<div>« ${esc(r.message)} »</div>` : ''}</div>`).join('') || '<div class="vide">Aucune réponse pour l\'instant. Elles arrivent ici dès qu\'un invité confirme dans l\'invitation.</div>'}</div>`;
+    } else {
+      v.innerHTML = `<div class="carte" style="margin-top:0"><h3>Message WhatsApp</h3><p class="muet" style="margin-top:0">{famille} et {lien} sont remplacés pour chaque famille.</p><textarea id="modele" rows="3">${esc(modele)}</textarea></div>
+        <div class="carte"><h3>Lien général</h3><p class="muet" style="margin-top:0">Pour un groupe ou les réseaux sociaux. Les personnes qui répondent par ce lien apparaissent dans « Réponses ».</p>
+          <div class="outils" style="margin:0"><input type="text" readonly value="${esc(lienGeneral)}" style="flex:1"><button class="btn" id="cp-gen">Copier</button><a class="btn wa" target="_blank" href="https://wa.me/?text=${encodeURIComponent(lienGeneral)}">WhatsApp</a></div></div>
+        <div class="carte"><h3>Ce lien organisateur</h3><p class="muet" style="margin:0">Gardez-le pour vous : il permet de voir et de modifier la liste des invités. Ajoutez-le aux favoris pour le retrouver.</p></div>`;
+      $('#modele').oninput = e => { modele = e.target.value; try { localStorage.setItem('hote.msg.' + slug, modele); } catch (er) {} };
+      $('#cp-gen').onclick = () => copier(lienGeneral);
+    }
+  }
+  async function copier(t) { try { await navigator.clipboard.writeText(t); } catch (e) { const a = document.createElement('textarea'); a.value = t; document.body.appendChild(a); a.select(); document.execCommand('copy'); a.remove(); } toast('Lien copié'); }
+
+  function formulaire(f) {
+    const n = !f; f = f || { code: Base.code(), nom: '', categorie: '', places: 2, telephone: '', table: '', statut: 'attente', adultes: 0, enfants: 0 };
+    const d = $('#dlg'), fo = $('#dlg-form');
+    fo.innerHTML = `<h3>${n ? 'Ajouter une famille' : 'Modifier'}</h3>
+      <label>Nom de la famille<input name="nom" required value="${esc(f.nom)}" placeholder="Ex. Fianakaviana Rakoto"></label>
+      <div class="deux"><label>Catégorie<input name="categorie" value="${esc(f.categorie || '')}" placeholder="Famille, amis…"></label><label>Places<input name="places" type="number" min="1" value="${f.places || 1}"></label></div>
+      <div class="deux"><label>Téléphone (WhatsApp)<input name="telephone" inputmode="tel" value="${esc(f.telephone || '')}" placeholder="034 00 000 00"></label><label>Table<input name="table" value="${esc(f.table || '')}"></label></div>
+      <label>Réponse<select name="statut">${Object.entries(STAT).map(([k, t]) => `<option value="${k}" ${(f.statut || 'attente') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+      <div class="deux"><label>Adultes qui viennent<input name="adultes" type="number" min="0" value="${f.adultes || 0}"></label><label>Enfants qui viennent<input name="enfants" type="number" min="0" value="${f.enfants || 0}"></label></div>
+      <div class="outils" style="margin:6px 0 0;justify-content:flex-end"><button class="btn" value="annuler" formnovalidate>Annuler</button><button class="btn plein" value="ok">Enregistrer</button></div>`;
+    d.showModal();
+    d.onclose = async () => {
+      if (d.returnValue !== 'ok') return;
+      const x = Object.fromEntries(new FormData(fo).entries());
+      if (!x.nom.trim()) return;
+      try { await envoyer([Object.assign({}, f, x, { nom: x.nom.trim(), places: Number(x.places) || 1, adultes: Number(x.adultes) || 0, enfants: Number(x.enfants) || 0 })]); toast(n ? 'Famille ajoutée' : 'Enregistré'); }
+      catch (e) { toast(e.message); }
+    };
+  }
+  function importer() {
+    if (!window.XLSX) return toast('Lecture Excel en cours de chargement, réessayez');
+    const i = document.createElement('input'); i.type = 'file'; i.accept = '.xlsx,.xls,.csv';
+    i.onchange = async () => {
+      const wb = XLSX.read(await i.files[0].arrayBuffer());
+      const lignes = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
+      const cle = (o, ...ks) => { for (const k of Object.keys(o)) if (ks.some(x => k.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes(x))) return o[k]; return ''; };
+      const exist = new Set((D.familles || []).map(f => f.nom.toLowerCase()));
+      const liste = lignes.map(o => ({ code: Base.code(), nom: String(cle(o, 'famille', 'nom', 'anarana')).trim(), categorie: String(cle(o, 'categ', 'groupe')).trim(), places: Number(cle(o, 'place', 'nombre', 'isa')) || (Number(cle(o, 'adulte')) || 0) + (Number(cle(o, 'enfant')) || 0) || 1, telephone: String(cle(o, 'tel', 'phone', 'whatsapp', 'finday')).trim(), table: String(cle(o, 'table', 'latabatra')).trim() })).filter(f => f.nom && !exist.has(f.nom.toLowerCase()));
+      if (!liste.length) return toast('Aucune nouvelle famille trouvée (colonne « Famille » ou « Nom »)');
+      try { await envoyer(liste); toast(liste.length + ' famille(s) importée(s)'); } catch (e) { toast(e.message); }
+    };
+    i.click();
+  }
+  function exporter() {
+    if (!window.XLSX) return toast('Excel en cours de chargement, réessayez');
+    const rows = (D.familles || []).map(f => ({ Famille: f.nom, 'Catégorie': f.categorie, Places: f.places, 'Téléphone': f.telephone, Table: f.table, 'Réponse': STAT[f.statut] || STAT.attente, Adultes: f.adultes, Enfants: f.enfants, Message: f.message || '', Lien: lienFamille(f) }));
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Invités');
+    const g = (D.reponses || []).filter(r => !r.code).map(r => ({ Nom: r.nom, 'Réponse': r.presence === 'oui' ? 'Vient' : 'Ne vient pas', Adultes: r.adultes, Enfants: r.enfants, Message: r.message, Date: new Date(r.date).toLocaleString('fr-FR') }));
+    if (g.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(g), 'Lien général');
+    XLSX.writeFile(wb, 'invites-' + slug + '.xlsx');
+  }
+
+  await lire();
+  setInterval(() => { if (!document.hidden && !$('#dlg').open) lire(true); }, 30000);
+})();
+</script>
+</body>
+</html>
