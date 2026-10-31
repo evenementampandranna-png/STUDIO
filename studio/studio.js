@@ -270,7 +270,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
   function vueProjet(p, onglet) {
     $('#app').innerHTML = `
       <div class="entete"><div><a href="#/" class="muet" style="text-decoration:none">‹ Événements</a><h1 style="margin-top:4px">${esc(p.fiche.titre)}</h1><p>${esc(MoteurInfo.dateLisible(p.fiche.date, p.fiche.langue))}${p.fiche.heure ? ' · ' + esc(p.fiche.heure) : ''}</p></div>
-        <div class="ligne"><span class="muet" id="etat-sauve">Enregistré</span></div></div>
+        <div class="ligne"><a class="btn ${p.publie ? 'plein' : ''}" href="#/p/${p.id}/publier" title="Les 2 liens à donner au client">🔗 Liens du client</a><span class="muet" id="etat-sauve">Enregistré</span></div></div>
       <div class="onglets">
         <a href="#/p/${p.id}/plans" class="${onglet === 'plans' ? 'actif' : ''}">Plans</a>
         <a href="#/p/${p.id}/fiche" class="${onglet === 'fiche' ? 'actif' : ''}">Fiche</a>
@@ -296,14 +296,21 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       <p class="muet">Ces informations alimentent les textes variables ({date}, {date_limite}, {compte_a_rebours}…), les boutons Map et Appeler, et le message WhatsApp.</p>
       <label class="champ">Titre<input type="text" data-f="titre" value="${esc(f.titre)}"></label>
       <div class="trois"><label class="champ">Date<input type="date" data-f="date" value="${esc(f.date)}"></label><label class="champ">Heure<input type="time" data-f="heure" value="${esc(f.heure)}"></label><label class="champ">Date limite<input type="date" data-f="date_limite" value="${esc(f.date_limite)}"></label></div>
-      <label class="champ">Langue des boutons<select data-f="langue"><option value="mg" ${f.langue === 'mg' ? 'selected' : ''}>Malgache</option><option value="fr" ${f.langue === 'fr' ? 'selected' : ''}>Français</option></select></label>
+      <div class="carte pile" style="padding:12px;background:#fbf7f1">
+        <b>Langues de l'invitation</b>
+        <label class="champ">Langue principale (celle de vos textes)<select data-f="langue">${Object.entries(MoteurInfo.LANGUES).map(([k, n]) => `<option value="${k}" ${f.langue === k ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+        <div class="muet">Autres langues proposées aux invités (un bouton 🌐 dans l'invitation permet de passer de l'une à l'autre) :</div>
+        <div class="cases" style="flex-wrap:wrap">${Object.entries(MoteurInfo.LANGUES).filter(([k]) => k !== f.langue).map(([k, n]) => `<label><input type="checkbox" data-langue="${k}" ${(p.langues || []).includes(k) ? 'checked' : ''}> ${n}</label>`).join('')}</div>
+        <div class="muet">Ensuite : onglet Plans → <b>🌐 Traduire</b> pour traduire tous les textes d'un coup.</div>
+      </div>
       <div class="section-titre">Lieux (n° pour les boutons Map : 0, 1…)</div>
       ${f.lieux.map((l, i) => `<div class="deux"><input type="text" data-l="${i}" data-k="nom" value="${esc(l.nom)}"><input type="url" data-l="${i}" data-k="maps" value="${esc(l.maps)}"></div>`).join('')}
       <div class="section-titre">Contacts (n° pour les boutons Appeler : 0, 1…)</div>
       ${f.contacts.map((c, i) => `<div class="deux"><input type="text" data-c="${i}" data-k="nom" value="${esc(c.nom)}"><input type="text" data-c="${i}" data-k="telephone" value="${esc(c.telephone)}"></div>`).join('')}
       <label class="champ">Texte source<textarea rows="8" readonly>${esc(f.texte_source || '')}</textarea></label>
     </div>`;
-    $$('[data-f]').forEach(i => i.oninput = () => { f[i.dataset.f] = i.value; enregistrer(p); });
+    $$('[data-f]').forEach(i => i.oninput = () => { f[i.dataset.f] = i.value; if (i.dataset.f === 'langue') { p.langues = (p.langues || []).filter(x => x !== i.value); enregistrer(p); return ongletFiche(p); } enregistrer(p); });
+    $$('[data-langue]').forEach(i => i.onchange = () => { const l = new Set(p.langues || []); if (i.checked) l.add(i.dataset.langue); else l.delete(i.dataset.langue); p.langues = [...l]; enregistrer(p); });
     $$('[data-l]').forEach(i => i.oninput = () => { f.lieux[i.dataset.l][i.dataset.k] = i.value; enregistrer(p); });
     $$('[data-c]').forEach(i => i.oninput = () => { f.contacts[i.dataset.c][i.dataset.k] = i.value; enregistrer(p); });
   }
@@ -328,7 +335,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
             <select id="vue" class="btn petit"><option value="famille">Voir : lien personnel</option><option value="general">Voir : lien général</option></select>
             <button class="btn petit icone" id="annuler" title="Annuler">↶</button><button class="btn petit icone" id="refaire" title="Rétablir">↷</button>
           </div>
-          <div class="commandes"><button class="btn petit" id="musique-btn" title="Chanson de l'invitation">♪ ${p.musique ? esc((p.musique.nom || 'Chanson').replace(/\.\w+$/, '').slice(0, 18)) : 'Ajouter une chanson'}</button><button class="btn petit" id="img-test">Image test</button><button class="btn ia" id="finaliser">✨ Finaliser ce plan avec l'IA</button></div>
+          <div class="commandes"><button class="btn petit" id="musique-btn" title="Chanson de l'invitation">♪ ${p.musique ? esc((p.musique.nom || 'Chanson').replace(/\.\w+$/, '').slice(0, 18)) : 'Ajouter une chanson'}</button><button class="btn petit" id="traduire">🌐 Traduire</button><select id="voir-langue" class="btn petit" title="Voir l'aperçu dans une autre langue"></select><button class="btn petit" id="img-test">Image test</button><button class="btn ia" id="finaliser">✨ Finaliser ce plan avec l'IA</button></div>
         </div>
         <div class="col-reglages carte" id="col-reglages"></div>
       </div>`;
@@ -374,6 +381,10 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     };
     $('#jouer-plan').addEventListener('click', couperSon);
     $('#stop').onclick = () => { couperSon(); eng.pause(); eng.mode = 'edition'; afficher(); };
+    const majVoirLangue = () => { const sel = $('#voir-langue'); const ls = [p.fiche.langue].concat((p.langues || []).filter(l => l !== p.fiche.langue)); sel.style.display = ls.length > 1 ? '' : 'none'; sel.innerHTML = ls.map(l => `<option value="${l}" ${(eng.langue || p.fiche.langue) === l ? 'selected' : ''}>Voir en : ${esc(MoteurInfo.LANGUES[l] || l)}</option>`).join(''); };
+    majVoirLangue();
+    $('#voir-langue').onchange = e => { eng.changerLangue(e.target.value); E.rafraichir(); };
+    $('#traduire').onclick = () => modaleTraduction(p, () => { majVoirLangue(); E.afficher(); });
     $('#musique-btn').onclick = () => modaleMusique(p, () => { $('#musique-btn').textContent = '♪ ' + (p.musique ? (p.musique.nom || 'Chanson').replace(/\.\w+$/, '').slice(0, 18) : 'Ajouter une chanson'); });
     eng.onTemps = (t) => { $('#t-aff').textContent = t.toFixed(1).replace('.', ',') + ' s'; if (eng.planFixe != null) $('#t-curseur').value = t; };
     eng.onFin = () => { eng.mode = 'edition'; afficher(); };
@@ -785,7 +796,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       E.modif(true);
       const base = { id: uid(), x: 50, y: 50, largeur: 60, debut: 0.4, couleur: p.style.couleur || '#7a1f2b' };
       let c;
-      const L = Fabrique.LIB[p.fiche.langue] || Fabrique.LIB.fr;
+      const L = Fabrique.LIB[p.fiche.langue] || Fabrique.LIB.en;
       if (type === 'texte') c = Object.assign(base, { type, texte: 'Nouveau texte', police: 'Cormorant Garamond', taille: 4.4, align: 'center', ombre: true, animation: 'fondu-montee', sortie: 'aucune' });
       if (type === 'bouton') c = Object.assign(base, { type, texte: L.confirmer, action: 'suivant', style: 'plein', taille: 2.4, debut: 0 });
       if (type === 'compteur') c = Object.assign(base, { type, texte: L.adultes, champ: 'adultes', min: 0, defaut: 1, taille: 2.3, largeur: 66 });
@@ -819,6 +830,13 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <button class="btn petit" data-voir-anim style="margin-top:8px">▶ Voir l'animation</button>
       </details>`;
     }
+    function blocTraductions(c) {
+      const ls = (p.langues || []).filter(l => l !== p.fiche.langue);
+      if (!ls.length) return '';
+      return `<details class="bloc" ${ls.some(l => !(c.trad && c.trad[l])) ? 'open' : ''}><summary>Traductions</summary><div class="pile">
+        ${ls.map(l => `<label class="champ">${esc(MoteurInfo.LANGUES[l] || l)}${c.trad && c.trad[l] ? '' : ' <span class="badge alerte">à traduire</span>'}<textarea data-trad="${l}" rows="2">${esc((c.trad && c.trad[l]) || '')}</textarea></label>`).join('')}
+        <span class="muet">Vide = le texte d'origine s'affiche. Pour tout traduire d'un coup : 🌐 Traduire sous l'aperçu.</span></div></details>`;
+    }
     function formulaireCalque(c) {
       const position = `<details class="bloc" open><summary>Position</summary>
         <div class="trois"><label class="champ">X (%)<input type="number" id="cx" data-k="x" step="0.5" value="${c.x}"></label><label class="champ">Y (%)<input type="number" id="cy" data-k="y" step="0.5" value="${c.y}"></label><label class="champ">Largeur (%)<input type="number" data-k="largeur" step="1" value="${c.largeur || 60}"></label></div>
@@ -829,17 +847,18 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <div class="deux"><label class="champ">Police<select data-k="police">${opts(I.POLICES, c.police)}</select></label><label class="champ">Taille<input type="range" data-k="taille" min="1.5" max="12" step="0.1" value="${c.taille || 4}"></label></div>
         <div class="trois"><label class="champ">Couleur<input type="color" data-k="couleur" value="${c.couleur || '#7a1f2b'}"></label><label class="champ">Alignement<select data-k="align">${opts([['center', 'Centré'], ['left', 'Gauche'], ['right', 'Droite']], c.align || 'center')}</select></label><label class="champ">Interligne<input type="number" data-k="interligne" step="0.05" min="0.8" max="2" value="${c.interligne || 1.25}"></label></div>
         <div class="cases"><label><input type="checkbox" data-k="gras" ${c.gras ? 'checked' : ''}> Gras</label><label><input type="checkbox" data-k="italique" ${c.italique ? 'checked' : ''}> Italique</label><label><input type="checkbox" data-k="majuscules" ${c.majuscules ? 'checked' : ''}> Majuscules</label><label><input type="checkbox" data-k="ombre" ${c.ombre ? 'checked' : ''}> Halo clair</label></div>
-        </div></details>` + blocAnimation(c);
+        </div></details>` + blocTraductions(c) + blocAnimation(c);
       if (c.type === 'bouton') s += `<details class="bloc" open><summary>Bouton</summary><div class="pile">
         <label class="champ">Libellé<input type="text" data-k="texte" value="${esc(c.texte)}"></label>
         <div class="deux"><label class="champ">Action<select data-k="action">${opts(I.ACTIONS, c.action)}</select></label><label class="champ">N° du lieu / contact<input type="number" data-k="cible" min="0" value="${c.cible || 0}"></label></div>
         ${c.action === 'lien' || c.action === 'messenger' ? `<label class="champ">Adresse du lien<input type="url" data-k="lien" value="${esc(c.lien || '')}"></label>` : ''}
         <div class="trois"><label class="champ">Style<select data-k="style">${opts([['plein', 'Plein'], ['contour', 'Contour'], ['lien', 'Lien']], c.style || 'plein')}</select></label><label class="champ">Taille<input type="number" data-k="taille" step="0.1" min="1" max="6" value="${c.taille || 2.4}"></label><label class="champ">Couleur<input type="color" data-k="couleur" value="${c.couleur || '#7a1f2b'}"></label></div>
-        <label class="champ">Apparaît à (s)<input type="number" data-k="debut" step="0.1" min="0" value="${c.debut || 0}"></label></div></details>`;
+        <label class="champ">Apparaît à (s)<input type="number" data-k="debut" step="0.1" min="0" value="${c.debut || 0}"></label></div></details>` + blocTraductions(c);
       if (c.type === 'compteur') s += `<details class="bloc" open><summary>Compteur</summary><div class="pile">
         <label class="champ">Libellé<input type="text" data-k="texte" value="${esc(c.texte)}"></label>
         <div class="trois"><label class="champ">Champ<select data-k="champ">${opts(['adultes', 'enfants', 'places_transport'], c.champ)}</select></label><label class="champ">Min<input type="number" data-k="min" value="${c.min || 0}"></label><label class="champ">Max<input type="number" data-k="max" value="${c.max || ''}" placeholder="places"></label></div>
         <div class="deux"><label class="champ">Taille<input type="number" data-k="taille" step="0.1" min="1" max="6" value="${c.taille || 2.3}"></label><label class="champ">Couleur<input type="color" data-k="couleur" value="${c.couleur || '#7a1f2b'}"></label></div></div></details>`;
+      if (c.type === 'compteur') s += blocTraductions(c);
       if (c.type === 'image' || c.type === 'video') s += `<details class="bloc" open><summary>Photo / vidéo</summary><div class="pile">
         ${c.media ? '' : '<div class="alerte-boite">Ce calque est vide : importez une photo ou une vidéo.</div>'}
         <div class="ligne"><label class="btn petit plein">${c.media ? 'Remplacer le fichier' : 'Importer une photo ou une vidéo'}<input type="file" data-remplacer accept="image/*,video/*" hidden></label></div>
@@ -851,6 +870,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       return s + position;
     }
     function lierFormulaire(c) {
+      $$('#props [data-trad]').forEach(t => t.oninput = () => { c.trad = c.trad || {}; if (t.value.trim()) c.trad[t.dataset.trad] = t.value; else delete c.trad[t.dataset.trad]; E.modif(); E.rafraichir(); });
       const rp = $('#props [data-remplacer]');
       if (rp) rp.onchange = async e => { const f = e.target.files[0]; if (!f) return; const m = await importerFichier(f, null, p.id); sauverMedias(); E.modif(true); c.media = m.src; c.type = m.type === 'video' ? 'video' : 'image'; eng.precharger().then(() => { E.rafraichir(); rendreReglages(); }); };
       const an = $('#props [data-animer]'); if (an) an.onclick = () => allerCreateur(p, E.i, { methode: 'animer', calque: c.id });
@@ -994,6 +1014,47 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     }
     const fin = enc.flush(); if (fin.length) morceaux.push(new Uint8Array(fin));
     return new File(morceaux, f.name.replace(/\.\w+$/, '') + '.mp3', { type: 'audio/mpeg' });
+  }
+
+  /* ---------- Traduction de toute l'invitation ---------- */
+  function modaleTraduction(p, apres) {
+    const N = MoteurInfo.LANGUES;
+    const calques = () => p.plans.flatMap(x => (x.calques || []).filter(c => c.texte && String(c.texte).trim()));
+    const manque = l => calques().filter(c => !(c.trad && c.trad[l])).length;
+    modale(`<h2>🌐 Langues de l'invitation</h2>
+      <p class="muet">Langue principale : <b>${esc(N[p.fiche.langue] || p.fiche.langue)}</b>. Cochez les langues à proposer aux invités : dans l'invitation, un bouton 🌐 leur permet de changer de langue d'un clic.</p>
+      <div class="cases" style="flex-wrap:wrap" id="tr-langues">${Object.entries(N).filter(([k]) => k !== p.fiche.langue).map(([k, n]) => `<label><input type="checkbox" value="${k}" ${(p.langues || []).includes(k) ? 'checked' : ''}> ${n}${(p.langues || []).includes(k) ? ` <span class="muet">(${manque(k) ? manque(k) + ' texte(s) à traduire' : '✓ traduite'})</span>` : ''}</label>`).join('')}</div>
+      <div class="ia-grille" style="margin-top:12px">
+        <div class="pile"><p class="ia-etape">1. Copier le prompt</p>
+          <p class="muet" style="margin:0">Il contient tous les textes de l'invitation (${calques().length}) et les règles (ton de faire-part, variables {famille}, {date}… gardées).</p>
+          <div class="ligne"><button class="btn plein" id="tr-copier">Copier le prompt</button><a class="btn" href="https://claude.ai/new" target="_blank" rel="noopener">Ouvrir Claude ↗</a><a class="btn" href="https://chatgpt.com/" target="_blank" rel="noopener">Ouvrir ChatGPT ↗</a></div>
+          <label class="cases"><input type="checkbox" id="tr-tout"> Retraduire aussi les textes déjà traduits</label></div>
+        <div class="pile"><p class="ia-etape">2. Coller la réponse</p>
+          <textarea id="tr-rep" rows="8" placeholder='{ "fr": { "…": "…" }, "en": { … } }' style="width:100%;font:12.5px ui-monospace,monospace"></textarea>
+          <div class="ligne"><button class="btn plein" id="tr-ok">Appliquer les traductions</button><span class="muet" id="tr-etat"></span></div></div>
+      </div>`, (box, fermer) => {
+      const choisies = () => $$('#tr-langues input:checked', box).map(i => i.value);
+      $$('#tr-langues input', box).forEach(i => i.onchange = () => { p.langues = choisies(); enregistrer(p); });
+      $('#tr-copier', box).onclick = () => {
+        const ls = choisies(); if (!ls.length) return toast('Cochez d\'abord au moins une langue');
+        let proj = p;
+        if (!$('#tr-tout', box).checked) { proj = JSON.parse(JSON.stringify(p)); proj.plans.forEach(x => x.calques = (x.calques || []).filter(c => ls.some(l => !(c.trad && c.trad[l])))); }
+        copier(Fabrique.promptTraduction(proj, ls, N));
+      };
+      $('#tr-ok', box).onclick = () => {
+        let j; try { j = Fabrique.lireJSON($('#tr-rep', box).value); } catch (e) { $('#tr-etat', box).textContent = 'Réponse illisible : collez tout le bloc de code JSON.'; return; }
+        const parId = {}; calques().forEach(c => { parId[c.id] = c; });
+        let n = 0;
+        Object.entries(j || {}).forEach(([l, textes]) => {
+          if (!N[l] || l === p.fiche.langue || typeof textes !== 'object') return;
+          Object.entries(textes).forEach(([id, t]) => { const c = parId[id]; if (c && typeof t === 'string' && t.trim()) { c.trad = c.trad || {}; c.trad[l] = t; n++; } });
+          if (!(p.langues || []).includes(l)) p.langues = (p.langues || []).concat(l);
+        });
+        enregistrer(p);
+        if (!n) { $('#tr-etat', box).textContent = 'Aucun texte reconnu dans la réponse.'; return; }
+        fermer(); toast(n + ' traductions appliquées'); if (apres) apres();
+      };
+    });
   }
 
   /* ---------- Chanson de l'invitation ---------- */
@@ -1568,6 +1629,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     if (pub.fiche) delete pub.fiche.texte_source;
     pub.publication = { date: new Date().toISOString(), firebase: reglages.firebase || null, supabase: reglages.supabase || null };
     delete pub.cle_hote; delete pub.supprimes;
+    pub.langues = [p.fiche.langue].concat((p.langues || []).filter(l => l !== p.fiche.langue));
     if (!apercu) pub.plans.forEach(pl => { (pl.calques || []).forEach(c => { if (c.media && /^idb:/.test(c.media)) c.media = 'medias/' + c.media.slice(4); }); if (pl.fond && /^idb:/.test(pl.fond.media)) pl.fond.media = 'medias/' + pl.fond.media.slice(4); });
     if (!apercu && pub.musique && /^idb:/.test(pub.musique.src)) pub.musique.src = 'medias/' + pub.musique.src.slice(4);
     return pub;
@@ -1611,6 +1673,26 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <div class="ligne"><button class="btn plein" id="film">Enregistrer le film</button><span class="muet" id="film-etat"></span></div></div>
       </div>
       <div class="pile">
+        <div class="carte pile carte-client"><h3>🔗 Les 2 liens à donner au client</h3>
+          <ol class="etat-liste">
+            <li class="${reglages.github && reglages.github.token ? 'fait' : ''}">Publication reliée (GitHub) ${reglages.github && reglages.github.token ? '✓' : '— <a href="#/reglages">à faire dans Réglages</a>'}</li>
+            <li class="${reglages.supabase ? 'fait' : ''}">Base des invités (pour le lien organisateur) ${reglages.supabase ? '✓' : '— <a href="#/reglages">à faire dans Réglages</a>'}</li>
+            <li class="${p.publie ? 'fait' : ''}">Invitation publiée ${p.publie ? '✓ le ' + esc(new Date(p.publie).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })) : '— bouton « Publier l\'invitation » ci-dessous'}</li>
+          </ol>
+          <div class="lien-client">
+            <b>1. Lien des invités</b> <span class="muet">— l'invitation : les invités la regardent et confirment</span>
+            <div class="ligne"><input type="text" readonly value="${esc(lienGeneral(p))}" style="flex:1"><button class="btn petit" id="cp-gen" ${p.publie ? '' : 'disabled'}>Copier</button></div>
+            <div class="ligne"><a class="btn petit" target="_blank" href="https://wa.me/?text=${encodeURIComponent(lienGeneral(p))}">Partager sur WhatsApp</a><a class="btn petit" target="_blank" href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(lienGeneral(p))}">Partager sur Facebook</a><a class="btn petit" href="#/p/${p.id}/invites">Liens personnels par famille →</a></div>
+          </div>
+          <div class="lien-client">
+            <b>2. Lien organisateur</b> <span class="muet">— privé : le client ajoute ses invités et voit qui vient, combien</span>
+            ${!reglages.supabase ? `<p class="muet" style="margin:0">Activez d'abord la <a href="#/reglages">base des invités</a> (Réglages, une seule fois), puis publiez.</p>`
+              : !p.cle_hote || !p.publie ? `<p class="muet" style="margin:0">Il apparaîtra ici dès que vous aurez publié.</p>`
+              : `<div class="ligne"><input type="text" readonly value="${esc(lienHote(p))}" style="flex:1"><button class="btn petit" id="cp-hote">Copier</button><a class="btn petit" target="_blank" href="${esc(lienHote(p))}">Ouvrir</a></div>
+                <div class="ligne"><a class="btn petit" target="_blank" href="https://wa.me/?text=${encodeURIComponent((p.fiche.langue === 'mg' ? 'Ity ny rohy hitantananao ny vahiny (aza zaraina): ' : 'Voici votre lien pour gérer vos invités (à garder pour vous) : ') + lienHote(p))}">Envoyer au client sur WhatsApp</a></div>`}
+          </div>
+          ${p.publie ? '' : '<div class="alerte-boite">Tant que l\'invitation n\'est pas publiée, ces liens affichent « Invitation introuvable ».</div>'}
+        </div>
         <div class="carte pile"><h3>Publier en ligne</h3>
           ${pret ? `<p class="muet">Dépôt : <b>${esc(g.owner)}/${esc(g.repo)}</b>. La publication envoie l'invitation${fichiersIdb.length ? ` et ${fichiersIdb.length} fichier(s) importé(s)` : ''} sur GitHub Pages (1 à 10 minutes avant d'être visible).</p>
             <div class="carte pile" style="padding:10px;background:#fbf7f1;margin:0">
@@ -1628,18 +1710,6 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <button class="btn" id="tele-pub">Télécharger le fichier de publication</button>
           <button class="btn" id="tele-projet">Sauvegarder le projet complet (.json)</button>
         </div>
-        <div class="carte pile"><h3>Liens</h3>
-          ${p.publie ? `<div class="ok-boite">Publiée le ${esc(new Date(p.publie).toLocaleString('fr-FR'))}. Après une modification, republiez pour mettre les liens à jour.</div>` : `<div class="alerte-boite"><b>Pas encore publiée</b> : ces liens afficheront « Invitation introuvable » tant que vous n'aurez pas cliqué sur « Publier l'invitation ».</div>`}
-          <p class="muet">Lien général (groupes, réseaux sociaux) :</p>
-          <div class="ligne"><input type="text" readonly value="${esc(lienGeneral(p))}" style="flex:1"><button class="btn petit" id="cp-gen">Copier</button></div>
-          <div class="ligne"><a class="btn petit" target="_blank" href="https://wa.me/?text=${encodeURIComponent(lienGeneral(p))}">Partager sur WhatsApp</a><a class="btn petit" target="_blank" href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(lienGeneral(p))}">Partager sur Facebook</a></div>
-          <p class="muet">Liens personnels : onglet Invités.</p>
-          <h3 style="margin-top:10px">Lien organisateur (pour votre client)</h3>
-          ${!reglages.supabase ? `<p class="muet">Pour donner à votre client un lien où il ajoute ses invités et voit qui vient : activez la <a href="#/reglages">base des invités</a> (Réglages, une seule fois), puis publiez.</p>`
-            : !p.cle_hote || !p.publie ? `<p class="muet">Il apparaîtra ici après la prochaine publication.</p>`
-            : `<p class="muet">Votre client y ajoute ses invités (ou importe son Excel), envoie les liens par WhatsApp et voit en direct qui vient et combien. <b>Lien privé</b> : à ne donner qu'à l'organisateur.</p>
-              <div class="ligne"><input type="text" readonly value="${esc(lienHote(p))}" style="flex:1"><button class="btn petit" id="cp-hote">Copier</button><a class="btn petit" target="_blank" href="${esc(lienHote(p))}">Ouvrir</a></div>
-              <div class="ligne"><a class="btn petit" target="_blank" href="https://wa.me/?text=${encodeURIComponent((p.fiche.langue === 'mg' ? 'Ity ny rohy hitantananao ny vahiny (aza zaraina): ' : 'Voici votre lien pour gérer vos invités (à garder pour vous) : ') + lienHote(p))}">Envoyer au client sur WhatsApp</a></div>`}</div>
       </div></div>`;
     $('#ap-gen').onclick = () => { Stock.ecrire('studio.apercu', publication(p, true)); window.open('../i/?apercu=1', '_blank'); };
     $('#ap-fam').onclick = () => { Stock.ecrire('studio.apercu', publication(p, true)); window.open('../i/?apercu=1&test=1', '_blank'); };
@@ -1984,6 +2054,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <li><b>✨ Créer un fond sur mesure (IA)</b> : quand il vous manque un fond, ou qu'un même fond revient trop souvent. Deux façons : <b>Recolorer</b> une vidéo déjà prête aux couleurs du fond actuel (gratuit, ici même ; ou avec Claude pour plus de précision), ou <b>Wan 2.2</b>, qui crée une nouvelle vidéo sur votre pod, en partant soit de l'image du fond actuel, soit de <b>votre propre photo ou vidéo</b> (le studio la recadre et la passe d'abord aux couleurs du fond actuel, puis Wan l'anime dans le thème). Pour Wan, ajoutez si vous voulez une idée et le mouvement : le studio ajoute tout seul le thème, les couleurs et la place à laisser à chaque calque (liste dans « Calques pris en compte »). La vidéo s'affiche à droite ; « Harmoniser ses couleurs » la rapproche du fond actuel si besoin, puis <b>Utiliser ce fond</b>.</li>
         <li><b>✨ Créer avec l'IA</b> se trouve dans la <a href="#/bibliotheque">Bibliothèque</a> : choisissez l'événement en haut, puis « ✨ Créer avec l'IA ». Choisissez le plan de référence (son fond sert de modèle, ses calques gardent leur place), créez, puis « Ranger dans la bibliothèque » ; cochez « Mettre aussi sur le plan » pour l'y poser directement. Depuis un plan, le bouton « ✨ Créer avec l'IA (Bibliothèque) » vous y emmène avec le bon événement et le bon plan.</li>
         <li><b>Animer une image</b> : dans « ✨ Créer avec l'IA », choix <b>Animer une image</b>, ou bouton « ✨ Animer cette photo » dans le panneau d'une photo. Choisissez la photo du plan (ou ＋ une autre image) et le mouvement (naturel, zoom lent, léger vent, pétales, lumière). Wan 2.2 en fait une vidéo de 5 s en gardant les visages identiques ; elle remplace la photo sur le plan (ou s'y ajoute), au-dessus du fond.</li>
+        <li><b>🌐 Plusieurs langues</b> : onglet Fiche → « Langues de l'invitation », cochez les langues à proposer (English, Français…). Sous l'aperçu, <b>🌐 Traduire</b> : copiez le prompt, collez-le dans Claude ou ChatGPT, collez la réponse, « Appliquer ». Chaque texte a aussi ses traductions modifiables à la main (panneau du calque → Traductions). « Voir en : … » montre l'aperçu dans une autre langue. Dans l'invitation, l'invité choisit sa langue à l'ouverture ou avec le bouton 🌐 : tout bascule d'un clic.</li>
         <li><b>♪ Chanson</b> : bouton « ♪ Ajouter une chanson » sous l'aperçu. Choisissez le fichier (tous les formats : MP3, M4A, WAV, FLAC, OGG, AIFF… et même une vidéo, dont on garde le son ; les formats moins courants sont convertis en MP3 tout seuls), réglez le volume et le moment où elle commence (« Position actuelle » pour sauter l'introduction). Elle joue avec « ▶ Toute l'invitation », chez l'invité et dans le film exporté.</li>
         <li><b>Bibliothèque par événement</b> : tout ce que vous créez ou importez dans un événement (fonds IA, images animées, photos) est rangé dans sa bibliothèque, et seuls ses fichiers sont proposés dans ses plans (avec les fonds de base et les fichiers communs). Dans <a href="#/bibliotheque">Bibliothèque</a>, choisissez l'événement en haut ; « Réglages » d'un fichier permet de le déplacer vers un autre événement.</li>
         <li><b>Wan 2.2</b> (gratuit, open source) : il tourne sur votre pod RunPod (ComfyUI). Le studio lui envoie l'image du fond actuel et le prompt, puis récupère la vidéo (5 s, environ 5 minutes) : vous n'avez rien à copier ni à télécharger. L'adresse du pod se règle une seule fois dans Réglages.</li>

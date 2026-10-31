@@ -27,25 +27,33 @@
   #bandeau .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
   #bandeau a, #bandeau button { font: 600 16px "Cormorant Garamond", serif; flex: 1; text-align: center; padding: 10px 12px; border-radius: 999px; border: 1.5px solid var(--vin); color: var(--vin); background: #fff; text-decoration: none; cursor: pointer; }
   #bandeau a.plein { background: var(--vin); color: #fff; }
+  .langues { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 420px; }
+  .langues button { font: 600 15px Inter, system-ui, sans-serif; background: rgba(255,255,255,.18); color: #fff; border: 1.5px solid rgba(255,255,255,.65); border-radius: 999px; padding: 7px 14px; cursor: pointer; backdrop-filter: blur(4px); }
+  .langues button.actif { background: #fff; color: var(--vin); border-color: #fff; }
+  #btn-langue { position: fixed; z-index: 16; right: 12px; top: 12px; height: 40px; border-radius: 999px; border: 0; background: rgba(255,255,255,.88); color: var(--vin); font: 600 14px Inter, system-ui, sans-serif; padding: 0 14px; display: none; box-shadow: 0 4px 14px rgba(0,0,0,.25); cursor: pointer; }
+  #menu-langue { position: fixed; z-index: 30; right: 12px; top: 58px; background: #fffaf3; border-radius: 14px; padding: 6px; box-shadow: 0 10px 30px rgba(0,0,0,.35); display: none; flex-direction: column; min-width: 170px; }
+  #menu-langue button { font: 500 15px Inter, system-ui, sans-serif; background: none; border: 0; text-align: left; padding: 10px 12px; border-radius: 10px; color: #3a2323; cursor: pointer; }
+  #menu-langue button.actif { background: var(--vin); color: #fff; }
   #erreur { color: #fff; position: fixed; inset: 0; display: none; align-items: center; justify-content: center; text-align: center; padding: 30px; font-size: 20px; }
 </style>
 </head>
 <body>
 <div id="fond-flou"></div>
 <div id="scene"></div>
-<div id="ecran-ouvrir"><div class="titre" id="titre-ouvrir">Vous êtes invités</div><button class="bouton" id="btn-ouvrir">Ouvrir l'invitation</button></div>
+<div id="ecran-ouvrir"><div class="titre" id="titre-ouvrir">Vous êtes invités</div><div class="langues" id="langues-ouvrir" hidden></div><button class="bouton" id="btn-ouvrir">Ouvrir l'invitation</button></div>
+<button id="btn-langue" aria-label="Langue">🌐</button><div id="menu-langue" role="menu"></div>
 <button id="son" aria-label="Son">♪</button>
 <div id="bandeau" role="dialog"></div>
 <div id="erreur"></div>
-<script src="../config.js?v=202610310756"></script>
-<script src="../moteur/moteur.js?v=202610310756"></script>
-<script src="../moteur/fabrique.js?v=202610310756"></script>
-<script src="../moteur/base.js?v=202610310756"></script>
+<script src="../config.js?v=202610311317"></script>
+<script src="../moteur/moteur.js?v=202610311317"></script>
+<script src="../moteur/fabrique.js?v=202610311317"></script>
+<script src="../moteur/base.js?v=202610311317"></script>
 <script>
 (async function () {
   const q = new URLSearchParams(location.search);
   const slug = q.get('p'), code = q.get('f'), apercu = q.get('apercu');
-  const $ = s => document.querySelector(s);
+  const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
   const montrerErreur = t => { const e = $('#erreur'); e.textContent = t; e.style.display = 'flex'; $('#ecran-ouvrir').style.display = 'none'; };
 
   /* ---- Charger le projet ---- */
@@ -66,9 +74,32 @@
   const fiche = projet.fiche || {};
   const L = Fabrique.LIB[fiche.langue] || Fabrique.LIB.fr;
   document.title = fiche.titre || 'Invitation';
-  document.documentElement.lang = fiche.langue === 'mg' ? 'mg' : 'fr';
+  /* ---- Langues : l'invité choisit, tout bascule d'un clic ---- */
+  const NOMS = (window.MoteurInfo && MoteurInfo.LANGUES) || { mg: 'Malagasy', fr: 'Français', en: 'English' };
+  const langues = (projet.langues && projet.langues.length ? projet.langues : [fiche.langue || 'fr']).filter((l, i, a) => a.indexOf(l) === i);
+  let LG = (() => { try { const l = localStorage.getItem('inv.langue.' + (slug || 'apercu')); if (langues.includes(l)) return l; } catch (e) {} const nav = (navigator.languages || [navigator.language || '']).map(x => String(x).slice(0, 2).toLowerCase()).find(x => langues.includes(x)); return nav || langues[0]; })();
+  const tr = (mg, fr, en) => LG === 'mg' ? mg : LG === 'fr' ? fr : en;
+  const OUVRIR = { mg: 'Sokafy ny fanasana', fr: "Ouvrir l'invitation", en: 'Open the invitation', de: 'Einladung öffnen', it: "Apri l'invito", es: 'Abrir la invitación', pt: 'Abrir o convite', zh: '打开邀请函', ar: 'افتح الدعوة', ru: 'Открыть приглашение', ja: '招待状を開く' };
+  let moteurPret = null;
+  function appliquerLangue(l, memo) {
+    LG = l; document.documentElement.lang = l; document.documentElement.dir = l === 'ar' ? 'rtl' : 'ltr';
+    $('#btn-ouvrir').textContent = OUVRIR[l] || OUVRIR.en;
+    $('#btn-langue').textContent = '🌐 ' + l.toUpperCase();
+    $$('#langues-ouvrir button, #menu-langue button').forEach(b => b.classList.toggle('actif', b.dataset.l === l));
+    if (memo) { try { localStorage.setItem('inv.langue.' + (slug || 'apercu'), l); } catch (e) {} }
+    if (moteurPret) moteurPret.changerLangue(l);
+  }
   $('#titre-ouvrir').textContent = fiche.titre || 'Invitation';
-  $('#btn-ouvrir').textContent = fiche.langue === 'mg' ? 'Sokafy ny fanasana' : "Ouvrir l'invitation";
+  if (langues.length > 1) {
+    const btns = langues.map(l => `<button type="button" data-l="${l}">${NOMS[l] || l}</button>`).join('');
+    $('#langues-ouvrir').innerHTML = btns; $('#langues-ouvrir').hidden = false;
+    $('#menu-langue').innerHTML = btns;
+    $$('#langues-ouvrir button').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); appliquerLangue(b.dataset.l, true); }));
+    $$('#menu-langue button').forEach(b => b.onclick = () => { appliquerLangue(b.dataset.l, true); $('#menu-langue').style.display = 'none'; });
+    $('#btn-langue').onclick = e => { e.stopPropagation(); const m = $('#menu-langue'); m.style.display = m.style.display === 'flex' ? 'none' : 'flex'; };
+    document.addEventListener('click', () => { $('#menu-langue').style.display = 'none'; });
+  }
+  appliquerLangue(LG);
 
   let famille = null;
   const sbConf = !apercu && projet.publication && projet.publication.supabase;
@@ -84,7 +115,8 @@
       if (p.role !== 'confirmation') return;
       p.calques = p.calques.filter(c => !(c.type === 'compteur' || c.action === 'confirmer' || c.action === 'refuser' || c.action === 'whatsapp'));
       const noms = (fiche.contacts || []).map(c => c.nom).join(fiche.langue === 'mg' ? ' na ' : ' ou ');
-      p.calques.push({ id: 'clos', type: 'texte', texte: fiche.langue === 'mg' ? `Efa nikatona ny famaliana nanomboka ny {date_limite}. Raha misy fanontaniana, antsoy i ${noms}.` : `Les réponses sont closes depuis le {date_limite}. Pour toute information, appelez ${noms}.`, x: 50, y: 52, largeur: 70, taille: 3, couleur: '#7a1f2b', fond_couleur: '#ffffff', fond_opacite: .75, gras: true, animation: 'fondu', debut: .3 });
+      const closTr = { mg: `Efa nikatona ny famaliana nanomboka ny {date_limite}. Raha misy fanontaniana, antsoy i ${(fiche.contacts || []).map(c => c.nom).join(' na ')}.`, fr: `Les réponses sont closes depuis le {date_limite}. Pour toute information, appelez ${(fiche.contacts || []).map(c => c.nom).join(' ou ')}.`, en: `Replies closed on {date_limite}. For any question, please call ${(fiche.contacts || []).map(c => c.nom).join(' or ')}.` };
+      p.calques.push({ id: 'clos', type: 'texte', trad: closTr, texte: fiche.langue === 'mg' ? `Efa nikatona ny famaliana nanomboka ny {date_limite}. Raha misy fanontaniana, antsoy i ${noms}.` : `Les réponses sont closes depuis le {date_limite}. Pour toute information, appelez ${noms}.`, x: 50, y: 52, largeur: 70, taille: 3, couleur: '#7a1f2b', fond_couleur: '#ffffff', fond_opacite: .75, gras: true, animation: 'fondu', debut: .3 });
     });
   }
 
@@ -118,6 +150,8 @@
   }
   const moteur = new Moteur($('#scene'), { resolveur: resoudre, mode: 'invitation', famille, onAction });
   await moteur.setProjet(projet);
+  moteurPret = moteur; moteur.changerLangue(LG);
+  if (langues.length > 1) $('#btn-langue').style.display = 'block';
   moteur.afficherPlan(0, 0.01);
 
   let musique = null;
@@ -174,7 +208,7 @@
       noter('partage');
       const url = location.href.replace(/[?&]f=[^&]+/, '').replace(/[?&]apercu=[^&]+/, '');
       if (navigator.share) { navigator.share({ title: fiche.titre, url }).catch(() => {}); }
-      else { navigator.clipboard && navigator.clipboard.writeText(url); bandeau(`<b>${fiche.langue === 'mg' ? 'Voadika ny rohy' : 'Lien copié'}</b><div class="actions"><a class="plein" target="_blank" href="https://wa.me/?text=${encodeURIComponent(url)}">WhatsApp</a><a target="_blank" href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}">Facebook</a><button data-fermer>OK</button></div>`); }
+      else { navigator.clipboard && navigator.clipboard.writeText(url); bandeau(`<b>${tr('Voadika ny rohy', 'Lien copié', 'Link copied')}</b><div class="actions"><a class="plein" target="_blank" href="https://wa.me/?text=${encodeURIComponent(url)}">WhatsApp</a><a target="_blank" href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}">Facebook</a><button data-fermer>OK</button></div>`); }
       return;
     }
     if (action === 'calendrier') {
@@ -185,13 +219,13 @@
     if (action === 'confirmer' || action === 'refuser') {
       const oui = action === 'confirmer';
       const ok = await enregistrer(oui, form);
-      if (ok === 'places') { bandeau(`<b>${fiche.langue === 'mg' ? 'Mihoatra ny toerana natokana ho anareo' : 'Trop de personnes'}</b><div style="margin-top:6px">${fiche.langue === 'mg' ? 'Toerana ' + (famille.places || '') + ' no natokana ho an\'ny fianakavianareo.' : (famille.places || '') + ' place(s) prévue(s) pour votre famille.'}</div><div class="actions"><button data-fermer>OK</button></div>`); return; }
+      if (ok === 'places') { bandeau(`<b>${tr('Mihoatra ny toerana natokana ho anareo', 'Trop de personnes', 'Too many people')}</b><div style="margin-top:6px">${tr('Toerana ' + (famille.places || '') + ' no natokana ho an\'ny fianakavianareo.', (famille.places || '') + ' place(s) prévue(s) pour votre famille.', (famille.places || '') + ' seat(s) reserved for your family.')}</div><div class="actions"><button data-fermer>OK</button></div>`); return; }
       const k = contacts[0];
       const lienWa = k ? 'https://wa.me/' + tel(k.telephone) + '?text=' + encodeURIComponent(messageReponse(oui, form)) : '';
-      const merci = fiche.langue === 'mg' ? (oui ? 'Misaotra! Voaray ny valinteninareo.' : 'Misaotra nampahafantatra.') : (oui ? 'Merci ! Votre réponse est enregistrée.' : 'Merci de nous avoir prévenus.');
-      const envoyer = fiche.langue === 'mg' ? 'Alefaso amin\'ny WhatsApp' : 'Envoyer sur WhatsApp';
+      const merci = oui ? tr('Misaotra! Voaray ny valinteninareo.', 'Merci ! Votre réponse est enregistrée.', 'Thank you! Your reply has been saved.') : tr('Misaotra nampahafantatra.', 'Merci de nous avoir prévenus.', 'Thank you for letting us know.');
+      const envoyer = tr('Alefaso amin\'ny WhatsApp', 'Envoyer sur WhatsApp', 'Send on WhatsApp');
       if (ok) bandeau(`<b>${merci}</b><div class="actions"><button data-fermer>OK</button></div>`);
-      else bandeau(`<b>${fiche.langue === 'mg' ? 'Alefaso amin\'ny WhatsApp ny valinteninareo' : 'Envoyez votre réponse sur WhatsApp'}</b><div style="margin-top:6px">${messageReponse(oui, form)}</div><div class="actions">${lienWa ? `<a class="plein" target="_blank" href="${lienWa}">${envoyer}</a>` : ''}<button data-fermer>${fiche.langue === 'mg' ? 'Hidio' : 'Fermer'}</button></div>`);
+      else bandeau(`<b>${tr('Alefaso amin\'ny WhatsApp ny valinteninareo', 'Envoyez votre réponse sur WhatsApp', 'Send your reply on WhatsApp')}</b><div style="margin-top:6px">${messageReponse(oui, form)}</div><div class="actions">${lienWa ? `<a class="plein" target="_blank" href="${lienWa}">${envoyer}</a>` : ''}<button data-fermer>${tr('Hidio', 'Fermer', 'Close')}</button></div>`);
       const i = moteur.seq.findIndex(k => projet.plans[k].role === 'remerciement');
       if (i >= 0) setTimeout(() => moteur.allerA(i), 400);
     }

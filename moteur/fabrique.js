@@ -112,6 +112,7 @@
   /* ---------- 2. Fiche → plans ---------- */
   const STYLE = { police_titre: 'Great Vibes', police_texte: 'Cormorant Garamond', couleur: '#7a1f2b', couleur2: '#9c6b3f' };
   const LIB = {
+    en: { confirmer: 'I will attend', refuser: 'I cannot come', adultes: 'Adults', enfants: 'Children', map: 'Map', appeler: 'Call', partager: 'Share', revoir: 'Watch again', passer: 'Skip ›', whatsapp: 'Reply on WhatsApp', pour: 'For', merci: 'Thank you', inviter: 'We are inviting {places} people', compte: 'The big day in' },
     mg: { confirmer: 'Ho tonga izahay', refuser: 'Tsy ho afaka izahay', adultes: 'Olon-dehibe', enfants: 'Ankizy', map: 'Sarintany', appeler: 'Antsoy', partager: 'Zarao', revoir: 'Jereo indray', passer: 'Dingano ›', whatsapp: 'Hamaly amin\'ny WhatsApp', pour: 'Ho an\'i', merci: 'Misaotra betsaka', inviter: 'Manasa olona {places}', compte: 'Andro sisa' },
     fr: { confirmer: 'Je confirme ma présence', refuser: 'Je ne pourrai pas venir', adultes: 'Adultes', enfants: 'Enfants', map: 'Plan', appeler: 'Appeler', partager: 'Partager', revoir: 'Revoir le film', passer: 'Passer ›', whatsapp: 'Répondre sur WhatsApp', pour: 'Pour', merci: 'Merci', inviter: 'Nous invitons {places} personnes', compte: 'Le grand jour dans' }
   };
@@ -536,9 +537,32 @@ Méthode conseillée : mesure la palette réelle de la vidéo jointe, construis 
 Livrable : la vidéo recolorée en MP4 (H.264), ${o.format || 'même format que l\'original'}, avec un court récapitulatif des correspondances appliquées (avant → après).`;
   }
 
+  /* ---------- 7. Prompt : traduire tous les textes de l'invitation ---------- */
+  function promptTraduction(projet, langues, noms) {
+    const textes = {};
+    (projet.plans || []).forEach(p => (p.calques || []).forEach(c => { if (c.texte && String(c.texte).trim()) textes[c.id] = c.texte; }));
+    const principale = (projet.fiche && projet.fiche.langue) || 'mg';
+    return `Tu es traducteur professionnel spécialisé dans les faire-part et invitations (mariage, anniversaire, cérémonies).
+Voici les textes d'une invitation vidéo, rédigés en ${noms[principale] || principale}. Événement : « ${(projet.fiche && projet.fiche.titre) || ''} ».
+Traduis CHAQUE texte dans ces langues : ${langues.map(l => noms[l] + ' (code ' + l + ')').join(', ')}.
+
+Règles :
+- Ton chaleureux, élégant et naturel, comme un vrai faire-part dans la langue cible (pas de traduction mot à mot).
+- Garde EXACTEMENT les mots entre accolades, sans les traduire : {famille}, {places}, {date}, {heure}, {date_limite}, {compte_a_rebours}, {titre}, {adultes}, {enfants}.
+- Garde les retours à la ligne (\n) au même endroit, et une longueur proche (les textes doivent tenir à l'écran).
+- Ne traduis pas les noms de personnes ni les noms de lieux.
+- Les textes de boutons restent courts (2 à 5 mots).
+
+Réponds UNIQUEMENT par un seul bloc de code JSON, de cette forme (les clés sont les identifiants ci-dessous) :
+{ ${langues.map(l => `"${l}": { "identifiant": "texte traduit", … }`).join(', ')} }
+
+Textes à traduire (identifiant : texte) :
+${JSON.stringify(textes, null, 1)}`;
+  }
+
   function ambiance(projet, fonds) {
     const d = decorDe(projet, fonds);
     return (d.length ? d.join(' ; ') + '. ' : '') + 'Couleurs de l\'invitation : ' + palette(projet).join(', ') + '.';
   }
-  global.Fabrique = { ambiance, promptEtalonnage, promptFond, nettoyerJSON, lireJSON, FONDS, analyserTexte, genererPlans, nouveauProjet, validerPlan, prompt0, prompt1, prompt3, prompt4, LIB, STYLE, uid };
+  global.Fabrique = { promptTraduction, ambiance, promptEtalonnage, promptFond, nettoyerJSON, lireJSON, FONDS, analyserTexte, genererPlans, nouveauProjet, validerPlan, prompt0, prompt1, prompt3, prompt4, LIB, STYLE, uid };
 })(window);

@@ -30,7 +30,9 @@
     if (ms == null) return '';
     const s = Math.floor(ms / 1000), j = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60;
     const p = n => String(n).padStart(2, '0');
-    return langue === 'mg' ? `${j} andro  ${p(h)} ora  ${p(m)} min  ${p(sec)} s` : `${j} jours  ${p(h)} h  ${p(m)} min  ${p(sec)} s`;
+    if (langue === 'mg') return `${j} andro  ${p(h)} ora  ${p(m)} min  ${p(sec)} s`;
+    if (langue === 'fr') return `${j} jours  ${p(h)} h  ${p(m)} min  ${p(sec)} s`;
+    return `${j} ${({ de: 'Tage', it: 'giorni', es: 'días', pt: 'dias', ru: 'дн.', zh: '天', ja: '日', ar: 'يوم' })[langue] || 'days'}  ${p(h)} h  ${p(m)} min  ${p(sec)} s`;
   }
   const MOIS_FR = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
   const MOIS_MG = ['Janoary', 'Febroary', 'Martsa', 'Aprily', 'Mey', 'Jona', 'Jolay', 'Aogositra', 'Septambra', 'Oktobra', 'Novambra', 'Desambra'];
@@ -40,15 +42,20 @@
     if (!iso) return '';
     const [y, m, d] = iso.split('-').map(Number);
     const wd = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
-    return langue === 'mg' ? `${JOURS_MG[wd]} ${d} ${MOIS_MG[m - 1]} ${y}` : `${JOURS_FR[wd]} ${d} ${MOIS_FR[m - 1]} ${y}`;
+    if (langue === 'mg') return `${JOURS_MG[wd]} ${d} ${MOIS_MG[m - 1]} ${y}`;
+    if (langue === 'fr' || !langue) return `${JOURS_FR[wd]} ${d} ${MOIS_FR[m - 1]} ${y}`;
+    try { return new Intl.DateTimeFormat(langue, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(y, m - 1, d))); }
+    catch (e) { return `${JOURS_FR[wd]} ${d} ${MOIS_FR[m - 1]} ${y}`; }
   }
   function remplacer(texte, vars) {
     if (!texte) return '';
     return String(texte).replace(/\{(\w+)\}/g, (all, k) => (vars && vars[k] != null && vars[k] !== '') ? String(vars[k]) : (k === 'places' ? '' : all));
   }
-  function variablesDe(projet, famille, form) {
+  // Texte d'un calque dans la langue affichée (traduction si elle existe, sinon le texte d'origine)
+  function texteDe(c, langue) { return (langue && c.trad && c.trad[langue]) || c.texte; }
+  function variablesDe(projet, famille, form, langue) {
     const f = (projet && projet.fiche) || {};
-    const lang = f.langue || 'fr';
+    const lang = langue || f.langue || 'fr';
     return {
       famille: famille ? famille.nom : '',
       places: famille ? famille.places : '',
@@ -117,6 +124,8 @@
       this._raf = requestAnimationFrame(this._boucle);
     }
 
+    // Change la langue affichée (null = langue principale) ; tout se redessine tout de suite
+    changerLangue(code) { this.langue = code && this.projet && this.projet.fiche && code !== this.projet.fiche.langue ? code : null; this._construireHTML(); }
     detruire() { cancelAnimationFrame(this._raf); Object.values(this.medias).forEach(m => { if (m.pause) m.pause(); }); this.racine.innerHTML = ''; }
 
     async setProjet(projet) {
@@ -337,7 +346,7 @@
       } else { ctx.fillStyle = '#f4ede2'; ctx.fillRect(0, 0, W, H); }
       if (f.assombrir) { ctx.fillStyle = `rgba(0,0,0,${clamp(f.assombrir, 0, 0.9)})`; ctx.fillRect(0, 0, W, H); }
       if (f.eclaircir) { ctx.fillStyle = `rgba(255,255,255,${clamp(f.eclaircir, 0, 0.9)})`; ctx.fillRect(0, 0, W, H); }
-      const vars = variablesDe(this.projet, this.famille, this.form);
+      const vars = variablesDe(this.projet, this.famille, this.form, this.langue);
       (p.calques || []).forEach(c => {
         if (c.masque || (c.condition === 'famille' && !this.famille) || (c.condition === 'general' && this.famille)) { if (mesurer) delete this.bbox[c.id]; return; }
         if (c._edition && c.type === 'texte') return;   // en cours d'écriture dans l'éditeur : garder le cadre, ne pas dessiner
@@ -361,8 +370,8 @@
       if (!edition && (t < deb || t > fin)) return null;
       const entree = c.animation || 'fondu';
       const sortie = c.sortie || 'aucune';
-      const nbMots = String(c.texte || '').split(/\s+/).length;
-      const dE = Number(c.duree_animation) || (entree === 'ecriture' ? clamp(String(c.texte || '').length * 0.05, 0.8, 2.5) : entree === 'mot-par-mot' ? clamp(nbMots * 0.22, 0.8, 3) : 0.9);
+      const nbMots = String(texteDe(c, this.langue) || '').split(/\s+/).length;
+      const dE = Number(c.duree_animation) || (entree === 'ecriture' ? clamp(String(texteDe(c, this.langue) || '').length * 0.05, 0.8, 2.5) : entree === 'mot-par-mot' ? clamp(nbMots * 0.22, 0.8, 3) : 0.9);
       const dS = Number(c.duree_sortie) || 0.6;
       let brutE = edition && t < deb ? 1 : clamp((t - deb) / dE, 0, 1);
       if (entree === 'aucune') brutE = 1;
@@ -411,7 +420,7 @@
         ctx.textBaseline = 'middle';
         const align = c.align || 'center';
         ctx.textAlign = align;
-        let txt = remplacer(c.texte, vars);
+        let txt = remplacer(texteDe(c, this.langue), vars);
         if (c.majuscules) txt = txt.toUpperCase();
         const ls = lignes(ctx, txt, larg);
         const inter = taille * (Number(c.interligne) || 1.25);
@@ -465,8 +474,8 @@
       box.innerHTML = '';
       const p = this.planCourant();
       if (!p || this.masquerHTML) return;
-      const vars = variablesDe(this.projet, this.famille, this.form);
-      const lang = (this.projet.fiche && this.projet.fiche.langue) || 'fr';
+      const vars = variablesDe(this.projet, this.famille, this.form, this.langue);
+      const lang = this.langue || (this.projet.fiche && this.projet.fiche.langue) || 'fr';
       (p.calques || []).forEach(c => {
         if (!TYPES_HTML.includes(c.type) || c.masque) return;
         if (c.condition === 'famille' && !this.famille) return;
@@ -485,14 +494,14 @@
         if (c.type === 'bouton') {
           const b = document.createElement('button');
           b.type = 'button';
-          b.textContent = remplacer(c.texte, vars);
+          b.textContent = remplacer(texteDe(c, this.langue), vars);
           b.addEventListener('click', ev => { ev.stopPropagation(); if (this.mode === 'edition') return; this._action(c); });
           el.appendChild(b);
         } else if (c.type === 'compteur') {
           const champ = c.champ || 'adultes';
           if (this.form[champ] == null) this.form[champ] = Number(c.defaut) || 0;
           el.innerHTML = `<span class="mt-lib"></span><span class="mt-ctrl"><button type="button" class="mt-moins" aria-label="moins">−</button><b class="mt-val"></b><button type="button" class="mt-plus" aria-label="plus">+</button></span>`;
-          el.querySelector('.mt-lib').textContent = remplacer(c.texte, vars);
+          el.querySelector('.mt-lib').textContent = remplacer(texteDe(c, this.langue), vars);
           const val = el.querySelector('.mt-val');
           const maj = () => { val.textContent = this.form[champ]; };
           maj();
@@ -511,7 +520,7 @@
           const champ = c.champ || 'quartier';
           el.innerHTML = `<input type="text" class="mt-input">`;
           const inp = el.querySelector('input');
-          inp.placeholder = remplacer(c.texte, vars) || (lang === 'mg' ? 'Soraty eto' : 'Écrire ici');
+          inp.placeholder = remplacer(texteDe(c, this.langue), vars) || (lang === 'mg' ? 'Soraty eto' : lang === 'fr' ? 'Écrire ici' : 'Write here');
           inp.value = this.form[champ] || '';
           inp.addEventListener('input', () => { this.form[champ] = inp.value; });
           inp.addEventListener('click', ev => ev.stopPropagation());
@@ -540,7 +549,7 @@
       const taille = (Number(c.taille) || 4) / 100 * H;
       ctx.save();
       ctx.font = `${c.italique ? 'italic ' : ''}${c.gras ? '700 ' : '400 '}${taille}px "${c.police || 'Cormorant Garamond'}", serif`;
-      let txt = remplacer(c.texte, variablesDe(this.projet, this.famille || { nom: 'Fianakaviana Rakotomalala', places: 4 }, this.form));
+      let txt = remplacer(texteDe(c, this.langue), variablesDe(this.projet, this.famille || { nom: 'Fianakaviana Rakotomalala', places: 4 }, this.form, this.langue));
       if (c.majuscules) txt = txt.toUpperCase();
       const n = lignes(ctx, txt, (Number(c.largeur) || 80) / 100 * W).length;
       ctx.restore();
@@ -644,5 +653,7 @@
   }
 
   global.Moteur = Moteur;
-  global.MoteurInfo = { W, H, POLICES, ANIMATIONS, SORTIES, NOMS_EFFETS, ACTIONS, TYPES_HTML, uid, variablesDe, dateLisible, remplacer, MOIS_MG, MOIS_FR };
+  // Langues proposées pour les invitations
+  const LANGUES = { mg: 'Malagasy', fr: 'Français', en: 'English', de: 'Deutsch', it: 'Italiano', es: 'Español', pt: 'Português', zh: '中文', ar: 'العربية', ru: 'Русский', ja: '日本語' };
+  global.MoteurInfo = { LANGUES, texteDe, W, H, POLICES, ANIMATIONS, SORTIES, NOMS_EFFETS, ACTIONS, TYPES_HTML, uid, variablesDe, dateLisible, remplacer, MOIS_MG, MOIS_FR };
 })(window);

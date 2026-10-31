@@ -267,3 +267,8 @@ textarea.edition-directe { position: absolute; z-index: 8; resize: none; overflo
 .nf-contexte { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; background: #fbf7f1; border: 1px solid var(--ligne); border-radius: 12px; padding: 8px 12px; margin-bottom: 12px; font-size: 14px; }
 .nf-contexte select { max-width: 320px; }
 .nf-contexte .muet { flex-basis: 100%; font-size: 12.5px; }
+
+.carte-client { border: 2px solid var(--vin); }
+.etat-liste { margin: 0; padding-left: 20px; color: var(--gris); font-size: 13.5px; display: flex; flex-direction: column; gap: 3px; }
+.etat-liste li.fait { color: #2e7d32; }
+.lien-client { display: flex; flex-direction: column; gap: 6px; background: #fbf7f1; border: 1px solid var(--ligne); border-radius: 12px; padding: 10px 12px; }
