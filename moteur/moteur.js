@@ -189,6 +189,8 @@
     }
 
     /* ----- Séquences ----- */
+    // Film à télécharger : tous les plans dans l'ordre de l'invitation, confirmation comprise
+    plansFilmComplet() { return this.plansInvitation(); }
     plansFilm() { return (this.projet.plans || []).map((p, i) => i).filter(i => this.projet.plans[i].role !== 'confirmation'); }
     plansInvitation() {
       const pl = this.projet.plans || [];
@@ -386,6 +388,7 @@
 
     // Film : les boutons (HTML dans l'invitation) sont dessinés comme des images, sauf ceux de navigation
     _dessinerBouton(c, t, p, vars, alphaPlan) {
+      if (c.type === 'compteur') return this._dessinerCompteur(c, t, vars, alphaPlan);
       if (c.type !== 'bouton' || ['passer', 'suivant', 'precedent', 'revoir', 'partager', 'calendrier'].includes(c.action || 'suivant')) return;
       const deb = Number(c.debut) || 0; if (t < deb) return;
       const ctx = this.ctx, fs = (Number(c.taille) || 2.4) / 100 * H, larg = (Number(c.largeur) || 60) / 100 * W, haut = fs * 2.3;
@@ -396,6 +399,20 @@
       ctx.fillStyle = style === 'plein' ? '#fff' : coul; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.font = `600 ${fs.toFixed(1)}px "Cormorant Garamond", Georgia, serif`;
       ctx.fillText(remplacer(texteDe(c, this.langue), vars), x + larg / 2, y + haut / 2, larg - fs);
+      ctx.restore();
+    }
+
+    _dessinerCompteur(c, t, vars, alphaPlan) {
+      const deb = Number(c.debut) || 0; if (t < deb) return;
+      const ctx = this.ctx, fs = (Number(c.taille) || 2.3) / 100 * H, larg = (Number(c.largeur) || 66) / 100 * W, haut = fs * 2.4;
+      const x = (Number(c.x) || 50) / 100 * W - larg / 2, y = (Number(c.y) || 50) / 100 * H - haut / 2, coul = c.couleur || '#7a1f2b';
+      ctx.save(); ctx.globalAlpha = alphaPlan * clamp((t - deb) / 0.6, 0, 1);
+      arrondi(ctx, x, y, larg, haut, fs * 0.9); ctx.fillStyle = 'rgba(255,255,255,.82)'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = coul; ctx.globalAlpha *= 0.9; ctx.stroke();
+      ctx.fillStyle = coul; ctx.textBaseline = 'middle'; ctx.font = `600 ${fs.toFixed(1)}px "Cormorant Garamond", Georgia, serif`;
+      ctx.textAlign = 'left'; ctx.fillText(remplacer(texteDe(c, this.langue), vars), x + fs * 0.7, y + haut / 2, larg * 0.55);
+      const r = fs * 0.75, cxP = x + larg - fs * 1.2, cxM = cxP - fs * 3.2, cy = y + haut / 2;
+      [[cxM, '−'], [cxP, '+']].forEach(([cx, sgn]) => { ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill(); ctx.stroke(); ctx.fillStyle = coul; ctx.textAlign = 'center'; ctx.fillText(sgn, cx, cy); });
+      ctx.textAlign = 'center'; ctx.fillText(String(c.defaut != null ? c.defaut : (c.champ === 'enfants' ? 0 : 1)), (cxM + cxP) / 2, cy);
       ctx.restore();
     }
 
@@ -628,11 +645,11 @@
     // Rendu hors temps réel : chaque image est calculée puis encodée ; rien ne saute, même si l'onglet n'est pas au premier plan.
     async exporterFilmImages(opts) {
       opts = opts || {};
-      const seq = opts.seq || this.plansFilm();
+      const seq = opts.seq || this.plansFilmComplet();
       if (!seq.length) throw new Error('Aucun plan à filmer');
       if (!window.Mp4Muxer) await new Promise((ok, ko) => { const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.1/build/mp4-muxer.min.js'; sc.onload = ok; sc.onerror = () => ko(new Error('Outil MP4 indisponible (connexion ?)')); document.head.appendChild(sc); });
       const FPS = 30, pl = this.projet.plans;
-      const durees = seq.map(i => Number(pl[i].duree) || 4);
+      const durees = seq.map(i => Number(pl[i].duree) || (pl[i].role === 'confirmation' ? 7 : 4));
       const total = durees.reduce((a, b) => a + b, 0), N = Math.round(total * FPS);
       // vidéo
       let vcodec = null;
@@ -661,15 +678,22 @@
       Object.values(this.medias).forEach(m => { if (m && m.pause) m.pause(); });
       // temps de chaque vidéo : elle continue si le plan suivant garde le même fond, sinon elle repart à 0
       const departMedia = {};
+      // place une vidéo à l'instant voulu et attend qu'une image soit vraiment prête (sinon le fond disparaîtrait de l'image)
+      const attendre = (v, evs, ms) => new Promise(r => { let fait = false; const fin = () => { if (fait) return; fait = true; evs.forEach(e => v.removeEventListener(e, fin)); r(); }; evs.forEach(e => v.addEventListener(e, fin)); setTimeout(fin, ms); });
       const caler = async (src, conf, tm) => {
         const v = this.medias[src]; if (!v || v.tagName !== 'VIDEO') return;
-        if (v.readyState < 1) await new Promise(r => { v.addEventListener('loadedmetadata', r, { once: true }); setTimeout(r, 3000); });
+        if (v.preload !== 'auto') { v.preload = 'auto'; }
+        if (v.readyState < 1) { try { v.load(); } catch (e) {} await attendre(v, ['loadedmetadata'], 15000); }
         const d = v.duration || 1; let x = tm * (conf.vitesse || 1); x = conf.boucle === false ? Math.min(x, d - 0.04) : x % d;
-        if (Math.abs(v.currentTime - x) < 0.004 && v.readyState >= 2) return;
-        await new Promise(r => { const fin = () => { v.removeEventListener('seeked', fin); r(); }; v.addEventListener('seeked', fin); try { v.currentTime = x; } catch (e) { r(); } setTimeout(fin, 1500); });
+        if (!(Math.abs(v.currentTime - x) < 0.004 && v.readyState >= 2)) {
+          const p = attendre(v, ['seeked'], 8000); try { v.currentTime = x; } catch (e) {} await p;
+        }
+        for (let essai = 0; v.readyState < 2 && essai < 40; essai++) await attendre(v, ['loadeddata', 'canplay', 'seeked'], 250);
       };
       const mediasDe = p => { const l = []; if (p.fond && p.fond.media) l.push([p.fond.media, p.fond]); (p.calques || []).forEach(c => { if (c.type === 'video' && c.media) l.push([c.media, c]); }); return l; };
       try {
+        if (opts.progres) opts.progres(0);
+        for (const i of seq) for (const [src] of mediasDe(pl[i])) { const v = this.medias[src]; if (v && v.tagName === 'VIDEO' && v.readyState < 2) { v.preload = 'auto'; try { v.load(); } catch (e) {} await attendre(v, ['loadeddata', 'error'], 20000); } }
         let pos = 0, debPlan = 0;
         const entrer = k => { const p = pl[seq[k]], av = k > 0 ? pl[seq[k - 1]] : null; mediasDe(p).forEach(([src]) => { const garde = av && av.fond && p.fond && av.fond.media === p.fond.media && src === p.fond.media && departMedia[src] != null; if (!garde) departMedia[src] = debPlan; }); };
         entrer(0);

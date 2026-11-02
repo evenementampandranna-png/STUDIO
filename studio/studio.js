@@ -94,15 +94,35 @@
       if (!this.actif()) return;
       this.rpc('equipe_creation', { p_creation: { auteur: this.membre(), projet: p ? p.id : '', titre_projet: p ? p.fiche.titre : '', type, nom, secondes } }).catch(() => {});
     },
-    // le travail de chacun, visible par l'admin (les fichiers déjà partagés y sont remplacés par leur adresse d'équipe)
+    // fichiers d'une invitation envoyés dans l'espace d'équipe (une seule fois chacun), pour que l'admin ait tout
+    urls: Stock.lire('studio.equipe.urls', {}),
+    urlDe(src) {
+      const m = medias.find(x => x.src === src);
+      if (m && m.equipe_id) { const it = (this.items || []).find(x => x.id === m.equipe_id); if (it) return this.url(it.chemin); }
+      return this.urls[src] || null;
+    },
+    async envoyerSrc(src) {
+      if (!/^idb:/.test(src || '') || this.urlDe(src)) return;
+      const m = medias.find(x => x.src === src);
+      if (m && (m.type === 'fond' || m.anime) && !m.brouillon) { await this.partager(m, ''); if (this.urlDe(src)) return; }
+      const blob = await IDB.lire(src); if (!blob) return;
+      if (blob.size > 50e6) throw new Error('fichier de plus de 50 Mo');
+      const chemin = reglages.equipe.cle + '/' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7) + '.' + ((src.split('.').pop() || 'bin').toLowerCase());
+      await this.envoyerFichier(chemin, blob);
+      this.urls[src] = this.url(chemin); Stock.ecrire('studio.equipe.urls', this.urls);
+    },
+    // le travail de chacun, visible par l'admin (avec ses fichiers, pour qu'il puisse le publier)
     _t: {},
     travail(p) {
       if (!this.actif() || !p) return;
       clearTimeout(this._t[p.id]);
-      this._t[p.id] = setTimeout(() => {
-        const parSrc = {}; medias.forEach(m => { if (m.equipe_id) { const it = (this.items || []).find(x => x.id === m.equipe_id); if (it) parSrc[m.src] = this.url(it.chemin); } });
+      this._t[p.id] = setTimeout(async () => {
+        const srcs = [...new Set(p.plans.flatMap(pl => [pl.fond && pl.fond.media].concat((pl.calques || []).map(c => c.media))).concat(p.musique ? [p.musique.src] : []).filter(x => /^idb:/.test(x || '')))];
+        for (const src of srcs) { try { await this.envoyerSrc(src); } catch (e) { console.warn('équipe : envoi', src, e.message); } }
+        const loc = src => (src && this.urlDe(src)) || src;
         const d = JSON.parse(JSON.stringify(p)); delete d.cle_hote;
-        d.plans.forEach(pl => { if (pl.fond && parSrc[pl.fond.media]) pl.fond.media = parSrc[pl.fond.media]; (pl.calques || []).forEach(c => { if (parSrc[c.media]) c.media = parSrc[c.media]; }); });
+        d.plans.forEach(pl => { if (pl.fond) pl.fond.media = loc(pl.fond.media); (pl.calques || []).forEach(c => { if (c.media) c.media = loc(c.media); }); });
+        if (d.musique && d.musique.src) d.musique.src = loc(d.musique.src);
         const v = vignetteDe(((p.plans.find(x => x.role !== 'ouverture') || p.plans[0] || {}).fond || {}).media || '');
         this.rpc('equipe_travail', { p_travail: { projet: p.id, auteur: this.membre(), titre: p.fiche.titre || '', slug: p.slug || '', plans: p.plans.length, publie: p.publie || null, vignette: /^data:/.test(v) ? (v.length < 150000 ? v : '') : (v ? new URL(v, location.href).href : ''), donnees: d } }).catch(() => {});
       }, 8000);
@@ -173,6 +193,10 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-02-4', date: '2 novembre 2026', titre: 'Film complet, confirmation par le lien général, vitrine de l\'équipe', points: [
+      '<b>Film</b> : le fond ne disparaît plus (chaque image attend que la vidéo soit prête), et le <b>plan de confirmation</b> est maintenant dans le film (7 s).',
+      '<b>Lien général</b> : les invités peuvent aussi confirmer ou refuser (avec les compteurs) ; ils donnent leur nom, et la réponse arrive tout de suite chez l\'organisateur.',
+      '<b>Admin</b> : dans la page Équipe, « Publier sur la vitrine » met l\'invitation d\'un membre sur la vitrine du site (anonymisée ou non), et « Retirer » l\'enlève. Les fichiers de chaque invitation sont envoyés tout seuls dans l\'espace d\'équipe pour cela.'] },
     { id: '2026-11-02-3', date: '2 novembre 2026', titre: 'Travail en équipe', points: [
       '<b>Un seul lien pour toute l\'équipe</b> (Réglages → Équipe) : chacun entre son nom, et c\'est tout.',
       '<b>Bibliothèque commune</b> : les fonds et images animées de chacun sont visibles et utilisables par toute l\'équipe (partage automatique, ou « Partager avec l\'équipe »).',
@@ -1772,7 +1796,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     if (!apercu) pub.plans.forEach(pl => { (pl.calques || []).forEach(c => { if (c.media && /^idb:/.test(c.media)) c.media = 'medias/' + c.media.slice(4); }); if (pl.fond && /^idb:/.test(pl.fond.media)) pl.fond.media = 'medias/' + pl.fond.media.slice(4); });
     if (!apercu && pub.musique && /^idb:/.test(pub.musique.src)) pub.musique.src = 'medias/' + pub.musique.src.slice(4);
     // fichiers de la bibliothèque d'équipe : copiés à côté de l'invitation (l'adresse de l'équipe ne sort pas)
-    if (!apercu) { const loc = src => Equipe.estUrl(src) ? 'medias/eq-' + src.split('/').pop() : src; pub.plans.forEach(pl => { if (pl.fond) pl.fond.media = loc(pl.fond.media); (pl.calques || []).forEach(c => { if (c.media) c.media = loc(c.media); }); }); }
+    if (!apercu) { const loc = src => Equipe.estUrl(src) ? 'medias/eq-' + src.split('/').pop() : src; pub.plans.forEach(pl => { if (pl.fond) pl.fond.media = loc(pl.fond.media); (pl.calques || []).forEach(c => { if (c.media) c.media = loc(c.media); }); }); if (pub.musique && pub.musique.src) pub.musique.src = loc(pub.musique.src); }
     return pub;
   }
   const enJS = (slug, obj) => 'window.PROJETS = window.PROJETS || {};\nwindow.PROJETS[' + JSON.stringify(slug) + '] = ' + JSON.stringify(obj) + ';\n';
@@ -1792,13 +1816,46 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     return d;
   }
 
+  /* ---------- Publication : outils communs (invitation, vitrine, page Équipe) ---------- */
+  const srcsEquipe = p => [...new Set(p.plans.flatMap(pl => [pl.fond && pl.fond.media].concat((pl.calques || []).map(c => c.media))).concat(p.musique ? [p.musique.src] : []).filter(src => Equipe.estUrl(src)))];
+  async function copierFichiersEquipe(srcs, suivi) {
+    for (const src of srcs) {
+      suivi && suivi('Copie du fichier d\'équipe ' + src.split('/').pop() + '…');
+      const nom = 'medias/eq-' + src.split('/').pop();
+      let existe = false; try { existe = !!(await GitHub.sha(nom)); } catch (e) {}
+      if (!existe) { const r = await fetch(src); if (!r.ok) throw new Error('Fichier d\'équipe introuvable (' + r.status + ')'); await GitHub.envoyer(nom, await r.blob(), 'Fichier d\'équipe ' + src.split('/').pop()); }
+    }
+  }
+  async function lireVitrine() { try { return JSON.parse(await GitHub.lireTexte('vitrine/index.json')) || []; } catch (e) { return []; } }
+  async function ecrireVitrine(index, message) {
+    await GitHub.envoyer('vitrine/index.json', JSON.stringify(index, null, 1), message);
+    await GitHub.envoyer('vitrine/index.js', 'window.VITRINE = ' + JSON.stringify(index, null, 1) + ';\n', message + ' (js)');
+  }
+  // Met une invitation sur la vitrine du site (démo anonymisée, ou telle quelle avec l'accord du client)
+  async function publierVitrine(p, pub, garderNoms, auteur) {
+    const demo = anonymiser(pub, garderNoms);
+    await GitHub.envoyer('projets/demo-' + p.slug + '.json', JSON.stringify(demo, null, 1), 'Démo ' + p.fiche.titre);
+    await GitHub.envoyer('projets/demo-' + p.slug + '.js', enJS('demo-' + p.slug, demo), 'Démo ' + p.fiche.titre + ' (js)');
+    const fondV = (p.plans.find(x => x.role !== 'ouverture') || p.plans[0]).fond.media;
+    let vignette = /^idb:/.test(fondV) ? 'medias/' + fondV.slice(4).replace(/\.\w+$/, '.jpg') : fondV.replace(/\.mp4$/, '.jpg');
+    if (Equipe.estUrl(fondV)) { const it = Equipe.medias().find(x => x.src === fondV); vignette = 'medias/eq-' + fondV.split('/').pop().replace(/\.\w+$/, '.jpg'); if (it && /^data:/.test(it.vignette || '')) await GitHub.envoyer(vignette, dataURLversBlob(it.vignette), 'Vignette ' + p.fiche.titre); else vignette = 'fonds/fond_2.jpg'; }
+    else if (/^idb:/.test(fondV)) { const mv = medias.find(x => x.src === fondV); if (mv && /^data:/.test(mv.vignette || '')) await GitHub.envoyer(vignette, dataURLversBlob(mv.vignette), 'Vignette ' + p.fiche.titre); else vignette = 'fonds/fond_2.jpg'; }
+    let index = (await lireVitrine()).filter(x => x.slug !== 'demo-' + p.slug);
+    index.unshift({ slug: 'demo-' + p.slug, titre: demo.fiche.titre, type: demo.fiche.type, langue: demo.fiche.langue, vignette, auteur: auteur || '', date: new Date().toISOString().slice(0, 10) });
+    await ecrireVitrine(index, 'Vitrine : ' + p.fiche.titre);
+  }
+  async function retirerVitrine(slug, titre) {
+    const index = (await lireVitrine()).filter(x => x.slug !== 'demo-' + slug);
+    await ecrireVitrine(index, 'Vitrine : retrait ' + (titre || slug));
+  }
+
   function ongletPublier(p) {
     const g = reglages.github || {};
     const pret = g.owner && g.repo && g.token;
     const fichiersIdb = [];
     p.plans.forEach(pl => { if (/^idb:/.test(pl.fond.media)) fichiersIdb.push(pl.fond.media); pl.calques.forEach(c => { if (/^idb:/.test(c.media || '')) fichiersIdb.push(c.media); }); });
     if (p.musique && /^idb:/.test(p.musique.src)) fichiersIdb.push(p.musique.src);
-    const fichiersEquipe = [...new Set(p.plans.flatMap(pl => [pl.fond && pl.fond.media].concat((pl.calques || []).map(c => c.media))).filter(src => Equipe.estUrl(src)))];
+    const fichiersEquipe = srcsEquipe(p);
     $('#onglet').innerHTML = `<div class="ia-grille">
       <div class="pile">
         <div class="carte pile"><h3>Aperçu</h3>
@@ -1809,7 +1866,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <div class="ligne"><label class="btn">${p.musique ? 'Changer' : 'Ajouter une musique'}<input type="file" id="musique" accept="audio/*,video/*,.mp3,.m4a,.aac,.wav,.wave,.ogg,.oga,.opus,.flac,.wma,.aif,.aiff,.aifc,.caf,.amr,.3gp,.3ga,.webm,.weba,.mka,.mp2,.mpga,.ac3,.mp4,.m4v,.mov,.mkv,.avi" hidden></label>${p.musique ? '<button class="btn danger" id="musique-suppr">Retirer</button>' : ''}</div>
           ${p.musique ? `<label class="champ">Volume<input type="range" id="volume" min="0" max="1" step="0.05" value="${p.musique.volume != null ? p.musique.volume : 0.8}"></label>` : ''}</div>
         <div class="carte pile"><h3>Film vidéo</h3>
-          <p class="muet">Fabrique le film MP4 (ouverture, plans intermédiaires, remerciement) avec la chanson, image par image : le fichier est complet, avec les transitions et les boutons, et se lit partout (téléphone, WhatsApp, Facebook, QuickTime). Comptez environ 1 à 2 minutes ; vous pouvez changer d'onglet pendant ce temps. Le plan de confirmation n'y est pas (il ne sert qu'en ligne).</p>
+          <p class="muet">Fabrique le film MP4 (ouverture, plans intermédiaires, remerciement) avec la chanson, image par image : le fichier est complet, avec les transitions et les boutons, et se lit partout (téléphone, WhatsApp, Facebook, QuickTime). Comptez environ 1 à 2 minutes ; vous pouvez changer d'onglet pendant ce temps. Tous les plans y sont, confirmation comprise (7 s).</p>
           <div class="apercu-cadre" style="height:340px;margin:0 auto" id="cadre-film"><div id="scene-film"></div></div>
           <div class="progres"><div id="barre"></div></div>
           <div class="ligne"><button class="btn plein" id="film">Enregistrer le film</button><span class="muet" id="film-etat"></span></div></div>
@@ -1872,7 +1929,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     const vol = $('#volume'); if (vol) vol.oninput = e => { p.musique.volume = Number(e.target.value); enregistrer(p); };
     const eng = new Moteur($('#scene-film'), { mode: 'rendu', resolveur: resoudre });
     moteurCourant = eng;
-    eng.setProjet(p).then(() => eng.afficherPlan(0, 0.5));
+    eng.setProjet(reglages.supabase ? Fabrique.confirmationPourTous(p) : p).then(() => eng.afficherPlan(0, 0.5));
     $('#film').onclick = async () => {
       if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) return toast('Ce navigateur ne sait pas enregistrer : utilisez Chrome sur ordinateur');
       const b = $('#film'); b.disabled = true; $('#film-etat').textContent = 'Fabrication du film…'; const t0 = Date.now();
@@ -1890,10 +1947,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     const dr = $('#demo-retirer'); if (dr) dr.onclick = async () => {
       if (!confirm('Retirer cette invitation de la vitrine du site ?')) return;
       try {
-        let index = []; try { index = JSON.parse(await GitHub.lireTexte('vitrine/index.json')) || []; } catch (e) {}
-        index = index.filter(x => x.slug !== 'demo-' + p.slug);
-        await GitHub.envoyer('vitrine/index.json', JSON.stringify(index, null, 1), 'Vitrine : retrait ' + p.fiche.titre);
-        await GitHub.envoyer('vitrine/index.js', 'window.VITRINE = ' + JSON.stringify(index, null, 1) + ';\n', 'Vitrine : retrait (js)');
+        await retirerVitrine(p.slug, p.fiche.titre);
         p.vitrine = false; p.vitrine_publiee = false; enregistrer(p); ongletPublier(p); toast('Retirée de la vitrine (visible dans quelques minutes)');
       } catch (e) { toast('Échec : ' + e.message); }
     };
@@ -1915,33 +1969,12 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           await Base.rpc(reglages.supabase, 'inv_studio_publier', { p_evt: p.id, p_cle: p.cle_hote, p_titre: p.fiche.titre || '', p_slug: p.slug, p_langue: p.fiche.langue || 'fr' });
           await syncInvites(p);
         }
-        for (const src of fichiersEquipe) {
-          etat.textContent = 'Copie du fond d\'équipe ' + src.split('/').pop() + '…';
-          const nom = 'medias/eq-' + src.split('/').pop();
-          let existe = false; try { existe = !!(await GitHub.sha(nom)); } catch (e) {}
-          if (!existe) { const r = await fetch(src); if (!r.ok) throw new Error('Fond d\'équipe introuvable (' + r.status + ')'); await GitHub.envoyer(nom, await r.blob(), 'Fond d\'équipe ' + src.split('/').pop()); }
-        }
+        await copierFichiersEquipe(fichiersEquipe, t => { etat.textContent = t; });
         etat.textContent = 'Envoi de l\'invitation…';
         const pub = publication(p);
         await GitHub.envoyer('projets/' + p.slug + '.json', JSON.stringify(pub, null, 1), 'Invitation ' + p.fiche.titre);
         await GitHub.envoyer('projets/' + p.slug + '.js', enJS(p.slug, pub), 'Invitation ' + p.fiche.titre + ' (js)');
-        if (p.vitrine) {
-          etat.textContent = 'Mise à jour de la vitrine…';
-          const demo = anonymiser(pub, p.vitrine_noms);
-          await GitHub.envoyer('projets/demo-' + p.slug + '.json', JSON.stringify(demo, null, 1), 'Démo ' + p.fiche.titre);
-          await GitHub.envoyer('projets/demo-' + p.slug + '.js', enJS('demo-' + p.slug, demo), 'Démo ' + p.fiche.titre + ' (js)');
-          let index = [];
-          try { index = JSON.parse(await GitHub.lireTexte('vitrine/index.json')) || []; } catch (e) { index = []; }
-          index = index.filter(x => x.slug !== 'demo-' + p.slug);
-          const fondV = (p.plans.find(x => x.role !== 'ouverture') || p.plans[0]).fond.media;
-          // vignette : celle du fond (fond de base) ou l'image du fond importé, envoyée à côté de la vidéo
-          let vignette = /^idb:/.test(fondV) ? 'medias/' + fondV.slice(4).replace(/\.\w+$/, '.jpg') : fondV.replace(/\.mp4$/, '.jpg');
-          if (Equipe.estUrl(fondV)) { const it = Equipe.medias().find(x => x.src === fondV); vignette = 'medias/eq-' + fondV.split('/').pop().replace(/\.\w+$/, '.jpg'); if (it && /^data:/.test(it.vignette || '')) await GitHub.envoyer(vignette, dataURLversBlob(it.vignette), 'Vignette ' + p.fiche.titre); else vignette = 'fonds/fond_2.jpg'; }
-          else if (/^idb:/.test(fondV)) { const mv = medias.find(x => x.src === fondV); if (mv && /^data:/.test(mv.vignette || '')) await GitHub.envoyer(vignette, dataURLversBlob(mv.vignette), 'Vignette ' + p.fiche.titre); else vignette = 'fonds/fond_2.jpg'; }
-          index.unshift({ slug: 'demo-' + p.slug, titre: demo.fiche.titre, type: demo.fiche.type, langue: demo.fiche.langue, vignette, date: new Date().toISOString().slice(0, 10) });
-          await GitHub.envoyer('vitrine/index.json', JSON.stringify(index, null, 1), 'Vitrine : ' + p.fiche.titre);
-          await GitHub.envoyer('vitrine/index.js', 'window.VITRINE = ' + JSON.stringify(index, null, 1) + ';\n', 'Vitrine : ' + p.fiche.titre + ' (js)');
-        }
+        if (p.vitrine) { etat.textContent = 'Mise à jour de la vitrine…'; await publierVitrine(p, pub, p.vitrine_noms, Equipe.actif() ? Equipe.membre() : ''); }
         if (p.vitrine) p.vitrine_publiee = true;
         p.publie = new Date().toISOString(); enregistrer(p);
         ongletPublier(p);
@@ -2130,6 +2163,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     $('#app').innerHTML = `<div class="entete"><div><h1>Équipe « ${esc(e.nom)} » <span class="badge ok">admin</span></h1><p>Le travail de chacun, ses invitations et le temps de fabrication des vidéos.</p></div><div class="ligne"><button class="btn" id="eq-maj">Actualiser</button></div></div><div id="eq-vue" class="muet">Chargement…</div>`;
     const rendre = async () => {
       let d; try { d = await Equipe.rpc('equipe_admin'); } catch (err) { $('#eq-vue').textContent = 'Impossible de lire l\'équipe : ' + err.message; return; }
+      let surVitrine = new Set(); try { const r = await fetch(urlSite() + 'vitrine/index.json?v=' + Date.now(), { cache: 'no-store' }); if (r.ok) surVitrine = new Set((await r.json()).map(x => x.slug)); } catch (e) {}
       const membres = {};
       const ajouter = (n) => (membres[n || '—'] = membres[n || '—'] || { nom: n || '—', evts: 0, publies: 0, videos: 0, secondes: 0, derniere: '' });
       d.travaux.forEach(t => { const m = ajouter(t.auteur); m.evts++; if (t.publie) m.publies++; if (t.maj > m.derniere) m.derniere = t.maj; });
@@ -2146,7 +2180,9 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <div class="carte" style="padding:10px;margin-top:14px"><h3 style="margin:4px 6px 10px">Toutes les invitations de l'équipe</h3>
           <div class="grille" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">${d.travaux.map(t => `<div class="carte pile" style="padding:10px">${t.vignette ? `<img src="${esc(t.vignette)}" alt="" style="width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:8px">` : ''}
             <b>${esc(t.titre || 'Sans titre')}</b><div class="muet">par <b>${esc(t.auteur || '—')}</b> · ${t.plans} plans · modifiée le ${date(t.maj)}</div>
-            <div class="ligne">${t.publie && t.slug ? `<a class="btn petit" target="_blank" href="${esc(urlSite() + 'i/?p=' + encodeURIComponent(t.slug))}">Voir l'invitation ↗</a>` : '<span class="badge alerte">non publiée</span>'}<button class="btn petit" data-copie="${esc(t.projet)}">Ouvrir une copie</button></div></div>`).join('') || '<p class="muet">Aucune invitation pour l\'instant.</p>'}</div></div>
+            <div class="ligne">${t.publie && t.slug ? `<a class="btn petit" target="_blank" href="${esc(urlSite() + 'i/?p=' + encodeURIComponent(t.slug))}">Voir l'invitation ↗</a>` : '<span class="badge alerte">non publiée</span>'}<button class="btn petit" data-copie="${esc(t.projet)}">Ouvrir une copie</button></div>
+            ${surVitrine.has('demo-' + t.slug) ? `<div class="ligne"><span class="badge ok">sur la vitrine</span><a class="btn petit" target="_blank" href="${esc(urlSite() + 'i/?p=' + encodeURIComponent('demo-' + t.slug))}">Voir la démo ↗</a><button class="btn petit danger" data-vit-retirer="${esc(t.projet)}">Retirer</button></div>`
+              : `<button class="btn petit plein" data-vitrine="${esc(t.projet)}">Publier sur la vitrine</button>`}</div>`).join('') || '<p class="muet">Aucune invitation pour l\'instant.</p>'}</div></div>
         <div class="carte" style="padding:10px;margin-top:14px"><h3 style="margin:4px 6px 10px">Vidéos fabriquées (temps de chacune)</h3><div class="tableau-boite"><table class="tableau"><thead><tr><th>Date</th><th>Membre</th><th>Type</th><th>Vidéo</th><th>Invitation</th><th>Temps</th></tr></thead>
           <tbody>${d.creations.slice(0, 300).map(c => `<tr><td>${date(c.date)}</td><td>${esc(c.auteur)}</td><td>${esc(NOMS[c.type] || c.type)}</td><td>${esc(c.nom)}</td><td>${esc(c.titre_projet)}</td><td><b>${dureeTexte(c.secondes)}</b></td></tr>`).join('') || '<tr><td colspan="6" class="muet">Aucune vidéo fabriquée depuis l\'activation de l\'équipe.</td></tr>'}</tbody></table></div></div>
         <div class="ia-grille" style="margin-top:14px"><div class="carte pile"><h3>Lien de l'équipe</h3><p class="muet">Le même lien pour tous les membres : ils y entrent leur nom, puis partagent la bibliothèque.</p>
@@ -2154,6 +2190,37 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <div class="carte pile"><h3>Votre lien admin (privé)</h3><p class="muet">Pour ouvrir cette page sur un autre ordinateur. Ne le donnez pas à l'équipe.</p>
           <div class="ligne"><input type="text" readonly value="${esc(lienEquipe(e.cle_admin))}" style="flex:1"><button class="btn petit" id="eq-cpa">Copier</button></div></div></div>`;
       $('#eq-cp').onclick = () => copier(lienEquipe(e.cle)); $('#eq-cpa').onclick = () => copier(lienEquipe(e.cle_admin));
+      const githubPret = () => { const g = reglages.github || {}; if (g.owner && g.repo && g.token) return true; toast('Reliez d\'abord GitHub dans Réglages (pour publier sur le site)'); return false; };
+      $$('[data-vitrine]').forEach(b => b.onclick = () => {
+        if (!githubPret()) return;
+        const t = d.travaux.find(x => x.projet === b.dataset.vitrine);
+        modale(`<h2>Publier sur la vitrine du site</h2><p class="muet">« ${esc(t.titre)} », par ${esc(t.auteur || '—')}. Les visiteurs du site pourront la regarder ; leurs réponses ne sont jamais enregistrées.</p>
+          <label class="cases"><input type="radio" name="vt-mode" value="anonyme" checked> Noms et téléphones remplacés par des exemples (recommandé)</label>
+          <label class="cases"><input type="radio" name="vt-mode" value="noms"> Telle quelle, avec les vrais noms (seulement avec l'accord du client)</label>
+          <div class="ligne" style="margin-top:10px"><button class="btn plein" id="vt-ok">Publier sur la vitrine</button><span class="muet" id="vt-etat"></span></div>`, (box, fermer) => {
+          $('#vt-ok', box).onclick = async () => {
+            const etat = $('#vt-etat', box), ok = $('#vt-ok', box); ok.disabled = true;
+            try {
+              etat.textContent = 'Lecture de l\'invitation…';
+              const pr = await Equipe.rpc('equipe_projet', { p_projet: t.projet });
+              if (!pr) throw new Error('invitation introuvable');
+              const manquants = [...new Set(pr.plans.flatMap(pl => [pl.fond && pl.fond.media].concat((pl.calques || []).map(c => c.media))).concat(pr.musique ? [pr.musique.src] : []).filter(x => /^idb:/.test(x || '')))];
+              if (manquants.length && !confirm(manquants.length + ' fichier(s) de cette invitation ne sont pas encore arrivés dans l\'espace d\'équipe (' + (t.auteur || 'le membre') + ' doit ouvrir son studio, connecté à Internet). Publier quand même, sans eux ?')) { ok.disabled = false; etat.textContent = ''; return; }
+              await copierFichiersEquipe(srcsEquipe(pr), x => { etat.textContent = x; });
+              etat.textContent = 'Publication sur la vitrine…';
+              const pub = publication(pr);
+              await publierVitrine(pr, pub, ($('input[name=vt-mode]:checked', box) || {}).value === 'noms', t.auteur);
+              fermer(); toast('Publiée sur la vitrine (visible dans quelques minutes)'); rendre();
+            } catch (err) { etat.textContent = 'Échec : ' + err.message; ok.disabled = false; }
+          };
+        });
+      });
+      $$('[data-vit-retirer]').forEach(b => b.onclick = async () => {
+        if (!githubPret()) return;
+        const t = d.travaux.find(x => x.projet === b.dataset.vitRetirer);
+        if (!confirm('Retirer « ' + t.titre + ' » de la vitrine du site ?')) return;
+        try { await retirerVitrine(t.slug, t.titre); toast('Retirée de la vitrine (dans quelques minutes)'); rendre(); } catch (err) { toast(err.message); }
+      });
       $$('[data-copie]').forEach(b => b.onclick = async () => {
         try {
           const src = await Equipe.rpc('equipe_projet', { p_projet: b.dataset.copie });

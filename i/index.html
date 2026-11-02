@@ -45,10 +45,10 @@
 <button id="son" aria-label="Son">♪</button>
 <div id="bandeau" role="dialog"></div>
 <div id="erreur"></div>
-<script src="../config.js?v=202611021140"></script>
-<script src="../moteur/moteur.js?v=202611021140"></script>
-<script src="../moteur/fabrique.js?v=202611021140"></script>
-<script src="../moteur/base.js?v=202611021140"></script>
+<script src="../config.js?v=202611021214"></script>
+<script src="../moteur/moteur.js?v=202611021214"></script>
+<script src="../moteur/fabrique.js?v=202611021214"></script>
+<script src="../moteur/base.js?v=202611021214"></script>
 <script>
 (async function () {
   const q = new URLSearchParams(location.search);
@@ -103,6 +103,8 @@
 
   let famille = null;
   const sbConf = !apercu && projet.publication && projet.publication.supabase;
+  // base des invités active : le lien général peut aussi confirmer (réponse visible par l'organisateur)
+  if (sbConf || (apercu && projet.publication && projet.publication.supabase)) projet = Fabrique.confirmationPourTous(projet);
   if (code && projet.liens && projet.liens[code]) famille = Object.assign({ code }, projet.liens[code]);
   // Familles ajoutées ensuite par l'organisateur (espace organisateur) : lues dans la base
   if (code && sbConf) { try { const f = await Base.rpc(sbConf, 'inv_famille', { p_evt: projet.id, p_code: code }); if (f) famille = Object.assign({}, famille || {}, f); } catch (e) { console.warn('Base', e); } }
@@ -222,6 +224,19 @@
     }
     if (action === 'confirmer' || action === 'refuser') {
       const oui = action === 'confirmer';
+      // lien général : on demande le nom de la famille (gardé pour la prochaine fois)
+      if (!famille && sbConf && !form.nom) {
+        let deja = ''; try { deja = localStorage.getItem('inv.nom') || ''; } catch (e) {}
+        const nom = await new Promise(res => {
+          bandeau(`<b>${tr('Iza no anaranareo?', 'Votre nom ?', 'Your name?')}</b><div style="margin-top:8px"><input id="inv-nom" value="${deja.replace(/"/g, '&quot;')}" placeholder="${tr('Ohatra : Fianakaviana Rakoto', 'Ex. : Famille Rakoto', 'E.g. Rakoto family')}" style="width:100%;font:inherit;padding:10px 12px;border:1.5px solid #c9b8a8;border-radius:12px"></div><div class="actions"><button class="plein" id="inv-nom-ok" style="background:var(--vin);color:#fff">${tr('Alefa', 'Envoyer', 'Send')}</button><button data-fermer>${tr('Hidio', 'Fermer', 'Close')}</button></div>`);
+          const i = $('#inv-nom'); setTimeout(() => i.focus(), 50);
+          const ok = () => { const v = i.value.trim(); if (!v) return i.focus(); try { localStorage.setItem('inv.nom', v); } catch (e) {} res(v); };
+          $('#inv-nom-ok').onclick = ok; i.onkeydown = e => { if (e.key === 'Enter') ok(); };
+          document.querySelector('#bandeau [data-fermer]').addEventListener('click', () => res(null));
+        });
+        if (!nom) return;
+        form.nom = nom;
+      }
       const ok = await enregistrer(oui, form);
       if (ok === 'places') { bandeau(`<b>${tr('Mihoatra ny toerana natokana ho anareo', 'Trop de personnes', 'Too many people')}</b><div style="margin-top:6px">${tr('Toerana ' + (famille.places || '') + ' no natokana ho an\'ny fianakavianareo.', (famille.places || '') + ' place(s) prévue(s) pour votre famille.', (famille.places || '') + ' seat(s) reserved for your family.')}</div><div class="actions"><button data-fermer>OK</button></div>`); return; }
       const k = contacts[0];

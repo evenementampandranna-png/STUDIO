@@ -188,8 +188,8 @@ grant execute on function public.equipe_projet(text, text) to anon, authenticate
 -- Fichiers de la bibliothèque commune : dossier « equipe », lecture publique par adresse (pas de liste),
 -- envoi seulement dans le dossier portant une clé d'équipe valide.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('equipe', 'equipe', true, 52428800, array['video/mp4', 'video/webm', 'video/quicktime', 'image/jpeg', 'image/png', 'image/webp'])
-on conflict (id) do update set public = true, file_size_limit = 52428800;
+values ('equipe', 'equipe', true, 52428800, array['video/mp4', 'video/webm', 'video/quicktime', 'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'audio/mpeg', 'audio/mp4', 'audio/aac', 'audio/x-m4a', 'audio/wav', 'audio/ogg'])
+on conflict (id) do update set public = true, file_size_limit = 52428800, allowed_mime_types = excluded.allowed_mime_types;
 drop policy if exists "equipe envoi" on storage.objects;
 drop policy if exists "equipe lecture" on storage.objects;
 drop policy if exists "equipe suppression" on storage.objects;

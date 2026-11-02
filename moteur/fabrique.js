@@ -560,9 +560,26 @@ Textes à traduire (identifiant : texte) :
 ${JSON.stringify(textes, null, 1)}`;
   }
 
+  /* ---------- Avec la base des invités : le lien général permet aussi de confirmer ---------- */
+  // Les compteurs et « Je confirme / Je ne pourrai pas venir » deviennent visibles pour tous ;
+  // le bouton WhatsApp du lien général (à la même place) est retiré. Le nom est demandé au moment de confirmer.
+  function confirmationPourTous(projet) {
+    const d = JSON.parse(JSON.stringify(projet));
+    (d.plans || []).forEach(p => {
+      if (p.role !== 'confirmation') return;
+      const ouvrir = (p.calques || []).some(c => c.condition === 'famille' && (c.action === 'confirmer' || c.action === 'refuser'));
+      if (!ouvrir) return;
+      p.calques.forEach(c => {
+        if (c.condition === 'famille' && (c.type === 'compteur' || c.action === 'confirmer' || c.action === 'refuser')) c.condition = '';
+        if (c.condition === 'general' && c.action === 'whatsapp') c.masque = true;
+      });
+    });
+    return d;
+  }
+
   function ambiance(projet, fonds) {
     const d = decorDe(projet, fonds);
     return (d.length ? d.join(' ; ') + '. ' : '') + 'Couleurs de l\'invitation : ' + palette(projet).join(', ') + '.';
   }
-  global.Fabrique = { promptTraduction, ambiance, promptEtalonnage, promptFond, nettoyerJSON, lireJSON, FONDS, analyserTexte, genererPlans, nouveauProjet, validerPlan, prompt0, prompt1, prompt3, prompt4, LIB, STYLE, uid };
+  global.Fabrique = { confirmationPourTous, promptTraduction, ambiance, promptEtalonnage, promptFond, nettoyerJSON, lireJSON, FONDS, analyserTexte, genererPlans, nouveauProjet, validerPlan, prompt0, prompt1, prompt3, prompt4, LIB, STYLE, uid };
 })(window);
