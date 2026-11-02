@@ -20,6 +20,8 @@
   const sauverProjets = () => Stock.ecrire('studio.projets', projets);
   const sauverMedias = () => Stock.ecrire('studio.medias', medias);
   const sauverReglages = () => Stock.ecrire('studio.reglages', reglages);
+  // Un autre onglet a changé les réglages (ex. nouveau jeton GitHub) : on les reprend ici aussi
+  window.addEventListener('storage', ev => { if (ev.key === 'studio.reglages') { try { reglages = Stock.lire('studio.reglages', reglages); } catch (e) {} } });
 
   const IDB = {
     _db: null,
@@ -202,6 +204,10 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-02-6', date: '2 novembre 2026', titre: 'Publication sur la vitrine plus fiable', points: [
+      'Le studio relit toujours le dernier jeton GitHub enregistré (même s\'il a été changé dans un autre onglet) : plus d\'erreur « Bad credentials » avec un ancien jeton.',
+      'Si GitHub refuse le jeton, un message clair explique quoi faire (Réglages → GitHub → nouveau jeton → Tester).'
+    ] },
     { id: '2026-11-02-5', date: '2 novembre 2026', titre: 'Couper, superposition, modèles et films de l\'équipe', points: [
       '<b>✂ Couper une vidéo</b> : bouton « ✂ Couper » sur le fond d\'un plan et sur chaque vidéo posée : vous gardez seulement le passage voulu (début / fin).',
       '<b>Superposition</b> : pour chaque photo, vidéo ou texte, un mode de fusion avec le fond (produit, écran, superposition, lumière douce…).',
@@ -2043,12 +2049,19 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
 
   /* ================= GitHub (publication sans serveur) ================= */
   const GitHub = {
-    api(chemin) { const g = reglages.github; return `https://api.github.com/repos/${g.owner}/${g.repo}/contents/${chemin.split('/').map(encodeURIComponent).join('/')}`; },
-    entetes() { return { Authorization: 'Bearer ' + reglages.github.token, Accept: 'application/vnd.github+json' }; },
+    // Toujours relire le jeton enregistré (il a pu être changé dans un autre onglet)
+    frais() { const r = Stock.lire('studio.reglages', null); if (r && r.github && r.github.token) reglages.github = r.github; return reglages.github || {}; },
+    erreur(statut, texte) {
+      if (statut === 401) return new Error('Jeton GitHub refusé (expiré ou supprimé). Allez dans Réglages → GitHub, collez un nouveau jeton puis « Tester ». ');
+      if (statut === 403 || statut === 404) return new Error('GitHub ' + statut + ' : le jeton n\'a pas le droit d\'écrire dans ' + (reglages.github.owner || '') + '/' + (reglages.github.repo || '') + ' (droit « Contents : Read and write » nécessaire).');
+      return new Error('GitHub ' + statut + ' : ' + texte.slice(0, 160));
+    },
+    api(chemin) { const g = this.frais(); return `https://api.github.com/repos/${g.owner}/${g.repo}/contents/${chemin.split('/').map(encodeURIComponent).join('/')}`; },
+    entetes() { return { Authorization: 'Bearer ' + (this.frais().token || '').trim(), Accept: 'application/vnd.github+json' }; },
     async sha(chemin) {
       const r = await fetch(this.api(chemin) + '?ref=' + encodeURIComponent(reglages.github.branche || 'main'), { headers: this.entetes() });
       if (r.status === 404) return null;
-      if (!r.ok) throw new Error('GitHub ' + r.status + ' : ' + (await r.text()).slice(0, 120));
+      if (!r.ok) throw this.erreur(r.status, await r.text());
       return (await r.json()).sha;
     },
     async lireTexte(chemin) {
@@ -2065,7 +2078,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       const corps = { message, content: await this.base64(contenu), branch: reglages.github.branche || 'main' };
       if (sha) corps.sha = sha;
       const r = await fetch(this.api(chemin), { method: 'PUT', headers: Object.assign(this.entetes(), { 'Content-Type': 'application/json' }), body: JSON.stringify(corps) });
-      if (!r.ok) throw new Error('GitHub ' + r.status + ' : ' + (await r.text()).slice(0, 160));
+      if (!r.ok) throw this.erreur(r.status, await r.text());
       return r.json();
     }
   };
@@ -2424,6 +2437,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     $('#g-ok').onclick = () => { reglages.github = { owner: $('#g-owner').value.trim(), repo: $('#g-repo').value.trim(), token: $('#g-token').value.trim(), branche: 'main' }; sauverReglages(); toast('Enregistré'); };
     $('#g-test').onclick = async () => {
       reglages.github = { owner: $('#g-owner').value.trim(), repo: $('#g-repo').value.trim(), token: $('#g-token').value.trim(), branche: 'main' };
+      sauverReglages();
       try { const r = await fetch(`https://api.github.com/repos/${reglages.github.owner}/${reglages.github.repo}`, { headers: GitHub.entetes() }); const j = await r.json(); $('#g-etat').textContent = r.ok ? (j.permissions && j.permissions.push ? 'Connexion réussie' : 'Connecté, mais sans droit d\'écriture') : 'Échec : ' + (j.message || r.status); }
       catch (e) { $('#g-etat').textContent = 'Échec : ' + e.message; }
     };
