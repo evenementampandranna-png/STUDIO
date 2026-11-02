@@ -108,7 +108,7 @@
   const NOUVEAUTES = [
     { id: '2026-11-02-2', date: '2 novembre 2026', titre: 'Film MP4 complet, transitions, compteurs', points: [
       '<b>Film vidéo</b> : fabriqué image par image en MP4 (H.264 + son AAC). Il va jusqu\'au bout, s\'ouvre partout (téléphone, WhatsApp, QuickTime), avec la chanson qui baisse doucement à la fin. Vous pouvez changer d\'onglet pendant la fabrication.',
-      'Les <b>boutons</b> (Sarintany, Antsoy…) apparaissent maintenant dans le film ; seuls les boutons de navigation (Dingano, Jereo indray) n\'y sont pas.',
+      'Les <b>boutons</b> (Sarintany, Antsoy…) apparaissent maintenant dans le film ; seuls les boutons qui ne servent qu\'en ligne (Dingano, Jereo indray, Zarao) n\'y sont pas.',
       '<b>Transitions</b> corrigées (le texte du plan précédent ne disparaît plus d\'un coup) et 6 nouvelles : glissement vers le haut, zoom, flou, volet, rideau, cercle. Durée réglable et bouton « ▶ Voir la transition ».',
       '<b>Compteurs</b> adultes / enfants : − et + marchent aussi dans l\'aperçu du studio ; au maximum de places, le compteur le signale.'] },
     { id: '2026-11-02-1', date: '2 novembre 2026', titre: 'Remerciement et nouveautés', points: [

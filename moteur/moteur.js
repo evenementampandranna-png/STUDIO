@@ -386,7 +386,7 @@
 
     // Film : les boutons (HTML dans l'invitation) sont dessinés comme des images, sauf ceux de navigation
     _dessinerBouton(c, t, p, vars, alphaPlan) {
-      if (c.type !== 'bouton' || ['passer', 'suivant', 'precedent', 'revoir'].includes(c.action || 'suivant')) return;
+      if (c.type !== 'bouton' || ['passer', 'suivant', 'precedent', 'revoir', 'partager', 'calendrier'].includes(c.action || 'suivant')) return;
       const deb = Number(c.debut) || 0; if (t < deb) return;
       const ctx = this.ctx, fs = (Number(c.taille) || 2.4) / 100 * H, larg = (Number(c.largeur) || 60) / 100 * W, haut = fs * 2.3;
       const x = (Number(c.x) || 50) / 100 * W - larg / 2, y = (Number(c.y) || 50) / 100 * H - haut / 2;
@@ -636,7 +636,7 @@
       const total = durees.reduce((a, b) => a + b, 0), N = Math.round(total * FPS);
       // vidéo
       let vcodec = null;
-      for (const c of ['avc1.640028', 'avc1.4d0028', 'avc1.42E028']) { try { if ((await VideoEncoder.isConfigSupported({ codec: c, width: W, height: H, bitrate: 6e6, framerate: FPS })).supported) { vcodec = c; break; } } catch (e) {} }
+      for (const c of ['avc1.640028', 'avc1.4d0028', 'avc1.42E028']) { try { if ((await VideoEncoder.isConfigSupported({ codec: c, width: W, height: H, bitrate: 4e6, framerate: FPS })).supported) { vcodec = c; break; } } catch (e) {} }
       if (!vcodec) throw new Error('H.264 non disponible');
       // audio : la chanson, à partir du début choisi, en boucle si besoin, fondu à la fin
       let audio = null, SR = 48000;
@@ -653,7 +653,7 @@
         video: { codec: 'avc', width: W, height: H, frameRate: FPS }, audio: audio ? { codec: audio.codec === 'opus' ? 'opus' : 'aac', numberOfChannels: 2, sampleRate: SR } : undefined });
       let erreur = null;
       const venc = new VideoEncoder({ output: (ch, meta) => muxer.addVideoChunk(ch, meta), error: e => { erreur = e; } });
-      venc.configure({ codec: vcodec, width: W, height: H, bitrate: 6e6, framerate: FPS });
+      venc.configure({ codec: vcodec, width: W, height: H, bitrate: 4e6, framerate: FPS });
       // préparer le moteur : lecture arrêtée, boutons dessinés, pas de HTML
       const avantEtat = { lecture: this.lecture, seq: this.seq, pos: this.pos, t: this.t, planFixe: this.planFixe };
       this.lecture = false; this.masquerHTML = true; this.boutonsDessines = true; this._construireHTML();
