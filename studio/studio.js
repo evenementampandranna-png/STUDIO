@@ -98,11 +98,27 @@
     },
     // le film MP4 fabriqué : visible par toute l'équipe, publiable sur la vitrine par l'admin
     async partagerFilm(blob, p, sec) {
+      let v = vignetteDe(((p.plans.find(x => x.role !== 'ouverture') || p.plans[0] || {}).fond || {}).media || '');
+      if (!/^data:/.test(v) || v.length >= 150000) v = '';
+      return this.ajouterFilm(blob, { titre: p.fiche.titre || '', secondes: sec, vignette: v });
+    },
+    // un film terminé (fabriqué ici, ou un fichier MP4 déjà fait) : envoyé dans l'espace d'équipe, visible par tous
+    async ajouterFilm(blob, o) {
+      if (!this.actif()) throw new Error('vous n\'êtes dans aucune équipe');
+      if (blob.size > 50e6) throw new Error('film de plus de 50 Mo (limite de l\'espace d\'équipe)');
+      const type = /webm/.test(blob.type) ? 'video/webm' : /quicktime/.test(blob.type) ? 'video/quicktime' : 'video/mp4';
+      const ext = type === 'video/webm' ? 'webm' : type === 'video/quicktime' ? 'mov' : 'mp4';
       const id = 'film' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-      const chemin = reglages.equipe.cle + '/' + id + '.mp4';
-      await this.envoyerFichier(chemin, new Blob([blob], { type: 'video/mp4' }));
-      const v = vignetteDe(((p.plans.find(x => x.role !== 'ouverture') || p.plans[0] || {}).fond || {}).media || '');
-      await this.rpc('equipe_biblio_ajouter', { p_item: { id, auteur: this.membre(), type: 'film', nom: 'Film — ' + (p.fiche.titre || ''), chemin, vignette: /^data:/.test(v) && v.length < 150000 ? v : '', duree: 0, secondes_creation: sec, evenement: p.fiche.titre || '' } });
+      const chemin = reglages.equipe.cle + '/' + id + '.' + ext;
+      let vignette = o.vignette || '', duree = 0;
+      try { const u = URL.createObjectURL(blob); const info = await Promise.race([vignetteVideo(u), new Promise(ok => setTimeout(() => ok({}), 15000))]); URL.revokeObjectURL(u); if (!vignette) vignette = info.vignette || ''; duree = Math.round((Number(info.duree) || 0) * 10) / 10; } catch (e) {}
+      let dernier;
+      for (let essai = 0; essai < 3; essai++) {   // réseau instable : on réessaie
+        try { await this.envoyerFichier(chemin, blob.type === type ? blob : new Blob([blob], { type })); dernier = null; break; }
+        catch (e) { dernier = e; if (/\(4\d\d\)/.test(e.message) && !/\(409\)/.test(e.message)) break; await new Promise(ok => setTimeout(ok, 2000 * (essai + 1))); }
+      }
+      if (dernier) throw dernier;
+      await this.rpc('equipe_biblio_ajouter', { p_item: { id, auteur: this.membre(), type: 'film', nom: 'Film — ' + (o.titre || 'Sans titre'), chemin, vignette: vignette.length < 150000 ? vignette : '', duree, secondes_creation: o.secondes || null, evenement: o.titre || '' } });
       await this.charger();
     },
     // fichiers d'une invitation envoyés dans l'espace d'équipe (une seule fois chacun), pour que l'admin ait tout
@@ -204,6 +220,12 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-02-7', date: '2 novembre 2026', titre: 'Fond, ombre et contour des textes · vitesse des vidéos · toutes les vidéos de l\'équipe', points: [
+      '<b>Textes</b> : nouveau panneau « Fond, ombre, contour » : arrière-plan (couleur, opacité, marge, arrondi), ombre (halo ou ombre portée : couleur, flou, intensité, décalage), contour (couleur, épaisseur). Styles rapides : Lisible sur fond chargé, Bandeau, Néon.',
+      '<b>Vitesse des vidéos</b> : du ralenti ×0,25 à l\'accéléré ×3, pour le fond d\'un plan (panneau Fond vidéo) et pour chaque vidéo posée. Le film MP4 respecte la vitesse.',
+      '<b>Équipe</b> : page Équipe → « Toutes les vidéos de l\'équipe » : films terminés et fonds vidéo de chacun, visibles par tous, avec filtres (type, membre), lecture et téléchargement.',
+      '« + Ajouter un film terminé » : mettez dans l\'équipe un film déjà fabriqué (MP4). Et si l\'envoi automatique d\'un film échoue, un bouton « Réessayer » apparaît.'
+    ] },
     { id: '2026-11-02-6', date: '2 novembre 2026', titre: 'Publication sur la vitrine plus fiable', points: [
       'Le studio relit toujours le dernier jeton GitHub enregistré (même s\'il a été changé dans un autre onglet) : plus d\'erreur « Bad credentials » avec un ancien jeton.',
       'Si GitHub refuse le jeton, un message clair explique quoi faire (Réglages → GitHub → nouveau jeton → Tester).',
@@ -714,7 +736,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     function supprimerCalque(c) { if (!c) return; E.modif(true); const pl = plan(); pl.calques = pl.calques.filter(x => x.id !== c.id); E.sel = null; E.rafraichir(); rendreReglages(); rendrePlans(); }
     function ordreCalque(c, sens) { if (!c) return; const pl = plan(); const k = pl.calques.indexOf(c); E.modif(true); pl.calques.splice(k, 1); if (sens === 'avant') pl.calques.push(c); else pl.calques.unshift(c); E.rafraichir(); rendreReglages(); }
     // Mise en forme : copier / coller le style d'un calque sur un autre (pinceau)
-    const STYLE_TEXTE = ['police', 'taille', 'couleur', 'gras', 'italique', 'majuscules', 'align', 'interligne', 'ombre', 'ombre_couleur', 'contour', 'contour_epaisseur', 'fond_couleur', 'fond_opacite', 'opacite', 'animation', 'duree_animation', 'sortie', 'duree_sortie'];
+    const STYLE_TEXTE = ['police', 'taille', 'couleur', 'gras', 'italique', 'majuscules', 'align', 'interligne', 'ombre', 'ombre_couleur', 'ombre_force', 'ombre_opacite', 'ombre_decalage', 'contour', 'contour_epaisseur', 'fond_couleur', 'fond_opacite', 'fond_marge', 'fond_arrondi', 'opacite', 'animation', 'duree_animation', 'sortie', 'duree_sortie'];
     const STYLE_BOUTON = ['police', 'taille', 'couleur', 'style'];
     const STYLE_MEDIA = ['forme', 'bordure', 'opacite', 'remplir', 'animation', 'duree_animation', 'sortie', 'duree_sortie'];
     const clesStyle = t => t === 'texte' ? STYLE_TEXTE : (t === 'bouton' || t === 'compteur' || t === 'champ') ? STYLE_BOUTON : STYLE_MEDIA;
@@ -733,6 +755,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       let n = 0;
       cibles.forEach(c => {
         const autorises = clesStyle(c.type);
+        if (st.type === 'texte' && c.type === 'texte') ['fond_couleur', 'contour', 'ombre_decalage'].forEach(k => { if (!(k in st.props)) delete c[k]; });
         Object.entries(st.props).forEach(([k, v]) => {
           if (!autorises.includes(k)) return;
           if (k === 'taille' && st.type !== c.type) return;     // tailles de texte et de bouton ne se comparent pas
@@ -912,6 +935,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
             <div class="muet">${nbMemeFond > 1 ? `Utilisé par ${nbMemeFond} plans` : 'Utilisé par ce plan seulement'}</div></div></div>
           <label class="champ">Choisir dans la bibliothèque<select id="p-fond">${fonds.map(f => `<option value="${esc(f.src)}" ${pl.fond.media === f.src ? 'selected' : ''}>${esc(f.nom)} (${esc(f.usage)})</option>`).join('')}</select></label>
           <div class="ligne" style="margin-top:8px"><label class="btn petit">Importer un fond<input type="file" id="imp-fond-plan" accept="video/*" hidden></label><button class="btn petit ia" id="fond-ia" title="S'ouvre dans la Bibliothèque">✨ Créer avec l'IA (Bibliothèque)</button><button class="btn petit" id="fond-couper">✂ Couper${MoteurInfo.plage(pl.fond) ? ' (' + MoteurInfo.plage(pl.fond).map(x => x.toFixed(1)).join(' → ') + ' s)' : ''}</button></div>
+          <label class="champ" style="margin-top:8px">Vitesse de la vidéo<select id="p-vitesse">${optsVitesse(pl.fond.vitesse)}</select></label>
           <div class="deux" style="margin-top:8px">
             <label class="champ">Éclaircir<input type="range" id="p-ecl" min="0" max="0.7" step="0.05" value="${pl.fond.eclaircir || 0}"></label>
             <label class="champ">Assombrir<input type="range" id="p-asb" min="0" max="0.7" step="0.05" value="${pl.fond.assombrir || 0}"></label>
@@ -949,6 +973,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       // montre la fin du plan précédent puis l'arrivée de ce plan
       const voirTransition = () => { if (E.i < 1) return toast('Le premier plan n\'a pas de transition d\'arrivée'); const av = p.plans[E.i - 1]; eng.mode = 'invitation'; $('#cadre').classList.add('en-lecture'); eng.jouer([E.i - 1, E.i], 0); eng.t = Math.max(0, (Number(av.duree) || 4) - 1); };
       $('#p-trans-voir').onclick = voirTransition;
+      $('#p-vitesse').onchange = e => { E.modif(true); const v = Number(e.target.value) || 1; if (v === 1) delete pl.fond.vitesse; else pl.fond.vitesse = v; const el = eng.medias[pl.fond.media]; if (el && el.tagName === 'VIDEO') el.playbackRate = v; eng._entrerPlan(); afficher(); toast(v === 1 ? 'Vitesse normale' : 'Vitesse ×' + String(v).replace('.', ',') + (v < 1 ? ' (ralenti)' : ' (accéléré)')); };
       $('#p-ecl').oninput = e => { E.modif(); pl.fond.eclaircir = Number(e.target.value); };
       $('#p-asb').oninput = e => { E.modif(); pl.fond.assombrir = Number(e.target.value); };
       $$('[data-ajout]', col).forEach(b => b.onclick = () => ajouterCalque(b.dataset.ajout));
@@ -993,6 +1018,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       eng.precharger().then(() => { E.rafraichir(); rendreReglages(); rendrePlans(); });
     }
 
+    function optsVitesse(v) { return opts([['0.25', '×0,25 (très lent)'], ['0.5', '×0,5 (ralenti)'], ['0.75', '×0,75'], ['1', 'Normale'], ['1.25', '×1,25'], ['1.5', '×1,5'], ['2', '×2 (rapide)'], ['3', '×3']], String(Number(v) || 1)); }
     function opts(liste, val) { return liste.map(o => { const [v, t] = Array.isArray(o) ? o : [o, o]; return `<option value="${esc(v)}" ${String(val) === String(v) ? 'selected' : ''}>${esc(t)}</option>`; }).join(''); }
     const effets = liste => liste.map(v => [v, I.NOMS_EFFETS[v] || v]);
     function blocAnimation(c) {
@@ -1010,6 +1036,24 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <button class="btn petit" data-voir-anim style="margin-top:8px">▶ Voir l'animation</button>
       </details>`;
     }
+    // Arrière-plan, ombre et contour d'un texte
+    function blocStyleTexte(c) {
+      const v = (k, d) => c[k] != null && c[k] !== '' ? c[k] : d;
+      const typeOmbre = !c.ombre ? 'aucune' : Number(c.ombre_decalage) ? 'portee' : 'halo';
+      const coulOmbre = /^#/.test(c.ombre_couleur || '') ? c.ombre_couleur : (typeOmbre === 'portee' ? '#000000' : '#ffffff');
+      return `<details class="bloc" open><summary>Fond, ombre, contour</summary><div class="pile style-texte">
+        <div class="st-ligne"><label class="st-case"><input type="checkbox" data-st="fond" ${c.fond_couleur ? 'checked' : ''}> <b>Arrière-plan</b></label>
+          ${c.fond_couleur ? `<input type="color" data-k="fond_couleur" value="${esc(c.fond_couleur)}" title="Couleur du fond">` : ''}</div>
+        ${c.fond_couleur ? `<div class="trois"><label class="champ">Opacité<input type="range" data-k="fond_opacite" min="0.05" max="1" step="0.05" value="${v('fond_opacite', 0.6)}"></label><label class="champ">Marge<input type="range" data-k="fond_marge" min="0" max="1.5" step="0.05" value="${v('fond_marge', 0.4)}"></label><label class="champ">Arrondi<input type="range" data-k="fond_arrondi" min="0" max="3" step="0.1" value="${v('fond_arrondi', 0.4)}"></label></div>` : ''}
+        <div class="st-ligne"><label class="champ" style="flex:1"><b>Ombre</b><select data-st="ombre">${opts([['aucune', 'Aucune'], ['halo', 'Halo (lueur autour)'], ['portee', 'Ombre portée (décalée)']], typeOmbre)}</select></label>
+          ${c.ombre ? `<input type="color" data-st="ombre_couleur" value="${esc(coulOmbre)}" title="Couleur de l'ombre">` : ''}</div>
+        ${c.ombre ? `<div class="trois"><label class="champ">Flou<input type="range" data-k="ombre_force" min="0" max="4" step="0.1" value="${v('ombre_force', 1)}"></label><label class="champ">Intensité<input type="range" data-k="ombre_opacite" min="0.1" max="1" step="0.05" value="${v('ombre_opacite', 0.85)}"></label>${typeOmbre === 'portee' ? `<label class="champ">Décalage<input type="range" data-k="ombre_decalage" min="0.5" max="6" step="0.25" value="${v('ombre_decalage', 1.5)}"></label>` : '<span></span>'}</div>` : ''}
+        <div class="st-ligne"><label class="st-case"><input type="checkbox" data-st="contour" ${c.contour ? 'checked' : ''}> <b>Contour</b></label>
+          ${c.contour ? `<input type="color" data-k="contour" value="${esc(c.contour)}" title="Couleur du contour"><label class="champ" style="flex:1">Épaisseur<input type="range" data-k="contour_epaisseur" min="1" max="16" step="0.5" value="${v('contour_epaisseur', 3)}"></label>` : ''}</div>
+        <div class="ligne st-presets"><span class="muet">Styles rapides :</span>
+          <button class="btn petit" data-st-preset="lisible">Lisible sur fond chargé</button><button class="btn petit" data-st-preset="bandeau">Bandeau</button><button class="btn petit" data-st-preset="neon">Néon</button><button class="btn petit" data-st-preset="rien">Aucun</button></div>
+      </div></details>`;
+    }
     function blocTraductions(c) {
       const ls = (p.langues || []).filter(l => l !== p.fiche.langue);
       if (!ls.length) return '';
@@ -1026,9 +1070,9 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <label class="champ">Texte <span class="muet">— variables : {famille} {places} {date} {heure} {date_limite} {compte_a_rebours}</span><textarea data-k="texte" rows="3">${esc(c.texte)}</textarea></label>
         <div class="deux"><label class="champ">Police<select data-k="police">${opts(I.POLICES, c.police)}</select></label><label class="champ">Taille<input type="range" data-k="taille" min="1.5" max="12" step="0.1" value="${c.taille || 4}"></label></div>
         <div class="trois"><label class="champ">Couleur<input type="color" data-k="couleur" value="${c.couleur || '#7a1f2b'}"></label><label class="champ">Alignement<select data-k="align">${opts([['center', 'Centré'], ['left', 'Gauche'], ['right', 'Droite']], c.align || 'center')}</select></label><label class="champ">Interligne<input type="number" data-k="interligne" step="0.05" min="0.8" max="2" value="${c.interligne || 1.25}"></label></div>
-        <div class="cases"><label><input type="checkbox" data-k="gras" ${c.gras ? 'checked' : ''}> Gras</label><label><input type="checkbox" data-k="italique" ${c.italique ? 'checked' : ''}> Italique</label><label><input type="checkbox" data-k="majuscules" ${c.majuscules ? 'checked' : ''}> Majuscules</label><label><input type="checkbox" data-k="ombre" ${c.ombre ? 'checked' : ''}> Halo clair</label></div>
+        <div class="cases"><label><input type="checkbox" data-k="gras" ${c.gras ? 'checked' : ''}> Gras</label><label><input type="checkbox" data-k="italique" ${c.italique ? 'checked' : ''}> Italique</label><label><input type="checkbox" data-k="majuscules" ${c.majuscules ? 'checked' : ''}> Majuscules</label></div>
         <label class="champ">Superposition (mode de fusion)<select data-k="fusion">${opts(I.FUSIONS, c.fusion || 'normal')}</select></label>
-        </div></details>` + blocTraductions(c) + blocAnimation(c);
+        </div></details>` + blocStyleTexte(c) + blocTraductions(c) + blocAnimation(c);
       if (c.type === 'bouton') s += `<details class="bloc" open><summary>Bouton</summary><div class="pile">
         <label class="champ">Libellé<input type="text" data-k="texte" value="${esc(c.texte)}"></label>
         <div class="deux"><label class="champ">Action<select data-k="action">${opts(I.ACTIONS, c.action)}</select></label><label class="champ">N° du lieu / contact<input type="number" data-k="cible" min="0" value="${c.cible || 0}"></label></div>
@@ -1047,6 +1091,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         ${c.type === 'image' && c.media ? '<button class="btn petit ia" data-animer>✨ Animer cette photo (Wan 2.2)</button>' : ''}
         <div class="trois"><label class="champ">Hauteur (%)<input type="number" data-k="hauteur" value="${c.hauteur || 22}"></label><label class="champ">Forme<select data-k="forme">${opts([['', 'Normale'], ['arrondi', 'Arrondie'], ['rond', 'Ronde']], c.forme || '')}</select></label><label class="champ">Opacité<input type="number" data-k="opacite" min="0" max="1" step="0.05" value="${c.opacite != null ? c.opacite : 1}"></label></div>
         <label class="champ">Superposition (mode de fusion avec le fond)<select data-k="fusion">${opts(I.FUSIONS, c.fusion || 'normal')}</select></label>
+        ${c.type === 'video' && c.media ? `<label class="champ">Vitesse de la vidéo<select data-vitesse>${optsVitesse(c.vitesse)}</select></label>` : ''}
         ${c.type === 'video' && c.media ? `<button class="btn petit" data-couper>✂ Couper la vidéo${MoteurInfo.plage(c) ? ' (' + MoteurInfo.plage(c).map(x => x.toFixed(1)).join(' → ') + ' s)' : ''}</button>` : ''}
         <div class="cases"><label><input type="checkbox" data-k="remplir" ${c.remplir ? 'checked' : ''}> Remplir le cadre (recadrer)</label><label>Bordure <input type="color" data-k="bordure" value="${c.bordure || '#b08a4f'}"></label></div>
         </div></details>` + blocAnimation(c);
@@ -1056,8 +1101,31 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       $$('#props [data-trad]').forEach(t => t.oninput = () => { c.trad = c.trad || {}; if (t.value.trim()) c.trad[t.dataset.trad] = t.value; else delete c.trad[t.dataset.trad]; E.modif(); E.rafraichir(); });
       const rp = $('#props [data-remplacer]');
       if (rp) rp.onchange = async e => { const f = e.target.files[0]; if (!f) return; const m = await importerFichier(f, null, p.id); sauverMedias(); E.modif(true); c.media = m.src; c.type = m.type === 'video' ? 'video' : 'image'; eng.precharger().then(() => { E.rafraichir(); rendreReglages(); }); };
+      const vi = $('#props [data-vitesse]'); if (vi) vi.onchange = () => { E.modif(true); const v = Number(vi.value) || 1; if (v === 1) delete c.vitesse; else c.vitesse = v; const el = eng.medias[c.media]; if (el && el.tagName === 'VIDEO') el.playbackRate = v; E.rafraichir(); };
       const cp = $('#props [data-couper]'); if (cp) cp.onclick = () => modaleCouper(c, c.media, () => { E.modif(true); eng.precharger().then(() => { E.rafraichir(); rendreReglages(); }); });
       const an = $('#props [data-animer]'); if (an) an.onclick = () => allerCreateur(p, E.i, { methode: 'animer', calque: c.id });
+      // Fond / ombre / contour du texte
+      const majStyle = () => { E.modif(true); E.rafraichir(); rendreReglages(); };
+      $$('#props [data-st]').forEach(inp => inp.addEventListener('change', () => {
+        const k = inp.dataset.st;
+        if (k === 'fond') { if (inp.checked) { c.fond_couleur = c.fond_couleur || '#ffffff'; if (c.fond_opacite == null || c.fond_opacite === '') c.fond_opacite = 0.6; } else delete c.fond_couleur; }
+        if (k === 'contour') { if (inp.checked) { c.contour = c.contour || '#ffffff'; c.contour_epaisseur = c.contour_epaisseur || 3; } else delete c.contour; }
+        if (k === 'ombre') {
+          c.ombre = inp.value !== 'aucune';
+          if (inp.value === 'halo') { c.ombre_decalage = 0; if (!/^#/.test(c.ombre_couleur || '')) c.ombre_couleur = '#ffffff'; }
+          if (inp.value === 'portee') { c.ombre_decalage = Number(c.ombre_decalage) || 1.5; if (!/^#/.test(c.ombre_couleur || '') || c.ombre_couleur === '#ffffff') c.ombre_couleur = '#000000'; if (c.ombre_opacite == null || c.ombre_opacite === '') c.ombre_opacite = 0.6; }
+        }
+        if (k === 'ombre_couleur') { c.ombre_couleur = inp.value; E.modif(true); return; }
+        majStyle();
+      }));
+      $$('#props [data-st-preset]').forEach(b => b.onclick = () => {
+        const t = b.dataset.stPreset;
+        ['fond_couleur', 'fond_opacite', 'fond_marge', 'fond_arrondi', 'contour', 'contour_epaisseur', 'ombre_couleur', 'ombre_force', 'ombre_opacite', 'ombre_decalage'].forEach(k => delete c[k]); c.ombre = false;
+        if (t === 'lisible') Object.assign(c, { ombre: true, ombre_couleur: '#000000', ombre_opacite: 0.7, ombre_force: 1.6, ombre_decalage: 1, contour: '#ffffff', contour_epaisseur: 2 });
+        if (t === 'bandeau') Object.assign(c, { fond_couleur: '#ffffff', fond_opacite: 0.75, fond_marge: 0.6, fond_arrondi: 0.5 });
+        if (t === 'neon') Object.assign(c, { ombre: true, ombre_couleur: c.couleur || '#ff4fa0', ombre_opacite: 1, ombre_force: 2.5, ombre_decalage: 0 });
+        majStyle();
+      });
       const va = $('#props [data-voir-anim]');
       if (va) va.onclick = () => { eng.mode = 'invitation'; eng.jouerPlan(E.i); };
       $$('#props [data-k]').forEach(inp => {
@@ -2003,7 +2071,14 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         Equipe.noter('film', 'Film — ' + (p.fiche.titre || ''), sec, p);
         if (Equipe.actif()) {
           if (r.blob.size > 50e6) toast('Film trop lourd (plus de 50 Mo) pour être partagé avec l\'équipe');
-          else { $('#film-etat').textContent += ' · envoi à l\'équipe…'; Equipe.partagerFilm(r.blob, p, sec).then(() => { $('#film-etat').textContent = $('#film-etat').textContent.replace(' · envoi à l\'équipe…', ' · partagé avec l\'équipe ✓'); }).catch(e => toast('Film non partagé : ' + e.message)); }
+          else {
+            const envoyer = () => {
+              const et = $('#film-etat'); if (!et) return; et.textContent = et.textContent.replace(/ · (envoi à l'équipe…|non partagé.*)$/, '') + ' · envoi à l\'équipe…';
+              Equipe.partagerFilm(r.blob, p, sec).then(() => { const e2 = $('#film-etat'); if (e2) e2.textContent = e2.textContent.replace(' · envoi à l\'équipe…', ' · visible par toute l\'équipe ✓'); toast('Film visible par toute l\'équipe (page Équipe)'); })
+                .catch(e => { const e2 = $('#film-etat'); if (!e2) return; e2.textContent = e2.textContent.replace(' · envoi à l\'équipe…', ' · non partagé (' + e.message + ') '); const bt = document.createElement('button'); bt.className = 'btn petit'; bt.textContent = 'Réessayer l\'envoi à l\'équipe'; bt.onclick = () => { bt.remove(); envoyer(); }; e2.appendChild(bt); });
+            };
+            envoyer();
+          }
         }
       } catch (e) { console.error(e); $('#film-etat').textContent = 'Erreur : ' + e.message; }
       b.disabled = false;
@@ -2232,11 +2307,13 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     } catch (e) { $('#rj-etat').textContent = 'Lien d\'équipe invalide : ' + e.message + '. Demandez le lien à jour à votre admin.'; }
   }
   // Modèles (invitations) et films de l'équipe : tout le monde les voit ; l'admin publie les films sur la vitrine
+  const vidFiltre = Object.assign({ type: 'tout', membre: '' }, Stock.lire('studio.vid.filtre', {}));
   async function modelesEtFilms(zone, admin, filmsSeuls) {
-    let modeles = [], films = [], surVitrine = new Set();
+    let modeles = [], films = [], videos = [], surVitrine = new Set();
     try {
       if (!filmsSeuls) modeles = await Equipe.rpc('equipe_modeles');
       await Equipe.charger(); films = Equipe.items.filter(x => x.type === 'film');
+      videos = Equipe.items.filter(x => x.type === 'film' || x.type === 'fond' || x.type === 'video');
       try { const r = await fetch(urlSite() + 'vitrine/index.json?v=' + Date.now(), { cache: 'no-store' }); if (r.ok) surVitrine = new Set((await r.json()).map(x => x.slug)); } catch (e) {}
     } catch (err) { zone.textContent = /function|schema cache|Could not find/i.test(err.message) ? 'Mise à jour de la base à installer (Réglages → Équipe).' : 'Impossible de lire l\'équipe : ' + err.message; return; }
     const date = x => x ? new Date(x).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
@@ -2245,11 +2322,29 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       <div class="grille" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr))">${modeles.map(t => `<div class="carte pile" style="padding:10px">${t.vignette ? `<img src="${esc(t.vignette)}" alt="" style="width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:8px">` : ''}
         <b>${esc(t.titre || 'Sans titre')}</b><div class="muet">par <b>${esc(t.auteur || '—')}</b> · ${t.plans} plans · ${date(t.maj)}</div>
         <div class="ligne">${t.publie && t.slug ? `<a class="btn petit" target="_blank" href="${esc(urlSite() + 'i/?p=' + encodeURIComponent(t.slug))}">Voir ↗</a>` : ''}<button class="btn petit plein" data-modele="${esc(t.projet)}">Utiliser ce modèle</button></div></div>`).join('') || '<p class="muet">Aucun modèle pour l\'instant.</p>'}</div></div>`}
-      <div class="carte" style="padding:10px;margin-top:14px"><h3 style="margin:4px 6px 10px">🎬 Films de l'équipe (${films.length})</h3>
-      <div class="grille" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr))">${films.map(f => { const u = Equipe.url(f.chemin), sv = surVitrine.has('film-' + f.id); return `<div class="carte pile" style="padding:10px">
+      <div class="carte" style="padding:10px;margin-top:14px" id="vid-equipe">
+        <div class="ligne" style="justify-content:space-between;margin:4px 6px 10px"><h3 style="margin:0">🎬 Toutes les vidéos de l'équipe (${videos.length})</h3>
+          <label class="btn petit plein">+ Ajouter un film terminé<input type="file" id="vid-ajout" accept="video/mp4,video/webm,video/quicktime,.mp4,.mov,.webm" multiple hidden></label></div>
+        <div class="ligne vid-filtres" style="margin:0 6px 10px;gap:6px;flex-wrap:wrap">
+          ${[['tout', 'Tout', videos.length], ['film', 'Films terminés', films.length], ['fond', 'Fonds vidéo', videos.filter(x => x.type !== 'film').length]].map(([k, n, c]) => `<button class="btn petit ${vidFiltre.type === k ? 'plein' : ''}" data-vf="${k}">${n} (${c})</button>`).join('')}
+          <select id="vid-membre" style="margin-left:auto"><option value="">Tous les membres</option>${[...new Set(videos.map(x => x.auteur || '—'))].sort().map(m => `<option ${vidFiltre.membre === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></div>
+        <div class="grille" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr))">${videos.filter(x => (vidFiltre.type === 'tout' || (vidFiltre.type === 'film' ? x.type === 'film' : x.type !== 'film')) && (!vidFiltre.membre || (x.auteur || '—') === vidFiltre.membre)).map(f => { const u = Equipe.url(f.chemin), estFilm = f.type === 'film', sv = estFilm && surVitrine.has('film-' + f.id); return `<div class="carte pile" style="padding:10px">
         <video src="${esc(u)}" poster="${esc(f.vignette || '')}" controls preload="none" playsinline style="width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:8px;background:#000"></video>
-        <b style="font-size:13px">${esc(f.nom)}</b><div class="muet" style="font-size:12px">par <b>${esc(f.auteur || '—')}</b> · ${date(f.cree)}${f.secondes_creation ? ' · ⏱ ' + dureeTexte(f.secondes_creation) : ''}</div>
-        <div class="ligne"><a class="btn petit" href="${esc(u)}" download target="_blank">Télécharger</a>${admin ? (sv ? `<span class="badge ok">sur la vitrine</span><button class="btn petit danger" data-film-retirer="${esc(f.id)}">Retirer</button>` : `<button class="btn petit plein" data-film-vitrine="${esc(f.id)}">Publier sur la vitrine</button>`) : (sv ? '<span class="badge ok">sur la vitrine</span>' : '')}</div></div>`; }).join('') || '<p class="muet">Aucun film pour l\'instant : chaque film fabriqué (Film et publication → Enregistrer le film) arrive ici tout seul.</p>'}</div></div>`;
+        <div><span class="badge ${estFilm ? 'ok' : ''}">${estFilm ? 'Film' : 'Fond vidéo'}</span></div>
+        <b style="font-size:13px">${esc(f.nom)}</b><div class="muet" style="font-size:12px">par <b>${esc(f.auteur || '—')}</b> · ${date(f.cree)}${f.duree ? ' · ' + Math.round(f.duree) + ' s' : ''}${f.secondes_creation ? ' · ⏱ fabriqué en ' + dureeTexte(f.secondes_creation) : ''}</div>
+        <div class="ligne"><a class="btn petit" href="${esc(u)}" download target="_blank">Télécharger</a>${estFilm ? (admin ? (sv ? `<span class="badge ok">sur la vitrine</span><button class="btn petit danger" data-film-retirer="${esc(f.id)}">Retirer</button>` : `<button class="btn petit plein" data-film-vitrine="${esc(f.id)}">Publier sur la vitrine</button>`) : (sv ? '<span class="badge ok">sur la vitrine</span>' : '')) : ''}</div></div>`; }).join('') || '<p class="muet">Aucune vidéo ici pour l\'instant. Chaque film fabriqué (Film et publication → Enregistrer le film) arrive tout seul ; un film déjà fait s\'ajoute avec « + Ajouter un film terminé ».</p>'}</div></div>`;
+    $$('[data-vf]', zone).forEach(b => b.onclick = () => { vidFiltre.type = b.dataset.vf; Stock.ecrire('studio.vid.filtre', vidFiltre); modelesEtFilms(zone, admin, filmsSeuls); });
+    const vm = $('#vid-membre', zone); if (vm) vm.onchange = () => { vidFiltre.membre = vm.value; Stock.ecrire('studio.vid.filtre', vidFiltre); modelesEtFilms(zone, admin, filmsSeuls); };
+    const va = $('#vid-ajout', zone); if (va) va.onchange = async () => {
+      const fs = [...va.files]; if (!fs.length) return;
+      for (const f of fs) {
+        const titre = f.name.replace(/\.\w+$/, '').replace(/[-_]+/g, ' ').replace(/\s*film\s*$/i, '').trim();
+        toast('Envoi de « ' + titre + ' » à l\'équipe…');
+        try { await Equipe.ajouterFilm(f, { titre }); toast('« ' + titre + ' » est visible par toute l\'équipe'); }
+        catch (err) { toast('« ' + titre + ' » non envoyé : ' + err.message); }
+      }
+      modelesEtFilms(zone, admin, filmsSeuls);
+    };
     $$('[data-modele]', zone).forEach(b => b.onclick = async () => {
       try {
         const src = await Equipe.rpc('equipe_modele', { p_projet: b.dataset.modele }); if (!src) return toast('Modèle introuvable');

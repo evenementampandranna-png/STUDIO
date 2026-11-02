@@ -39,6 +39,7 @@
   const JOURS_FR = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
   const JOURS_MG = ['Alahady', 'Alatsinainy', 'Talata', 'Alarobia', 'Alakamisy', 'Zoma', 'Sabotsy'];
   // Vidéo coupée (début / fin en secondes) : position dans le fichier pour un temps t de lecture
+  function rgba(hex, a) { const h = String(hex).replace('#', ''); const n = parseInt(h.length === 3 ? h.split('').map(x => x + x).join('') : h.slice(0, 6), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; }
   function plage(conf) { const c = conf && conf.coupe; return c && Number(c.fin) > (Number(c.debut) || 0) ? [Number(c.debut) || 0, Number(c.fin)] : null; }
   function positionVideo(conf, t, duree) {
     let x = t * ((conf && conf.vitesse) || 1);
@@ -499,19 +500,28 @@
         if (e.entree === 'ecriture') montrer = Math.floor(e.brutE * total);
         if (e.entree === 'mot-par-mot') { const nm = Math.ceil(e.brutE * txt.split(/\s+/).length); let k = 0, n = 0; for (const m of motsTxt) { if (!/^\s+$/.test(m)) { n++; if (n > nm) break; } k += m.length; } montrer = k; }
         const ax = align === 'left' ? -larg / 2 : align === 'right' ? larg / 2 : 0;
-        if (c.fond_couleur) {
-          ctx.save(); ctx.globalAlpha *= (c.fond_opacite != null ? Number(c.fond_opacite) : 0.6);
+        if (c.fond_couleur) {   // arrière-plan du texte (bandeau / cartouche)
+          ctx.save(); ctx.globalAlpha *= (c.fond_opacite != null && c.fond_opacite !== '' ? Number(c.fond_opacite) : 0.6);
           ctx.fillStyle = c.fond_couleur;
-          arrondi(ctx, -larg / 2 - taille * 0.4, -hTot / 2 - taille * 0.3, larg + taille * 0.8, hTot + taille * 0.6, taille * 0.4);
+          const mg = taille * (c.fond_marge != null && c.fond_marge !== '' ? Number(c.fond_marge) : 0.4);
+          const ar = c.fond_arrondi != null && c.fond_arrondi !== '' ? Number(c.fond_arrondi) : 0.4;
+          const fh = hTot + mg * 1.5;
+          arrondi(ctx, -larg / 2 - mg, -fh / 2, larg + mg * 2, fh, Math.min(fh / 2, taille * ar));
           ctx.fill(); ctx.restore();
         }
-        if (c.ombre) { ctx.shadowColor = c.ombre_couleur || 'rgba(255,255,255,0.85)'; ctx.shadowBlur = taille * 0.25; }
+        if (c.ombre) {   // halo (sans décalage) ou ombre portée (avec décalage)
+          const op = c.ombre_opacite != null && c.ombre_opacite !== '' ? Number(c.ombre_opacite) : 0.85;
+          ctx.shadowColor = /^#/.test(c.ombre_couleur || '') ? rgba(c.ombre_couleur, op) : (c.ombre_couleur || 'rgba(255,255,255,0.85)');
+          ctx.shadowBlur = taille * 0.25 * (c.ombre_force != null && c.ombre_force !== '' ? Number(c.ombre_force) : 1);
+          const dec = Number(c.ombre_decalage) || 0;
+          if (dec) { ctx.shadowOffsetX = dec * taille * 0.06 * Math.max(0.01, sc); ctx.shadowOffsetY = dec * taille * 0.06 * Math.max(0.01, sc); }
+        }
         let compte = 0;
         ls.forEach((l, i) => {
           const y = -hTot / 2 + inter * (i + 0.5);
           let morceau = l;
           if (e.entree === 'ecriture' || e.entree === 'mot-par-mot') { const reste = montrer - compte; morceau = reste <= 0 ? '' : l.slice(0, reste); compte += l.length + 1; }
-          if (c.contour) { ctx.lineWidth = Number(c.contour_epaisseur) || taille * 0.06; ctx.strokeStyle = c.contour; ctx.strokeText(morceau, ax, y); }
+          if (c.contour) { ctx.lineWidth = Number(c.contour_epaisseur) || taille * 0.06; ctx.lineJoin = 'round'; ctx.miterLimit = 2; ctx.strokeStyle = c.contour; ctx.strokeText(morceau, ax, y); }
           ctx.fillStyle = c.couleur || '#7a1f2b';
           ctx.fillText(morceau, ax, y);
         });

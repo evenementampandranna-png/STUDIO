@@ -283,3 +283,8 @@ textarea.edition-directe { position: absolute; z-index: 8; resize: none; overflo
 
 .cp-barre { position: relative; height: 10px; background: #efe5d8; border-radius: 99px; margin: 8px 0; }
 .cp-barre #cp-zone { position: absolute; top: 0; bottom: 0; background: var(--vin); border-radius: 99px; }
+/* Fond, ombre, contour d'un texte */
+.style-texte .st-ligne{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.style-texte .st-case{display:flex;align-items:center;gap:6px;cursor:pointer}
+.style-texte input[type=color]{width:40px;height:30px;padding:2px;border-radius:6px}
+.style-texte .st-presets{gap:6px;flex-wrap:wrap;margin-top:4px}
