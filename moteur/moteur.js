@@ -93,7 +93,7 @@
       this.base = opts.base || '';
       this.mode = opts.mode || 'invitation';      // 'invitation' | 'edition' | 'rendu'
       this.resolveur = opts.resolveur || null;     // async (src) => url
-      this.onAction = opts.onAction || function () {};
+      this.onAction = opts.onAction || null;
       this.onFin = opts.onFin || function () {};
       this.onTemps = opts.onTemps || function () {};
       this.famille = opts.famille || null;
@@ -226,6 +226,13 @@
     allerA(pos) { if (pos < 0 || pos >= this.seq.length) return; this.pos = pos; this.t = 0; this.lecture = true; this._entrerPlan(); }
     suivant() { if (this.pos < this.seq.length - 1) this.allerA(this.pos + 1); }
     precedent() { if (this.pos > 0) this.allerA(this.pos - 1); }
+    // Aller au plan de remerciement (après « Je confirme » / « Je ne pourrai pas venir »)
+    allerRemerciement() {
+      const pl = this.projet.plans;
+      let i = this.seq.findIndex(k => pl[k].role === 'remerciement');
+      if (i < 0) { const m = pl.findIndex(p => p.role === 'remerciement'); if (m < 0) return; this.seq = this.seq.concat(m); i = this.seq.length - 1; }
+      this.planFixe = null; this.allerA(i);
+    }
     passerFilm() {
       const pl = this.projet.plans;
       const i = this.seq.findIndex(k => pl[k].role === 'confirmation' || pl[k].role === 'remerciement');
@@ -540,7 +547,9 @@
       if (a === 'precedent') return this.precedent();
       if (a === 'passer') return this.passerFilm();
       if (a === 'revoir') { const seq = this.seq; return this.jouer(seq, 0); }
-      this.onAction(a, c, Object.assign({}, this.form), this);
+      if (this.onAction) return this.onAction(a, c, Object.assign({}, this.form), this);
+      // sans gestionnaire (aperçu du studio) : on montre quand même la suite
+      if (a === 'confirmer' || a === 'refuser') this.allerRemerciement();
     }
 
     /* ----- Mesure réelle d'un texte (pour éviter les chevauchements) ----- */

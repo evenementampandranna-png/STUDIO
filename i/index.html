@@ -45,10 +45,10 @@
 <button id="son" aria-label="Son">♪</button>
 <div id="bandeau" role="dialog"></div>
 <div id="erreur"></div>
-<script src="../config.js?v=202610311419"></script>
-<script src="../moteur/moteur.js?v=202610311419"></script>
-<script src="../moteur/fabrique.js?v=202610311419"></script>
-<script src="../moteur/base.js?v=202610311419"></script>
+<script src="../config.js?v=202611020832"></script>
+<script src="../moteur/moteur.js?v=202611020832"></script>
+<script src="../moteur/fabrique.js?v=202611020832"></script>
+<script src="../moteur/base.js?v=202611020832"></script>
 <script>
 (async function () {
   const q = new URLSearchParams(location.search);
@@ -116,6 +116,7 @@
       p.calques = p.calques.filter(c => !(c.type === 'compteur' || c.action === 'confirmer' || c.action === 'refuser' || c.action === 'whatsapp'));
       const noms = (fiche.contacts || []).map(c => c.nom).join(fiche.langue === 'mg' ? ' na ' : ' ou ');
       const closTr = { mg: `Efa nikatona ny famaliana nanomboka ny {date_limite}. Raha misy fanontaniana, antsoy i ${(fiche.contacts || []).map(c => c.nom).join(' na ')}.`, fr: `Les réponses sont closes depuis le {date_limite}. Pour toute information, appelez ${(fiche.contacts || []).map(c => c.nom).join(' ou ')}.`, en: `Replies closed on {date_limite}. For any question, please call ${(fiche.contacts || []).map(c => c.nom).join(' or ')}.` };
+      p.duree = Math.max(Number(p.duree) || 0, 7);   // réponses closes : le film continue vers le remerciement
       p.calques.push({ id: 'clos', type: 'texte', trad: closTr, texte: fiche.langue === 'mg' ? `Efa nikatona ny famaliana nanomboka ny {date_limite}. Raha misy fanontaniana, antsoy i ${noms}.` : `Les réponses sont closes depuis le {date_limite}. Pour toute information, appelez ${noms}.`, x: 50, y: 52, largeur: 70, taille: 3, couleur: '#7a1f2b', fond_couleur: '#ffffff', fond_opacite: .75, gras: true, animation: 'fondu', debut: .3 });
     });
   }
@@ -151,6 +152,7 @@
   const moteur = new Moteur($('#scene'), { resolveur: resoudre, mode: 'invitation', famille, onAction });
   await moteur.setProjet(projet);
   moteurPret = moteur; moteur.changerLangue(LG);
+  window.moteurInvitation = moteur;
   if (langues.length > 1) $('#btn-langue').style.display = 'block';
   moteur.afficherPlan(0, 0.01);
 
@@ -202,7 +204,9 @@
     if (action === 'whatsapp') {
       const k = contacts[cible] || contacts[0]; if (!k) return;
       const msg = fiche.langue === 'mg' ? `Salama! Momba ny fanasana "${fiche.titre}": ` : `Bonjour ! Au sujet de l'invitation « ${fiche.titre} » : `;
-      window.open('https://wa.me/' + tel(k.telephone) + '?text=' + encodeURIComponent(msg), '_blank'); return;
+      window.open('https://wa.me/' + tel(k.telephone) + '?text=' + encodeURIComponent(msg), '_blank');
+      if (moteur.planCourant() && moteur.planCourant().role === 'confirmation') setTimeout(() => moteur.allerRemerciement(), 800);
+      return;
     }
     if (action === 'partager') {
       noter('partage');
@@ -226,8 +230,7 @@
       const envoyer = tr('Alefaso amin\'ny WhatsApp', 'Envoyer sur WhatsApp', 'Send on WhatsApp');
       if (ok) bandeau(`<b>${merci}</b><div class="actions"><button data-fermer>OK</button></div>`);
       else bandeau(`<b>${tr('Alefaso amin\'ny WhatsApp ny valinteninareo', 'Envoyez votre réponse sur WhatsApp', 'Send your reply on WhatsApp')}</b><div style="margin-top:6px">${messageReponse(oui, form)}</div><div class="actions">${lienWa ? `<a class="plein" target="_blank" href="${lienWa}">${envoyer}</a>` : ''}<button data-fermer>${tr('Hidio', 'Fermer', 'Close')}</button></div>`);
-      const i = moteur.seq.findIndex(k => projet.plans[k].role === 'remerciement');
-      if (i >= 0) setTimeout(() => moteur.allerA(i), 400);
+      setTimeout(() => moteur.allerRemerciement(), 400);
     }
   }
 })();

@@ -103,6 +103,45 @@
   let nettoyeurs = [];
   function nettoyer() { if (moteurCourant) { moteurCourant.detruire(); moteurCourant = null; } if (boucleUI) { cancelAnimationFrame(boucleUI); boucleUI = null; } nettoyeurs.forEach(f => f()); nettoyeurs = []; }
   function ecouter(cible, ev, fn) { cible.addEventListener(ev, fn); nettoyeurs.push(() => cible.removeEventListener(ev, fn)); }
+  /* ================= Nouveautés : affichées à chaque mise à jour ================= */
+  // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
+  const NOUVEAUTES = [
+    { id: '2026-11-02-1', date: '2 novembre 2026', titre: 'Remerciement et nouveautés', points: [
+      'Le plan de <b>remerciement</b> s\'affiche bien après « Ho tonga izahay », « Tsy ho afaka izahay » ou « Hamaly amin\'ny WhatsApp » (lien général), dans l\'invitation et dans l\'aperçu du studio.',
+      'Quand la <b>date limite</b> des réponses est passée, le film continue tout seul vers le remerciement (au lieu de rester bloqué), et le studio vous prévient.',
+      'Ce panneau « Nouveautés » s\'affiche à chaque mise à jour du studio ; tout l\'historique est dans le menu <b>Nouveautés</b>.'] },
+    { id: '2026-10-31-3', date: '31 octobre 2026', titre: 'Catégories d\'invités', points: [
+      'Dans le lien organisateur : catégories proposées (Fianakaviana avy amin\'ny ray, avy amin\'ny reny, Namana, Mpiara-miasa…), ＋ nouvelle catégorie, renommer, retirer, filtrer.'] },
+    { id: '2026-10-31-2', date: '31 octobre 2026', titre: 'Invitation en plusieurs langues', points: [
+      'Fiche → Langues de l\'invitation ; Plans → 🌐 Traduire ; l\'invité choisit sa langue d\'un clic (bouton 🌐).',
+      'Bouton « 🔗 Liens du client » en haut de chaque événement : le lien des invités et le lien organisateur.'] },
+    { id: '2026-10-31-1', date: '31 octobre 2026', titre: 'Lien organisateur, brouillons, vitrine', points: [
+      'Lien organisateur privé : le client ajoute ses invités et voit qui vient, combien.',
+      'Les vidéos créées sont gardées en brouillon tout de suite, et récupérées après une coupure.',
+      'Vitrine du site : montrer une invitation (anonymisée ou non), la retirer.'] },
+    { id: '2026-10-30-1', date: '30 octobre 2026', titre: 'Créer avec l\'IA, chanson, bibliothèque par événement', points: [
+      '« ✨ Créer avec l\'IA » dans la Bibliothèque : Recolorer, Fond Wan 2.2, Animer une image.',
+      'Chanson : tous les formats, début réglable.', 'Chaque événement a sa propre bibliothèque.'] },
+  ];
+  function panneauNouveautes() {
+    const vu = Stock.lire('studio.nouveautes.vu', '');
+    const nouvelles = NOUVEAUTES.filter(n => n.id > vu).slice(0, vu ? 10 : 1);
+    if (!nouvelles.length || $('.nouveautes-panneau')) return;
+    const d = document.createElement('div'); d.className = 'nouveautes-panneau';
+    d.innerHTML = `<div class="np-tete"><b>🆕 Mise à jour du studio</b><button class="modale-fermer" aria-label="Fermer">×</button></div>
+      ${nouvelles.map(n => `<div class="np-bloc"><div class="muet">${n.date}</div><b>${n.titre}</b><ul>${n.points.map(x => `<li>${x}</li>`).join('')}</ul></div>`).join('')}
+      <div class="ligne"><button class="btn plein petit" data-ok>J'ai compris</button><a class="btn petit" href="#/nouveautes">Tout l'historique</a></div>`;
+    document.body.appendChild(d);
+    const ok = () => { Stock.ecrire('studio.nouveautes.vu', NOUVEAUTES[0].id); d.remove(); };
+    $('[data-ok]', d).onclick = ok; $('.modale-fermer', d).onclick = ok; $('a', d).onclick = ok;
+  }
+  function vueNouveautes() {
+    $('#app').innerHTML = `<div class="entete"><div><h1>Nouveautés</h1><p>Ce qui a changé dans le studio, du plus récent au plus ancien.</p></div></div>
+      <div class="pile" style="max-width:820px">${NOUVEAUTES.map(n => `<div class="carte pile"><div class="muet">${n.date}</div><h3 style="margin:0">${n.titre}</h3><ul style="margin:0;padding-left:20px">${n.points.map(x => `<li>${x}</li>`).join('')}</ul></div>`).join('')}</div>`;
+    Stock.ecrire('studio.nouveautes.vu', NOUVEAUTES[0].id);
+  }
+  setTimeout(panneauNouveautes, 1200);
+
   function route() {
     nettoyer();
     const h = location.hash.replace(/^#\/?/, '').split('/');
@@ -112,6 +151,7 @@
     if (h[0] === 'bibliotheque') return vueBibliotheque();
     if (h[0] === 'reglages') return vueReglages();
     if (h[0] === 'guide') return vueGuide();
+    if (h[0] === 'nouveautes') return vueNouveautes();
     if (h[0] === 'p' && projets[h[1]]) return vueProjet(projets[h[1]], h[2] || 'plans');
     return vueAccueil();
   }
@@ -388,7 +428,11 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     $('#musique-btn').onclick = () => modaleMusique(p, () => { $('#musique-btn').textContent = '♪ ' + (p.musique ? (p.musique.nom || 'Chanson').replace(/\.\w+$/, '').slice(0, 18) : 'Ajouter une chanson'); });
     eng.onTemps = (t) => { $('#t-aff').textContent = t.toFixed(1).replace('.', ',') + ' s'; if (eng.planFixe != null) $('#t-curseur').value = t; };
     eng.onFin = () => { eng.mode = 'edition'; afficher(); };
-    eng.onAction = (a) => toast('Action « ' + a + ' » (active sur la page d\'invitation)');
+    eng.onAction = (a) => {
+      if (a === 'whatsapp' && eng.planCourant() && eng.planCourant().role === 'confirmation') { toast('Réponse par WhatsApp (simulée) : suite du film'); return eng.allerRemerciement(); }
+      if (a === 'confirmer' || a === 'refuser') { toast(a === 'confirmer' ? 'Réponse « vient » (simulée) : suite du film' : 'Réponse « ne vient pas » (simulée) : suite du film'); return eng.allerRemerciement(); }
+      toast('Action « ' + a + ' » (active sur la page d\'invitation)');
+    };
     $('#vue').onchange = e => { E.vue = e.target.value; eng.famille = E.vue === 'famille' ? FAMILLE_TEST : null; eng.form = { adultes: null, enfants: null }; if (eng.famille) { eng.form.adultes = 2; eng.form.enfants = 2; } E.rafraichir(); };
     eng.form.adultes = 2; eng.form.enfants = 2;
     $('#img-test').onclick = () => { try { telecharger(`plan-${E.i + 1}.jpg`, dataURLversBlob(eng.imageTest())); } catch (e) { toast(e.message); } };
@@ -1693,6 +1737,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
                 <div class="ligne"><a class="btn petit" target="_blank" href="https://wa.me/?text=${encodeURIComponent((p.fiche.langue === 'mg' ? 'Ity ny rohy hitantananao ny vahiny (aza zaraina): ' : 'Voici votre lien pour gérer vos invités (à garder pour vous) : ') + lienHote(p))}">Envoyer au client sur WhatsApp</a></div>`}
           </div>
           ${p.publie ? '' : '<div class="alerte-boite">Tant que l\'invitation n\'est pas publiée, ces liens affichent « Invitation introuvable ».</div>'}
+          ${p.fiche.date_limite && Date.now() > Date.parse(p.fiche.date_limite + 'T23:59:59+03:00') ? `<div class="alerte-boite"><b>Date limite des réponses dépassée</b> (${esc(MoteurInfo.dateLisible(p.fiche.date_limite, 'fr'))}) : les invités ne peuvent plus confirmer, l'invitation affiche « réponses closes ». Pour rouvrir, changez la date limite dans l'onglet <a href="#/p/${p.id}/fiche">Fiche</a>, puis republiez.</div>` : ''}
         </div>
         <div class="carte pile"><h3>Publier en ligne</h3>
           ${pret ? `<p class="muet">Dépôt : <b>${esc(g.owner)}/${esc(g.repo)}</b>. La publication envoie l'invitation${fichiersIdb.length ? ` et ${fichiersIdb.length} fichier(s) importé(s)` : ''} sur GitHub Pages (1 à 10 minutes avant d'être visible).</p>

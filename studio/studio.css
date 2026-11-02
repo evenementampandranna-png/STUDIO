@@ -272,3 +272,9 @@ textarea.edition-directe { position: absolute; z-index: 8; resize: none; overflo
 .etat-liste { margin: 0; padding-left: 20px; color: var(--gris); font-size: 13.5px; display: flex; flex-direction: column; gap: 3px; }
 .etat-liste li.fait { color: #2e7d32; }
 .lien-client { display: flex; flex-direction: column; gap: 6px; background: #fbf7f1; border: 1px solid var(--ligne); border-radius: 12px; padding: 10px 12px; }
+
+.nouveautes-panneau { position: fixed; z-index: 75; right: 18px; top: 74px; width: min(400px, calc(100vw - 32px)); max-height: calc(100vh - 100px); overflow: auto; background: #fff; border: 2px solid var(--vin); border-radius: 16px; padding: 14px 16px; box-shadow: 0 16px 40px rgba(40,10,10,.28); display: flex; flex-direction: column; gap: 10px; font-size: 14px; animation: veilleEntree .3s ease; }
+.nouveautes-panneau .np-tete { display: flex; justify-content: space-between; align-items: center; color: var(--vin); font-size: 15px; }
+.nouveautes-panneau .modale-fermer { position: static; }
+.nouveautes-panneau ul { margin: 4px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.np-bloc { border-top: 1px solid var(--ligne); padding-top: 8px; }
