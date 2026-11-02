@@ -66,7 +66,7 @@
     medias() {
       if (!this.actif()) return [];
       const miens = new Set(medias.map(m => m.equipe_id).filter(Boolean));
-      return (this.items || []).filter(x => !miens.has(x.id)).map(x => ({ id: 'eq-' + x.id, equipe_id: x.id, equipe: true, src: this.url(x.chemin), nom: x.nom, type: x.type, vignette: x.vignette, usage: x.usage || 'programme', description: x.description || '', duree: x.duree, l: x.l, h: x.h, auteur: x.auteur, secondes_creation: x.secondes_creation, evenement: x.evenement, zone: { x: 50, y: 50, largeur: 66 }, zone_texte: 'centre' }));
+      return (this.items || []).filter(x => !miens.has(x.id) && x.type !== 'film').map(x => ({ id: 'eq-' + x.id, equipe_id: x.id, equipe: true, src: this.url(x.chemin), nom: x.nom, type: x.type, vignette: x.vignette, usage: x.usage || 'programme', description: x.description || '', duree: x.duree, l: x.l, h: x.h, auteur: x.auteur, secondes_creation: x.secondes_creation, evenement: x.evenement, zone: { x: 50, y: 50, largeur: 66 }, zone_texte: 'centre' }));
     },
     // partage un fichier local avec l'équipe (envoi + fiche)
     async partager(m, evtTitre) {
@@ -93,6 +93,15 @@
     noter(type, nom, secondes, p) {
       if (!this.actif()) return;
       this.rpc('equipe_creation', { p_creation: { auteur: this.membre(), projet: p ? p.id : '', titre_projet: p ? p.fiche.titre : '', type, nom, secondes } }).catch(() => {});
+    },
+    // le film MP4 fabriqué : visible par toute l'équipe, publiable sur la vitrine par l'admin
+    async partagerFilm(blob, p, sec) {
+      const id = 'film' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      const chemin = reglages.equipe.cle + '/' + id + '.mp4';
+      await this.envoyerFichier(chemin, new Blob([blob], { type: 'video/mp4' }));
+      const v = vignetteDe(((p.plans.find(x => x.role !== 'ouverture') || p.plans[0] || {}).fond || {}).media || '');
+      await this.rpc('equipe_biblio_ajouter', { p_item: { id, auteur: this.membre(), type: 'film', nom: 'Film — ' + (p.fiche.titre || ''), chemin, vignette: /^data:/.test(v) && v.length < 150000 ? v : '', duree: 0, secondes_creation: sec, evenement: p.fiche.titre || '' } });
+      await this.charger();
     },
     // fichiers d'une invitation envoyés dans l'espace d'équipe (une seule fois chacun), pour que l'admin ait tout
     urls: Stock.lire('studio.equipe.urls', {}),
@@ -193,6 +202,13 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-02-5', date: '2 novembre 2026', titre: 'Couper, superposition, modèles et films de l\'équipe', points: [
+      '<b>✂ Couper une vidéo</b> : bouton « ✂ Couper » sur le fond d\'un plan et sur chaque vidéo posée : vous gardez seulement le passage voulu (début / fin).',
+      '<b>Superposition</b> : pour chaque photo, vidéo ou texte, un mode de fusion avec le fond (produit, écran, superposition, lumière douce…).',
+      '<b>Film</b> : tous les boutons apparaissent maintenant dans le film (et sur la vitrine du site).',
+      '<b>Équipe</b> : chaque membre voit tous les modèles de l\'équipe (« Utiliser ce modèle ») et tous les films ; chaque film fabriqué y arrive tout seul.',
+      '<b>Admin</b> : « Publier sur la vitrine » pour les films de l\'équipe ; les visiteurs du site les regardent dans « Modèles à essayer ».',
+      '<b>Lien général</b> : quand l\'invité tape son nom, la liste des invités lui propose le sien ; sa réponse va directement à sa famille chez l\'organisateur.'] },
     { id: '2026-11-02-4', date: '2 novembre 2026', titre: 'Film complet, confirmation par le lien général, vitrine de l\'équipe', points: [
       '<b>Film</b> : le fond ne disparaît plus (chaque image attend que la vidéo soit prête), et le <b>plan de confirmation</b> est maintenant dans le film (7 s).',
       '<b>Lien général</b> : les invités peuvent aussi confirmer ou refuser (avec les compteurs) ; ils donnent leur nom, et la réponse arrive tout de suite chez l\'organisateur.',
@@ -887,7 +903,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <div class="fond-actuel"><img src="${esc(vignetteDe(pl.fond.media))}" alt=""><div style="min-width:0"><b>${esc(fondActuel ? fondActuel.nom : '—')}</b>
             <div class="muet">${nbMemeFond > 1 ? `Utilisé par ${nbMemeFond} plans` : 'Utilisé par ce plan seulement'}</div></div></div>
           <label class="champ">Choisir dans la bibliothèque<select id="p-fond">${fonds.map(f => `<option value="${esc(f.src)}" ${pl.fond.media === f.src ? 'selected' : ''}>${esc(f.nom)} (${esc(f.usage)})</option>`).join('')}</select></label>
-          <div class="ligne" style="margin-top:8px"><label class="btn petit">Importer un fond<input type="file" id="imp-fond-plan" accept="video/*" hidden></label><button class="btn petit ia" id="fond-ia" title="S'ouvre dans la Bibliothèque">✨ Créer avec l'IA (Bibliothèque)</button></div>
+          <div class="ligne" style="margin-top:8px"><label class="btn petit">Importer un fond<input type="file" id="imp-fond-plan" accept="video/*" hidden></label><button class="btn petit ia" id="fond-ia" title="S'ouvre dans la Bibliothèque">✨ Créer avec l'IA (Bibliothèque)</button><button class="btn petit" id="fond-couper">✂ Couper${MoteurInfo.plage(pl.fond) ? ' (' + MoteurInfo.plage(pl.fond).map(x => x.toFixed(1)).join(' → ') + ' s)' : ''}</button></div>
           <div class="deux" style="margin-top:8px">
             <label class="champ">Éclaircir<input type="range" id="p-ecl" min="0" max="0.7" step="0.05" value="${pl.fond.eclaircir || 0}"></label>
             <label class="champ">Assombrir<input type="range" id="p-asb" min="0" max="0.7" step="0.05" value="${pl.fond.assombrir || 0}"></label>
@@ -917,6 +933,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         E.modif(true); pl.fond.media = m.src; eng.precharger().then(() => { eng._entrerPlan(); afficher(); }); toast('Fond importé et appliqué à ce plan');
       };
       $('#fond-ia').onclick = () => allerCreateur(p, E.i, {});
+      $('#fond-couper').onclick = () => modaleCouper(pl.fond, pl.fond.media, () => { E.modif(true); eng.precharger().then(() => { eng._entrerPlan(); afficher(); }); });
       $('#empiler').onclick = () => { E.modif(true); if (eng.empilerTextes(pl)) { E.rafraichir(); rendreReglages(); toast('Textes réorganisés (↶ pour annuler)'); } else toast('Rien à réorganiser'); };
       $('#p-duree').oninput = e => { E.modif(); pl.duree = Math.max(0, Number(e.target.value) || 0); $('#t-curseur').max = Number(pl.duree) || 6; rendrePlans(); };
       $('#p-trans').onchange = e => { E.modif(true); pl.transition = pl.transition || {}; pl.transition.type = e.target.value; pl.transition.duree = pl.transition.duree || 0.8; voirTransition(); };
@@ -1002,6 +1019,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <div class="deux"><label class="champ">Police<select data-k="police">${opts(I.POLICES, c.police)}</select></label><label class="champ">Taille<input type="range" data-k="taille" min="1.5" max="12" step="0.1" value="${c.taille || 4}"></label></div>
         <div class="trois"><label class="champ">Couleur<input type="color" data-k="couleur" value="${c.couleur || '#7a1f2b'}"></label><label class="champ">Alignement<select data-k="align">${opts([['center', 'Centré'], ['left', 'Gauche'], ['right', 'Droite']], c.align || 'center')}</select></label><label class="champ">Interligne<input type="number" data-k="interligne" step="0.05" min="0.8" max="2" value="${c.interligne || 1.25}"></label></div>
         <div class="cases"><label><input type="checkbox" data-k="gras" ${c.gras ? 'checked' : ''}> Gras</label><label><input type="checkbox" data-k="italique" ${c.italique ? 'checked' : ''}> Italique</label><label><input type="checkbox" data-k="majuscules" ${c.majuscules ? 'checked' : ''}> Majuscules</label><label><input type="checkbox" data-k="ombre" ${c.ombre ? 'checked' : ''}> Halo clair</label></div>
+        <label class="champ">Superposition (mode de fusion)<select data-k="fusion">${opts(I.FUSIONS, c.fusion || 'normal')}</select></label>
         </div></details>` + blocTraductions(c) + blocAnimation(c);
       if (c.type === 'bouton') s += `<details class="bloc" open><summary>Bouton</summary><div class="pile">
         <label class="champ">Libellé<input type="text" data-k="texte" value="${esc(c.texte)}"></label>
@@ -1020,6 +1038,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <label class="champ">Ou choisir dans la bibliothèque<select data-k="media">${opts([['', '—']].concat(medias.filter(m => (m.type === 'image' || m.type === 'video') && (pourEvt(m, p.id) || m.src === c.media)).concat(Equipe.medias().filter(m => m.type === 'video' || m.type === 'image')).map(m => [m.src, m.nom + (m.anime ? ' (animée)' : '') + (m.equipe ? ' — équipe' : '')])), c.media)}</select></label>
         ${c.type === 'image' && c.media ? '<button class="btn petit ia" data-animer>✨ Animer cette photo (Wan 2.2)</button>' : ''}
         <div class="trois"><label class="champ">Hauteur (%)<input type="number" data-k="hauteur" value="${c.hauteur || 22}"></label><label class="champ">Forme<select data-k="forme">${opts([['', 'Normale'], ['arrondi', 'Arrondie'], ['rond', 'Ronde']], c.forme || '')}</select></label><label class="champ">Opacité<input type="number" data-k="opacite" min="0" max="1" step="0.05" value="${c.opacite != null ? c.opacite : 1}"></label></div>
+        <label class="champ">Superposition (mode de fusion avec le fond)<select data-k="fusion">${opts(I.FUSIONS, c.fusion || 'normal')}</select></label>
+        ${c.type === 'video' && c.media ? `<button class="btn petit" data-couper>✂ Couper la vidéo${MoteurInfo.plage(c) ? ' (' + MoteurInfo.plage(c).map(x => x.toFixed(1)).join(' → ') + ' s)' : ''}</button>` : ''}
         <div class="cases"><label><input type="checkbox" data-k="remplir" ${c.remplir ? 'checked' : ''}> Remplir le cadre (recadrer)</label><label>Bordure <input type="color" data-k="bordure" value="${c.bordure || '#b08a4f'}"></label></div>
         </div></details>` + blocAnimation(c);
       return s + position;
@@ -1028,6 +1048,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       $$('#props [data-trad]').forEach(t => t.oninput = () => { c.trad = c.trad || {}; if (t.value.trim()) c.trad[t.dataset.trad] = t.value; else delete c.trad[t.dataset.trad]; E.modif(); E.rafraichir(); });
       const rp = $('#props [data-remplacer]');
       if (rp) rp.onchange = async e => { const f = e.target.files[0]; if (!f) return; const m = await importerFichier(f, null, p.id); sauverMedias(); E.modif(true); c.media = m.src; c.type = m.type === 'video' ? 'video' : 'image'; eng.precharger().then(() => { E.rafraichir(); rendreReglages(); }); };
+      const cp = $('#props [data-couper]'); if (cp) cp.onclick = () => modaleCouper(c, c.media, () => { E.modif(true); eng.precharger().then(() => { E.rafraichir(); rendreReglages(); }); });
       const an = $('#props [data-animer]'); if (an) an.onclick = () => allerCreateur(p, E.i, { methode: 'animer', calque: c.id });
       const va = $('#props [data-voir-anim]');
       if (va) va.onclick = () => { eng.mode = 'invitation'; eng.jouerPlan(E.i); };
@@ -1169,6 +1190,37 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     }
     const fin = enc.flush(); if (fin.length) morceaux.push(new Uint8Array(fin));
     return new File(morceaux, f.name.replace(/\.\w+$/, '') + '.mp3', { type: 'audio/mpeg' });
+  }
+
+  /* ---------- ✂ Couper une vidéo (fond ou calque) : garder seulement un passage ---------- */
+  function modaleCouper(conf, src, apres) {
+    modale(`<h2>✂ Couper la vidéo</h2>
+      <p class="muet">Choisissez le passage à garder : la vidéo jouera seulement de « Début » à « Fin » (et recommencera au début du passage si elle tourne en boucle). Le fichier d'origine n'est pas modifié.</p>
+      <video id="cp-v" controls muted playsinline style="width:100%;max-height:52vh;background:#000;border-radius:10px"></video>
+      <div class="cp-barre"><div id="cp-zone"></div></div>
+      <div class="deux"><label class="champ">Début (s)<div class="ligne"><input type="number" id="cp-deb" step="0.1" min="0" style="width:100px"><button class="btn petit" id="cp-ici-deb">Position actuelle</button></div></label>
+        <label class="champ">Fin (s)<div class="ligne"><input type="number" id="cp-fin" step="0.1" min="0" style="width:100px"><button class="btn petit" id="cp-ici-fin">Position actuelle</button></div></label></div>
+      <div class="ligne"><button class="btn" id="cp-voir">▶ Voir le passage</button><button class="btn danger" id="cp-annuler">Garder toute la vidéo</button><button class="btn plein" id="cp-ok">Appliquer</button><span class="muet" id="cp-info"></span></div>`, async (box, fermer) => {
+      const v = $('#cp-v', box), deb = $('#cp-deb', box), fin = $('#cp-fin', box);
+      v.src = await resoudre(src);
+      await new Promise(r => { v.onloadedmetadata = r; v.onerror = r; });
+      const D = v.duration || 0, pl = MoteurInfo.plage(conf) || [0, D];
+      deb.value = pl[0].toFixed(1); fin.value = Math.min(pl[1], D).toFixed(1); deb.max = fin.max = D.toFixed(1);
+      const maj = () => { const a = Number(deb.value) || 0, b = Number(fin.value) || D; $('#cp-zone', box).style.cssText = `left:${a / D * 100}%;width:${Math.max(0, b - a) / D * 100}%`; $('#cp-info', box).textContent = 'Passage : ' + Math.max(0, b - a).toFixed(1) + ' s sur ' + D.toFixed(1) + ' s'; };
+      maj(); deb.oninput = fin.oninput = maj;
+      $('#cp-ici-deb', box).onclick = () => { deb.value = v.currentTime.toFixed(1); maj(); };
+      $('#cp-ici-fin', box).onclick = () => { fin.value = v.currentTime.toFixed(1); maj(); };
+      let boucle = null;
+      $('#cp-voir', box).onclick = () => { v.currentTime = Number(deb.value) || 0; v.play(); clearInterval(boucle); boucle = setInterval(() => { if (v.currentTime >= (Number(fin.value) || D)) v.currentTime = Number(deb.value) || 0; }, 50); };
+      modale._fermer = () => { clearInterval(boucle); v.pause(); };
+      $('#cp-annuler', box).onclick = () => { delete conf.coupe; fermer(); toast('Toute la vidéo est gardée'); apres && apres(); };
+      $('#cp-ok', box).onclick = () => {
+        const a = Math.max(0, Number(deb.value) || 0), b = Math.min(D, Number(fin.value) || D);
+        if (b - a < 0.3) return toast('Le passage doit durer au moins 0,3 s');
+        if (a <= 0.05 && b >= D - 0.05) delete conf.coupe; else conf.coupe = { debut: Math.round(a * 10) / 10, fin: Math.round(b * 10) / 10 };
+        fermer(); toast(conf.coupe ? 'Vidéo coupée : ' + conf.coupe.debut + ' → ' + conf.coupe.fin + ' s' : 'Toute la vidéo est gardée'); apres && apres();
+      };
+    });
   }
 
   /* ---------- Traduction de toute l'invitation ---------- */
@@ -1940,6 +1992,10 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         const sec = (Date.now() - t0) / 1000;
         $('#film-etat').textContent = `Film prêt en ${dureeTexte(sec)} (film de ${Math.round(r.duree)} s, ${(r.blob.size / 1e6).toFixed(1)} Mo, ${r.extension.toUpperCase()})`;
         Equipe.noter('film', 'Film — ' + (p.fiche.titre || ''), sec, p);
+        if (Equipe.actif()) {
+          if (r.blob.size > 50e6) toast('Film trop lourd (plus de 50 Mo) pour être partagé avec l\'équipe');
+          else { $('#film-etat').textContent += ' · envoi à l\'équipe…'; Equipe.partagerFilm(r.blob, p, sec).then(() => { $('#film-etat').textContent = $('#film-etat').textContent.replace(' · envoi à l\'équipe…', ' · partagé avec l\'équipe ✓'); }).catch(e => toast('Film non partagé : ' + e.message)); }
+        }
       } catch (e) { console.error(e); $('#film-etat').textContent = 'Erreur : ' + e.message; }
       b.disabled = false;
     };
@@ -2056,7 +2112,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <b style="font-size:13px">${esc(m.nom)}</b>${m.anime ? '<span class="badge">image animée</span>' : ''}${m.secondes_creation ? `<span class="badge">⏱ ${dureeTexte(m.secondes_creation)}</span>` : ''}${Equipe.actif() && m.anime && !m.brouillon ? (m.equipe_id ? '<span class="badge ok">👥 partagé</span>' : `<button class="btn petit" data-partager="${m.id}">Partager avec l'équipe</button>`) : ''}${m.brouillon ? `<div class="ligne"><span class="badge alerte">Brouillon</span><button class="btn petit plein" data-garder="${m.id}">Garder</button></div>` : ''}${evt === '*' ? `<span class="badge">${esc(titre(m.evt))}</span>` : ''}
         <details><summary class="muet" style="cursor:pointer">Réglages</summary><div class="pile" style="margin-top:6px">${choixEvt(m)}<button class="btn petit danger" data-suppr="${m.id}">Supprimer</button></div></details></div>`).join('')}</div>` : '<p class="muet">Aucune photo ou vidéo ici.</p>'}
       ${Equipe.actif() ? `<h3 style="margin-top:24px">👥 Bibliothèque de l'équipe « ${esc(reglages.equipe.nom)} » <span class="muet" style="font-weight:400">(${Equipe.items.length} · visible et utilisable par tous)</span> <button class="btn petit" id="eq-actualiser">Actualiser</button></h3>
-        ${Equipe.items.length ? `<div class="grille" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr))">${Equipe.items.map(x => `<div class="carte pile" style="padding:10px">
+        ${Equipe.items.filter(x => x.type !== 'film').length ? `<div class="grille" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr))">${Equipe.items.filter(x => x.type !== 'film').map(x => `<div class="carte pile" style="padding:10px">
           ${x.type === 'image' ? `<img src="${esc(Equipe.url(x.chemin))}" style="width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:8px">` : `<video src="" data-src="${esc(Equipe.url(x.chemin))}" muted loop playsinline poster="${esc(x.vignette || '')}" style="width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:8px;background:#eee"></video>`}
           <b style="font-size:13px">${esc(x.nom)}</b><div class="muet" style="font-size:12px">par <b>${esc(x.auteur || '—')}</b>${x.evenement ? ' · ' + esc(x.evenement) : ''}</div>
           ${x.secondes_creation ? `<span class="badge">⏱ créé en ${dureeTexte(x.secondes_creation)}</span>` : ''}
@@ -2152,13 +2208,66 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       location.hash = info.admin ? '#/equipe' : '#/bibliotheque';
     } catch (e) { $('#rj-etat').textContent = 'Lien d\'équipe invalide : ' + e.message + '. Demandez le lien à jour à votre admin.'; }
   }
+  // Modèles (invitations) et films de l'équipe : tout le monde les voit ; l'admin publie les films sur la vitrine
+  async function modelesEtFilms(zone, admin, filmsSeuls) {
+    let modeles = [], films = [], surVitrine = new Set();
+    try {
+      if (!filmsSeuls) modeles = await Equipe.rpc('equipe_modeles');
+      await Equipe.charger(); films = Equipe.items.filter(x => x.type === 'film');
+      try { const r = await fetch(urlSite() + 'vitrine/index.json?v=' + Date.now(), { cache: 'no-store' }); if (r.ok) surVitrine = new Set((await r.json()).map(x => x.slug)); } catch (e) {}
+    } catch (err) { zone.textContent = /function|schema cache|Could not find/i.test(err.message) ? 'Mise à jour de la base à installer (Réglages → Équipe).' : 'Impossible de lire l\'équipe : ' + err.message; return; }
+    const date = x => x ? new Date(x).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
+    zone.classList.remove('muet');
+    zone.innerHTML = `${filmsSeuls ? '' : `<div class="carte" style="padding:10px"><h3 style="margin:4px 6px 10px">Tous les modèles de l'équipe (${modeles.length})</h3>
+      <div class="grille" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr))">${modeles.map(t => `<div class="carte pile" style="padding:10px">${t.vignette ? `<img src="${esc(t.vignette)}" alt="" style="width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:8px">` : ''}
+        <b>${esc(t.titre || 'Sans titre')}</b><div class="muet">par <b>${esc(t.auteur || '—')}</b> · ${t.plans} plans · ${date(t.maj)}</div>
+        <div class="ligne">${t.publie && t.slug ? `<a class="btn petit" target="_blank" href="${esc(urlSite() + 'i/?p=' + encodeURIComponent(t.slug))}">Voir ↗</a>` : ''}<button class="btn petit plein" data-modele="${esc(t.projet)}">Utiliser ce modèle</button></div></div>`).join('') || '<p class="muet">Aucun modèle pour l\'instant.</p>'}</div></div>`}
+      <div class="carte" style="padding:10px;margin-top:14px"><h3 style="margin:4px 6px 10px">🎬 Films de l'équipe (${films.length})</h3>
+      <div class="grille" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr))">${films.map(f => { const u = Equipe.url(f.chemin), sv = surVitrine.has('film-' + f.id); return `<div class="carte pile" style="padding:10px">
+        <video src="${esc(u)}" poster="${esc(f.vignette || '')}" controls preload="none" playsinline style="width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:8px;background:#000"></video>
+        <b style="font-size:13px">${esc(f.nom)}</b><div class="muet" style="font-size:12px">par <b>${esc(f.auteur || '—')}</b> · ${date(f.cree)}${f.secondes_creation ? ' · ⏱ ' + dureeTexte(f.secondes_creation) : ''}</div>
+        <div class="ligne"><a class="btn petit" href="${esc(u)}" download target="_blank">Télécharger</a>${admin ? (sv ? `<span class="badge ok">sur la vitrine</span><button class="btn petit danger" data-film-retirer="${esc(f.id)}">Retirer</button>` : `<button class="btn petit plein" data-film-vitrine="${esc(f.id)}">Publier sur la vitrine</button>`) : (sv ? '<span class="badge ok">sur la vitrine</span>' : '')}</div></div>`; }).join('') || '<p class="muet">Aucun film pour l\'instant : chaque film fabriqué (Film et publication → Enregistrer le film) arrive ici tout seul.</p>'}</div></div>`;
+    $$('[data-modele]', zone).forEach(b => b.onclick = async () => {
+      try {
+        const src = await Equipe.rpc('equipe_modele', { p_projet: b.dataset.modele }); if (!src) return toast('Modèle introuvable');
+        const c = JSON.parse(JSON.stringify(src)); c.id = uid(); c.slug = (c.slug || 'modele') + '-' + c.id.slice(0, 4);
+        ['publie', 'cle_hote', 'familles', 'vitrine', 'vitrine_publiee', 'reponses_generales'].forEach(k => delete c[k]); c.familles = [];
+        c.fiche.titre = (c.fiche.titre || 'Modèle') + ' (copie)';
+        projets[c.id] = c; sauverProjets(); toast('Nouvel événement créé à partir du modèle'); location.hash = '#/p/' + c.id + '/plans';
+      } catch (err) { toast(err.message); }
+    });
+    const githubPret = () => { const g = reglages.github || {}; if (g.owner && g.repo && g.token) return true; toast('Reliez d\'abord GitHub dans Réglages (pour publier sur le site)'); return false; };
+    $$('[data-film-vitrine]', zone).forEach(b => b.onclick = async () => {
+      if (!githubPret()) return;
+      const f = films.find(x => x.id === b.dataset.filmVitrine); b.disabled = true; b.textContent = 'Publication…';
+      try {
+        const r = await fetch(Equipe.url(f.chemin)); if (!r.ok) throw new Error('film introuvable (' + r.status + ')');
+        const chemin = 'medias/films/' + f.id + '.mp4';
+        await GitHub.envoyer(chemin, await r.blob(), 'Film ' + f.nom);
+        let vignette = 'fonds/fond_2.jpg';
+        if (/^data:/.test(f.vignette || '')) { vignette = 'medias/films/' + f.id + '.jpg'; await GitHub.envoyer(vignette, dataURLversBlob(f.vignette), 'Vignette ' + f.nom); }
+        const index = (await lireVitrine()).filter(x => x.slug !== 'film-' + f.id);
+        index.unshift({ slug: 'film-' + f.id, film: true, video: chemin, titre: (f.evenement || f.nom.replace(/^Film — /, '')), type: 'Film vidéo', vignette, auteur: f.auteur || '', date: new Date().toISOString().slice(0, 10) });
+        await ecrireVitrine(index, 'Vitrine : film ' + f.nom);
+        toast('Film publié sur la vitrine (visible dans quelques minutes)'); modelesEtFilms(zone, admin, filmsSeuls);
+      } catch (err) { toast('Échec : ' + err.message); b.disabled = false; b.textContent = 'Publier sur la vitrine'; }
+    });
+    $$('[data-film-retirer]', zone).forEach(b => b.onclick = async () => {
+      if (!githubPret() || !confirm('Retirer ce film de la vitrine du site ?')) return;
+      try { const index = (await lireVitrine()).filter(x => x.slug !== 'film-' + b.dataset.filmRetirer); await ecrireVitrine(index, 'Vitrine : retrait film'); toast('Film retiré de la vitrine'); modelesEtFilms(zone, admin, filmsSeuls); } catch (err) { toast(err.message); }
+    });
+  }
+
   async function vueEquipe() {
     if (!Equipe.actif()) { $('#app').innerHTML = `<div class="entete"><div><h1>Équipe</h1><p>Travaillez à plusieurs : bibliothèque de fonds commune, et l'admin voit le travail de chacun.</p></div></div><div class="carte pile" style="max-width:640px"><p>Vous n'êtes dans aucune équipe. Ouvrez le lien d'équipe reçu, ou créez l'équipe dans <a href="#/reglages">Réglages</a> (vous en serez l'admin).</p></div>`; return; }
     const e = reglages.equipe;
     if (!Equipe.admin()) {
-      $('#app').innerHTML = `<div class="entete"><div><h1>Équipe « ${esc(e.nom)} »</h1><p>Vous : <b>${esc(e.membre)}</b>. Vos fonds partagés et ceux de l'équipe sont dans la <a href="#/bibliotheque">Bibliothèque</a>.</p></div></div>
-        <div class="carte pile" style="max-width:640px"><h3>Lien de l'équipe</h3><p class="muet">Pour faire entrer un nouveau membre.</p><div class="ligne"><input type="text" readonly value="${esc(lienEquipe(e.cle))}" style="flex:1"><button class="btn petit" id="eq-cp">Copier</button></div></div>`;
-      $('#eq-cp').onclick = () => copier(lienEquipe(e.cle)); return;
+      $('#app').innerHTML = `<div class="entete"><div><h1>Équipe « ${esc(e.nom)} »</h1><p>Vous : <b>${esc(e.membre)}</b>. Les fonds de l'équipe sont dans la <a href="#/bibliotheque">Bibliothèque</a> ; ici, tous les modèles et les films de l'équipe.</p></div><div class="ligne"><button class="btn" id="eq-maj">Actualiser</button></div></div>
+        <div id="eq-modeles" class="muet">Chargement…</div>
+        <div class="carte pile" style="max-width:640px;margin-top:14px"><h3>Lien de l'équipe</h3><p class="muet">Pour faire entrer un nouveau membre.</p><div class="ligne"><input type="text" readonly value="${esc(lienEquipe(e.cle))}" style="flex:1"><button class="btn petit" id="eq-cp">Copier</button></div></div>`;
+      $('#eq-cp').onclick = () => copier(lienEquipe(e.cle));
+      const charger = () => modelesEtFilms($('#eq-modeles'), false);
+      $('#eq-maj').onclick = charger; charger(); return;
     }
     $('#app').innerHTML = `<div class="entete"><div><h1>Équipe « ${esc(e.nom)} » <span class="badge ok">admin</span></h1><p>Le travail de chacun, ses invitations et le temps de fabrication des vidéos.</p></div><div class="ligne"><button class="btn" id="eq-maj">Actualiser</button></div></div><div id="eq-vue" class="muet">Chargement…</div>`;
     const rendre = async () => {
@@ -2183,6 +2292,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
             <div class="ligne">${t.publie && t.slug ? `<a class="btn petit" target="_blank" href="${esc(urlSite() + 'i/?p=' + encodeURIComponent(t.slug))}">Voir l'invitation ↗</a>` : '<span class="badge alerte">non publiée</span>'}<button class="btn petit" data-copie="${esc(t.projet)}">Ouvrir une copie</button></div>
             ${surVitrine.has('demo-' + t.slug) ? `<div class="ligne"><span class="badge ok">sur la vitrine</span><a class="btn petit" target="_blank" href="${esc(urlSite() + 'i/?p=' + encodeURIComponent('demo-' + t.slug))}">Voir la démo ↗</a><button class="btn petit danger" data-vit-retirer="${esc(t.projet)}">Retirer</button></div>`
               : `<button class="btn petit plein" data-vitrine="${esc(t.projet)}">Publier sur la vitrine</button>`}</div>`).join('') || '<p class="muet">Aucune invitation pour l\'instant.</p>'}</div></div>
+        <div id="eq-films"></div>
         <div class="carte" style="padding:10px;margin-top:14px"><h3 style="margin:4px 6px 10px">Vidéos fabriquées (temps de chacune)</h3><div class="tableau-boite"><table class="tableau"><thead><tr><th>Date</th><th>Membre</th><th>Type</th><th>Vidéo</th><th>Invitation</th><th>Temps</th></tr></thead>
           <tbody>${d.creations.slice(0, 300).map(c => `<tr><td>${date(c.date)}</td><td>${esc(c.auteur)}</td><td>${esc(NOMS[c.type] || c.type)}</td><td>${esc(c.nom)}</td><td>${esc(c.titre_projet)}</td><td><b>${dureeTexte(c.secondes)}</b></td></tr>`).join('') || '<tr><td colspan="6" class="muet">Aucune vidéo fabriquée depuis l\'activation de l\'équipe.</td></tr>'}</tbody></table></div></div>
         <div class="ia-grille" style="margin-top:14px"><div class="carte pile"><h3>Lien de l'équipe</h3><p class="muet">Le même lien pour tous les membres : ils y entrent leur nom, puis partagent la bibliothèque.</p>
@@ -2190,6 +2300,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <div class="carte pile"><h3>Votre lien admin (privé)</h3><p class="muet">Pour ouvrir cette page sur un autre ordinateur. Ne le donnez pas à l'équipe.</p>
           <div class="ligne"><input type="text" readonly value="${esc(lienEquipe(e.cle_admin))}" style="flex:1"><button class="btn petit" id="eq-cpa">Copier</button></div></div></div>`;
       $('#eq-cp').onclick = () => copier(lienEquipe(e.cle)); $('#eq-cpa').onclick = () => copier(lienEquipe(e.cle_admin));
+      modelesEtFilms($('#eq-films'), true, true);
       const githubPret = () => { const g = reglages.github || {}; if (g.owner && g.repo && g.token) return true; toast('Reliez d\'abord GitHub dans Réglages (pour publier sur le site)'); return false; };
       $$('[data-vitrine]').forEach(b => b.onclick = () => {
         if (!githubPret()) return;
@@ -2258,6 +2369,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
               <p class="muet" style="margin:0">Le script « équipe » doit être installé une fois dans Supabase (bouton ci-dessous).</p><button class="btn petit" id="eq-sql" style="align-self:flex-start">Copier le script SQL de l'équipe</button>`
             : `<p style="margin:0">Équipe <b>« ${esc(reglages.equipe.nom)} »</b>${Equipe.admin() ? ' <span class="badge ok">admin</span>' : ''} · vous : <b>${esc(reglages.equipe.membre)}</b> <button class="btn petit" id="eq-renom">Changer mon nom</button></p>
               <label class="cases"><input type="checkbox" id="eq-auto" ${reglages.equipe.auto !== false ? 'checked' : ''}> Partager automatiquement mes nouveaux fonds et images animées avec l'équipe</label>
+              <div class="ligne"><button class="btn petit" id="eq-sql2">Copier la mise à jour SQL n° 2</button><span class="muet">(à installer une fois dans Supabase pour les modèles partagés)</span></div>
               <div class="ligne"><a class="btn plein petit" href="#/equipe">${Equipe.admin() ? 'Voir le travail de l\'équipe' : 'Lien de l\'équipe'}</a><button class="btn petit" id="eq-tout">Partager tous mes fonds existants</button><button class="btn petit danger" id="eq-quitter">Quitter l'équipe</button></div>`}
         </div>
         <div class="carte pile"><h3>Base des invités et espace organisateur (Supabase, gratuit)</h3>
@@ -2333,6 +2445,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         reglages.equipe = { id: r.id, nom: r.nom, cle: r.cle, cle_admin: r.cle_admin, membre: nom, auto: true }; sauverReglages(); toast('Équipe créée : envoyez le lien d\'équipe à vos membres'); location.hash = '#/equipe'; }
       catch (e) { toast(/function|schema cache|Could not find/i.test(e.message) ? 'Installez d\'abord le script SQL de l\'équipe dans Supabase' : e.message); }
     };
+    const eqs2 = $('#eq-sql2'); if (eqs2) eqs2.onclick = async () => { try { copier(await (await fetch('../outils/equipe-2.sql?v=' + Date.now())).text()); toast('Script copié : Supabase → SQL Editor → coller → Run'); } catch (e) { toast('Script introuvable'); } };
     const eqs = $('#eq-sql'); if (eqs) eqs.onclick = async () => { try { copier(await (await fetch('../outils/equipe.sql?v=' + Date.now())).text()); toast('Script copié : Supabase → SQL Editor → coller → Run'); } catch (e) { toast('Script introuvable'); } };
     const eqr = $('#eq-renom'); if (eqr) eqr.onclick = async () => { const n = await demanderNom('Votre nom dans l\'équipe', reglages.equipe.membre); if (n) { reglages.equipe.membre = n; sauverReglages(); vueReglages(); } };
     const eqa = $('#eq-auto'); if (eqa) eqa.onchange = () => { reglages.equipe.auto = eqa.checked; sauverReglages(); };
@@ -2394,6 +2507,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <li><b>Animer une image</b> : dans « ✨ Créer avec l'IA », choix <b>Animer une image</b>, ou bouton « ✨ Animer cette photo » dans le panneau d'une photo. Choisissez la photo du plan (ou ＋ une autre image) et le mouvement (naturel, zoom lent, léger vent, pétales, lumière). Wan 2.2 en fait une vidéo de 5 s en gardant les visages identiques ; elle remplace la photo sur le plan (ou s'y ajoute), au-dessus du fond.</li>
         <li><b>🌐 Plusieurs langues</b> : onglet Fiche → « Langues de l'invitation », cochez les langues à proposer (English, Français…). Sous l'aperçu, <b>🌐 Traduire</b> : copiez le prompt, collez-le dans Claude ou ChatGPT, collez la réponse, « Appliquer ». Chaque texte a aussi ses traductions modifiables à la main (panneau du calque → Traductions). « Voir en : … » montre l'aperçu dans une autre langue. Dans l'invitation, l'invité choisit sa langue à l'ouverture ou avec le bouton 🌐 : tout bascule d'un clic.</li>
         <li><b>♪ Chanson</b> : bouton « ♪ Ajouter une chanson » sous l'aperçu. Choisissez le fichier (tous les formats : MP3, M4A, WAV, FLAC, OGG, AIFF… et même une vidéo, dont on garde le son ; les formats moins courants sont convertis en MP3 tout seuls), réglez le volume et le moment où elle commence (« Position actuelle » pour sauter l'introduction). Elle joue avec « ▶ Toute l'invitation », chez l'invité et dans le film exporté.</li>
+        <li><b>✂ Couper</b> : sur le fond d'un plan (panneau Fond vidéo) ou sur une vidéo posée, « ✂ Couper » : réglez Début et Fin (ou « Position actuelle » pendant la lecture), « ▶ Voir le passage », puis Appliquer. <b>Superposition</b> : dans le panneau d'une photo, d'une vidéo ou d'un texte, choisissez comment il se mélange au fond (Produit pour garder les ombres, Écran pour les lumières, Superposition…).</li>
         <li><b>👥 Équipe</b> : l'admin crée l'équipe dans Réglages et envoie <b>le lien d'équipe</b> (un seul pour tous). Chaque membre l'ouvre et entre son nom. Les nouveaux fonds et images animées sont partagés tout seuls dans la <b>bibliothèque de l'équipe</b> (Bibliothèque, en bas), que tout le monde peut utiliser dans ses plans. L'admin voit dans <a href="#/equipe">Équipe</a> le travail de chacun, toutes les invitations, et le temps de fabrication de chaque vidéo.</li>
         <li><b>Bibliothèque par événement</b> : tout ce que vous créez ou importez dans un événement (fonds IA, images animées, photos) est rangé dans sa bibliothèque, et seuls ses fichiers sont proposés dans ses plans (avec les fonds de base et les fichiers communs). Dans <a href="#/bibliotheque">Bibliothèque</a>, choisissez l'événement en haut ; « Réglages » d'un fichier permet de le déplacer vers un autre événement.</li>
         <li><b>Wan 2.2</b> (gratuit, open source) : il tourne sur votre pod RunPod (ComfyUI). Le studio lui envoie l'image du fond actuel et le prompt, puis récupère la vidéo (5 s, environ 5 minutes) : vous n'avez rien à copier ni à télécharger. L'adresse du pod se règle une seule fois dans Réglages.</li>

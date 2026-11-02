@@ -45,10 +45,10 @@
 <button id="son" aria-label="Son">♪</button>
 <div id="bandeau" role="dialog"></div>
 <div id="erreur"></div>
-<script src="../config.js?v=202611021214"></script>
-<script src="../moteur/moteur.js?v=202611021214"></script>
-<script src="../moteur/fabrique.js?v=202611021214"></script>
-<script src="../moteur/base.js?v=202611021214"></script>
+<script src="../config.js?v=202611021407"></script>
+<script src="../moteur/moteur.js?v=202611021407"></script>
+<script src="../moteur/fabrique.js?v=202611021407"></script>
+<script src="../moteur/base.js?v=202611021407"></script>
 <script>
 (async function () {
   const q = new URLSearchParams(location.search);
@@ -224,18 +224,36 @@
     }
     if (action === 'confirmer' || action === 'refuser') {
       const oui = action === 'confirmer';
-      // lien général : on demande le nom de la famille (gardé pour la prochaine fois)
+      // lien général : on demande le nom ; la liste des invités propose les noms qui correspondent,
+      // pour que la réponse aille directement à la bonne famille chez l'organisateur
       if (!famille && sbConf && !form.nom) {
         let deja = ''; try { deja = localStorage.getItem('inv.nom') || ''; } catch (e) {}
         const nom = await new Promise(res => {
-          bandeau(`<b>${tr('Iza no anaranareo?', 'Votre nom ?', 'Your name?')}</b><div style="margin-top:8px"><input id="inv-nom" value="${deja.replace(/"/g, '&quot;')}" placeholder="${tr('Ohatra : Fianakaviana Rakoto', 'Ex. : Famille Rakoto', 'E.g. Rakoto family')}" style="width:100%;font:inherit;padding:10px 12px;border:1.5px solid #c9b8a8;border-radius:12px"></div><div class="actions"><button class="plein" id="inv-nom-ok" style="background:var(--vin);color:#fff">${tr('Alefa', 'Envoyer', 'Send')}</button><button data-fermer>${tr('Hidio', 'Fermer', 'Close')}</button></div>`);
-          const i = $('#inv-nom'); setTimeout(() => i.focus(), 50);
-          const ok = () => { const v = i.value.trim(); if (!v) return i.focus(); try { localStorage.setItem('inv.nom', v); } catch (e) {} res(v); };
+          bandeau(`<b>${tr('Iza no anaranareo?', 'Votre nom ?', 'Your name?')}</b><div class="muet-b" style="font-size:15px;margin-top:2px">${tr('Soraty, dia safidio ny anaranareo raha miseho', 'Tapez-le, puis choisissez-le s\'il apparaît', 'Type it, then pick it if it appears')}</div>
+            <div style="margin-top:8px"><input id="inv-nom" autocomplete="off" value="${deja.replace(/"/g, '&quot;')}" placeholder="${tr('Ohatra : Fianakaviana Rakoto', 'Ex. : Famille Rakoto', 'E.g. Rakoto family')}" style="width:100%;font:inherit;padding:10px 12px;border:1.5px solid #c9b8a8;border-radius:12px"></div>
+            <div id="inv-sugg" style="display:flex;flex-direction:column;gap:6px;margin-top:6px"></div>
+            <div class="actions"><button class="plein" id="inv-nom-ok" style="background:var(--vin);color:#fff">${tr('Alefa', 'Envoyer', 'Send')}</button><button data-fermer>${tr('Hidio', 'Fermer', 'Close')}</button></div>`);
+          const i = $('#inv-nom'), sug = $('#inv-sugg'); setTimeout(() => i.focus(), 50);
+          let choisi = null, minu = null;
+          const chercher = () => { clearTimeout(minu); choisi = null; minu = setTimeout(async () => {
+            const q = i.value.trim(); if (q.length < 3) { sug.innerHTML = ''; return; }
+            let l = []; try { l = await Base.rpc(sbConf, 'inv_chercher_famille', { p_evt: projet.id, p_texte: q }) || []; } catch (e) {}
+            sug.innerHTML = l.map((f, k) => `<button type="button" data-k="${k}" style="text-align:left;flex:none;border-radius:12px">✓ ${f.nom.replace(/</g, '&lt;')}</button>`).join('');
+            sug.querySelectorAll('button').forEach(b => b.onclick = () => { choisi = l[Number(b.dataset.k)]; i.value = choisi.nom; sug.innerHTML = `<div style="font-size:15px;color:#2e7d32">✓ ${tr('Hita ao amin\'ny lisitra', 'Trouvé dans la liste des invités', 'Found in the guest list')}</div>`; });
+          }, 300); };
+          i.oninput = chercher; if (i.value) chercher();
+          const ok = () => { const v = i.value.trim(); if (!v) return i.focus(); try { localStorage.setItem('inv.nom', v); } catch (e) {} res(choisi && choisi.nom === v ? choisi : { nom: v }); };
           $('#inv-nom-ok').onclick = ok; i.onkeydown = e => { if (e.key === 'Enter') ok(); };
           document.querySelector('#bandeau [data-fermer]').addEventListener('click', () => res(null));
         });
         if (!nom) return;
-        form.nom = nom;
+        if (nom.code) {
+          // famille retrouvée : la réponse est rangée à son nom (et ses places sont vérifiées)
+          let f = null; try { f = await Base.rpc(sbConf, 'inv_famille', { p_evt: projet.id, p_code: nom.code }); } catch (e) {}
+          famille = Object.assign({ code: nom.code, nom: nom.nom }, f || {});
+          moteur.famille = famille;
+        }
+        form.nom = nom.nom;
       }
       const ok = await enregistrer(oui, form);
       if (ok === 'places') { bandeau(`<b>${tr('Mihoatra ny toerana natokana ho anareo', 'Trop de personnes', 'Too many people')}</b><div style="margin-top:6px">${tr('Toerana ' + (famille.places || '') + ' no natokana ho an\'ny fianakavianareo.', (famille.places || '') + ' place(s) prévue(s) pour votre famille.', (famille.places || '') + ' seat(s) reserved for your family.')}</div><div class="actions"><button data-fermer>OK</button></div>`); return; }

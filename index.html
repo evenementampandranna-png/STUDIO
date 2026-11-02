@@ -92,10 +92,10 @@
 <section id="contact"><h2>Contact</h2><p id="contact-texte" style="color:var(--gris)">Écrivez-nous pour un devis.</p></section>
 <footer>Invitations vidéo interactives</footer>
 <div id="boite"><button id="fermer" aria-label="Fermer">×</button><div class="lecteur" id="lecteur"><div class="fin-film" id="fin"><button id="revoir">↺ Revoir le film</button><a id="essayer" target="_blank">Essayer l'invitation interactive</a></div></div><div class="barre-lecture"><div id="progression"></div></div></div>
-<script src="config.js?v=202611021214"></script>
-<script src="moteur/moteur.js?v=202611021214"></script>
-<script src="moteur/fabrique.js?v=202611021214"></script>
-<script src="vitrine/index.js?v=202611021214"></script>
+<script src="config.js?v=202611021407"></script>
+<script src="moteur/moteur.js?v=202611021407"></script>
+<script src="moteur/fabrique.js?v=202611021407"></script>
+<script src="vitrine/index.js?v=202611021407"></script>
 <script>
 (async function () {
   const $ = s => document.querySelector(s);
@@ -109,48 +109,70 @@
   const charger = src => new Promise(ok => { const sc = document.createElement('script'); sc.src = src; sc.onload = ok; sc.onerror = ok; document.head.appendChild(sc); });
   let liste = window.VITRINE || [];
   if (!liste.length) { try { const r = await fetch('vitrine/index.json?v=' + Date.now()); if (r.ok) liste = await r.json(); } catch (e) {} }
-  await Promise.all(liste.map(m => charger('projets/' + encodeURIComponent(m.slug) + '.js?v=' + Date.now())));
+  await Promise.all(liste.filter(m => !m.film).map(m => charger('projets/' + encodeURIComponent(m.slug) + '.js?v=' + Date.now())));
   const projets = window.PROJETS || {};
-  liste = liste.filter(m => projets[m.slug]);
+  liste = liste.filter(m => m.film ? m.video : projets[m.slug]);
   const box = $('#liste');
   if (!liste.length) { box.innerHTML = '<p style="color:var(--gris)">Les premiers modèles arrivent bientôt.</p>'; return; }
   const familleDe = p => { const l = p.liens || {}; const k = Object.keys(l)[0]; return k ? Object.assign({ code: k }, l[k]) : null; };
   const clone = p => JSON.parse(JSON.stringify(p));
 
-  box.innerHTML = liste.map((m, i) => `<div class="modele" data-i="${i}"><div class="vignette" id="v${i}"></div><span class="lire">▶</span><div><b>${m.titre}</b><br><span>${m.type || ''}</span></div>
-    <div class="liens"><button data-voir="${i}">▶ Regarder le film</button><a href="i/?p=${encodeURIComponent(m.slug)}&f=DEMO" target="_blank" onclick="event.stopPropagation()">Essayer</a></div></div>`).join('');
+  const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  box.innerHTML = liste.map((m, i) => `<div class="modele" data-i="${i}"><div class="vignette" id="v${i}">${m.film ? `<video src="${esc(m.video)}" poster="${esc(m.vignette || '')}" muted loop playsinline preload="metadata" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"></video>` : ''}</div><span class="lire">▶</span><div><b>${esc(m.titre)}</b><br><span>${esc(m.type || '')}</span></div>
+    <div class="liens"><button data-voir="${i}">▶ Regarder le film</button>${m.film ? '' : `<a href="i/?p=${encodeURIComponent(m.slug)}&f=DEMO" target="_blank" onclick="event.stopPropagation()">Essayer</a>`}</div></div>`).join('');
+  box.querySelectorAll('.modele video').forEach(v => { const c = v.closest('.modele'); c.addEventListener('mouseenter', () => v.play().catch(() => {})); c.addEventListener('mouseleave', () => v.pause()); });
 
   /* Vignettes : la page titre de chaque modèle */
   liste.forEach(async (m, i) => {
+    if (m.film) return;
     const p = clone(projets[m.slug]);
     const v = new Moteur($('#v' + i), { mode: 'edition', famille: familleDe(p) });
-    v.masquerHTML = true;
+    v.masquerHTML = true; v.boutonsDessines = true;
     await v.setProjet(p);
     const k = Math.max(0, p.plans.findIndex(x => x.role === 'intermediaire'));
     v.afficherPlan(k, 3);
   });
 
   /* Film en boucle sur le téléphone de l'accueil */
-  const p0 = clone(projets[liste[0].slug]);
-  const hero = new Moteur($('#hero'), { mode: 'rendu', famille: familleDe(p0) });
-  hero.masquerHTML = true;
-  await hero.setProjet(p0);
-  hero.onFin = () => hero.jouer(hero.plansFilm(), 0);
-  hero.jouer(hero.plansFilm(), 0);
-  $('#hero').onclick = () => ouvrir(0);
+  const iHero = Math.max(0, liste.findIndex(m => !m.film));
+  if (liste[iHero].film) {
+    const vh = document.createElement('video'); vh.src = liste[iHero].video; vh.muted = true; vh.loop = true; vh.autoplay = true; vh.playsInline = true;
+    vh.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover'; $('#hero').prepend(vh); vh.play().catch(() => {});
+  } else {
+    const p0 = clone(projets[liste[iHero].slug]);
+    const hero = new Moteur($('#hero'), { mode: 'rendu', famille: familleDe(p0) });
+    hero.masquerHTML = true; hero.boutonsDessines = true;
+    await hero.setProjet(p0);
+    hero.onFin = () => hero.jouer(hero.plansFilm(), 0);
+    hero.jouer(hero.plansFilm(), 0);
+  }
+  $('#hero').onclick = () => ouvrir(iHero);
 
   /* Lecteur plein écran : le film du modèle, du début à la fin */
   let lecteur = null;
   async function ouvrir(i) {
-    const m = liste[i]; const p = clone(projets[m.slug]);
+    const m = liste[i];
     $('#boite').classList.add('ouvert'); $('#fin').classList.remove('vu'); $('#progression').style.width = '0';
+    $('#essayer').style.display = m.film ? 'none' : '';
     $('#essayer').href = 'i/?p=' + encodeURIComponent(m.slug) + '&f=DEMO';
-    if (lecteur) lecteur.detruire();
-    const zone = document.createElement('div'); zone.style.cssText = 'position:absolute;inset:0';
+    if (lecteur) { lecteur.detruire(); lecteur = null; }
     $('#lecteur').querySelectorAll('.mt-zone').forEach(e => e.remove());
+    if (m.film) {
+      // film MP4 de l'équipe : lecteur vidéo simple
+      const v = document.createElement('video'); v.className = 'mt-zone'; v.src = m.video; v.poster = m.vignette || ''; v.controls = true; v.autoplay = true; v.playsInline = true;
+      v.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000';
+      v.ontimeupdate = () => { $('#progression').style.width = (v.currentTime / (v.duration || 1) * 100) + '%'; };
+      v.onended = () => $('#fin').classList.add('vu');
+      $('#lecteur').prepend(v); v.play().catch(() => {});
+      $('#revoir').onclick = () => { $('#fin').classList.remove('vu'); v.currentTime = 0; v.play(); };
+      lecteur = { detruire: () => { v.pause(); v.remove(); } };
+      return;
+    }
+    const p = clone(projets[m.slug]);
+    const zone = document.createElement('div'); zone.style.cssText = 'position:absolute;inset:0';
     zone.className = 'mt-zone'; $('#lecteur').prepend(zone);
     lecteur = new Moteur(zone, { mode: 'rendu', famille: familleDe(p) });
-    lecteur.masquerHTML = true;
+    lecteur.masquerHTML = true; lecteur.boutonsDessines = true;
     await lecteur.setProjet(p);
     const seq = lecteur.plansFilm();
     const total = seq.reduce((s, k) => s + (Number(p.plans[k].duree) || 4), 0);

@@ -38,6 +38,15 @@
   const MOIS_MG = ['Janoary', 'Febroary', 'Martsa', 'Aprily', 'Mey', 'Jona', 'Jolay', 'Aogositra', 'Septambra', 'Oktobra', 'Novambra', 'Desambra'];
   const JOURS_FR = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
   const JOURS_MG = ['Alahady', 'Alatsinainy', 'Talata', 'Alarobia', 'Alakamisy', 'Zoma', 'Sabotsy'];
+  // Vidéo coupée (début / fin en secondes) : position dans le fichier pour un temps t de lecture
+  function plage(conf) { const c = conf && conf.coupe; return c && Number(c.fin) > (Number(c.debut) || 0) ? [Number(c.debut) || 0, Number(c.fin)] : null; }
+  function positionVideo(conf, t, duree) {
+    let x = t * ((conf && conf.vitesse) || 1);
+    const pl = plage(conf);
+    const deb = pl ? pl[0] : 0, fin = pl ? Math.min(pl[1], duree || pl[1]) : (duree || 1), d = Math.max(0.05, fin - deb);
+    x = conf && conf.boucle === false ? Math.min(x, d - 0.04) : x % d;
+    return deb + x;
+  }
   function dateLisible(iso, langue) {
     if (!iso) return '';
     const [y, m, d] = iso.split('-').map(Number);
@@ -256,9 +265,11 @@
       (p.calques || []).forEach(c => { if (c.type === 'video' && c.media) els.push([this.medias[c.media], c]); });
       els.forEach(([v, conf]) => {
         if (!v || v.tagName !== 'VIDEO') return;
-        v.loop = conf.boucle !== false;
+        const pl = plage(conf);
+        v.loop = conf.boucle !== false && !pl;      // vidéo coupée : la boucle est gérée par le moteur (retour au début de la coupe)
+        v._plage = pl; v._boucle = conf.boucle !== false;
         v.playbackRate = conf.vitesse || 1;
-        if (reset) { try { v.currentTime = 0; } catch (e) {} }
+        if (reset) { try { v.currentTime = pl ? pl[0] : 0; } catch (e) {} }
         if (this.lecture) { const pr = v.play(); if (pr && pr.catch) pr.catch(() => {}); }
       });
     }
@@ -267,12 +278,7 @@
       const caler = (v, conf) => {
         if (!v || v.tagName !== 'VIDEO') return;
         v.pause();
-        const go = () => {
-          const d = v.duration || 1;
-          let tt = t * (conf.vitesse || 1);
-          tt = conf.boucle === false ? Math.min(tt, d - 0.05) : tt % d;
-          try { v.currentTime = tt; } catch (e) {}
-        };
+        const go = () => { try { v.currentTime = positionVideo(conf, t, v.duration || 1); } catch (e) {} };
         if (v.readyState >= 1) go(); else v.addEventListener('loadedmetadata', go, { once: true });
       };
       if (p.fond && p.fond.media) caler(this.medias[p.fond.media], p.fond);
@@ -286,6 +292,8 @@
         const p = this.planCourant();
         if (p && this.lecture) {
           this.t += dt;
+          // vidéos coupées : on revient au début de la coupe (ou on s'arrête) à la fin de la coupe
+          Object.values(this.medias).forEach(v => { if (v && v._plage && !v.paused && v.currentTime >= v._plage[1] - 0.03) { if (v._boucle) { try { v.currentTime = v._plage[0]; } catch (e) {} } else v.pause(); } });
           const duree = Number(p.duree) || 0;
           if (duree > 0 && this.t >= duree) {
             if (this.pos < this.seq.length - 1) { this.pos++; this.t = 0; this._entrerPlan(); }
@@ -389,7 +397,7 @@
     // Film : les boutons (HTML dans l'invitation) sont dessinés comme des images, sauf ceux de navigation
     _dessinerBouton(c, t, p, vars, alphaPlan) {
       if (c.type === 'compteur') return this._dessinerCompteur(c, t, vars, alphaPlan);
-      if (c.type !== 'bouton' || ['passer', 'suivant', 'precedent', 'revoir', 'partager', 'calendrier'].includes(c.action || 'suivant')) return;
+      if (c.type !== 'bouton') return;
       const deb = Number(c.debut) || 0; if (t < deb) return;
       const ctx = this.ctx, fs = (Number(c.taille) || 2.4) / 100 * H, larg = (Number(c.largeur) || 60) / 100 * W, haut = fs * 2.3;
       const x = (Number(c.x) || 50) / 100 * W - larg / 2, y = (Number(c.y) || 50) / 100 * H - haut / 2;
@@ -464,6 +472,7 @@
       const cx = (Number(c.x) || 50) / 100 * W, cy = (Number(c.y) || 50) / 100 * H;
       const larg = (Number(c.largeur) || 80) / 100 * W;
       ctx.save();
+      if (c.fusion && c.fusion !== 'normal') ctx.globalCompositeOperation = c.fusion;   // superposition (mode de fusion)
       const r = { a: (c.opacite != null ? Number(c.opacite) : 1) * alphaPlan, dx: 0, dy: 0, sc: 1, flou: 0 };
       this._effet(e.entree, e.pE, e.brutE, r);
       if (e.brutS < 1) this._effet(e.sortie === 'aucune' ? 'fondu' : e.sortie, e.pS, e.brutS, r);
@@ -684,7 +693,7 @@
         const v = this.medias[src]; if (!v || v.tagName !== 'VIDEO') return;
         if (v.preload !== 'auto') { v.preload = 'auto'; }
         if (v.readyState < 1) { try { v.load(); } catch (e) {} await attendre(v, ['loadedmetadata'], 15000); }
-        const d = v.duration || 1; let x = tm * (conf.vitesse || 1); x = conf.boucle === false ? Math.min(x, d - 0.04) : x % d;
+        const x = positionVideo(conf, tm, v.duration || 1);
         if (!(Math.abs(v.currentTime - x) < 0.004 && v.readyState >= 2)) {
           const p = attendre(v, ['seeked'], 8000); try { v.currentTime = x; } catch (e) {} await p;
         }
@@ -824,5 +833,6 @@
   global.Moteur = Moteur;
   // Langues proposées pour les invitations
   const LANGUES = { mg: 'Malagasy', fr: 'Français', en: 'English', de: 'Deutsch', it: 'Italiano', es: 'Español', pt: 'Português', zh: '中文', ar: 'العربية', ru: 'Русский', ja: '日本語' };
-  global.MoteurInfo = { LANGUES, texteDe, W, H, POLICES, ANIMATIONS, SORTIES, NOMS_EFFETS, ACTIONS, TYPES_HTML, uid, variablesDe, dateLisible, remplacer, MOIS_MG, MOIS_FR };
+  const FUSIONS = [['normal', 'Normale'], ['multiply', 'Produit (assombrit, garde les ombres)'], ['screen', 'Écran (éclaircit, garde les lumières)'], ['overlay', 'Superposition'], ['soft-light', 'Lumière douce'], ['hard-light', 'Lumière crue'], ['color-dodge', 'Densité couleur −'], ['color-burn', 'Densité couleur +'], ['darken', 'Obscurcir'], ['lighten', 'Éclaircir'], ['difference', 'Différence'], ['luminosity', 'Luminosité'], ['color', 'Couleur']];
+  global.MoteurInfo = { FUSIONS, plage, positionVideo, LANGUES, texteDe, W, H, POLICES, ANIMATIONS, SORTIES, NOMS_EFFETS, ACTIONS, TYPES_HTML, uid, variablesDe, dateLisible, remplacer, MOIS_MG, MOIS_FR };
 })(window);
