@@ -206,7 +206,9 @@
   const NOUVEAUTES = [
     { id: '2026-11-02-6', date: '2 novembre 2026', titre: 'Publication sur la vitrine plus fiable', points: [
       'Le studio relit toujours le dernier jeton GitHub enregistré (même s\'il a été changé dans un autre onglet) : plus d\'erreur « Bad credentials » avec un ancien jeton.',
-      'Si GitHub refuse le jeton, un message clair explique quoi faire (Réglages → GitHub → nouveau jeton → Tester).'
+      'Si GitHub refuse le jeton, un message clair explique quoi faire (Réglages → GitHub → nouveau jeton → Tester).',
+      'Corrigé : l\'erreur « GitHub 422 sha wasn\'t supplied » à la fin de la publication (le studio réessaie automatiquement).',
+      'Les fichiers déjà copiés ne sont pas recopiés : relancer une publication est rapide.'
     ] },
     { id: '2026-11-02-5', date: '2 novembre 2026', titre: 'Couper, superposition, modèles et films de l\'équipe', points: [
       '<b>✂ Couper une vidéo</b> : bouton « ✂ Couper » sur le fond d\'un plan et sur chaque vidéo posée : vous gardez seulement le passage voulu (début / fin).',
@@ -1884,7 +1886,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       if (!existe) { const r = await fetch(src); if (!r.ok) throw new Error('Fichier d\'équipe introuvable (' + r.status + ')'); await GitHub.envoyer(nom, await r.blob(), 'Fichier d\'équipe ' + src.split('/').pop()); }
     }
   }
-  async function lireVitrine() { try { return JSON.parse(await GitHub.lireTexte('vitrine/index.json')) || []; } catch (e) { return []; } }
+  // Ne renvoie une liste vide que si le fichier n'existe pas encore (sinon on effacerait la vitrine)
+  async function lireVitrine() { try { return JSON.parse(await GitHub.lireTexte('vitrine/index.json')) || []; } catch (e) { if (e.message === 'absent') return []; throw e; } }
   async function ecrireVitrine(index, message) {
     await GitHub.envoyer('vitrine/index.json', JSON.stringify(index, null, 1), message);
     await GitHub.envoyer('vitrine/index.js', 'window.VITRINE = ' + JSON.stringify(index, null, 1) + ';\n', message + ' (js)');
@@ -2059,14 +2062,15 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     api(chemin) { const g = this.frais(); return `https://api.github.com/repos/${g.owner}/${g.repo}/contents/${chemin.split('/').map(encodeURIComponent).join('/')}`; },
     entetes() { return { Authorization: 'Bearer ' + (this.frais().token || '').trim(), Accept: 'application/vnd.github+json' }; },
     async sha(chemin) {
-      const r = await fetch(this.api(chemin) + '?ref=' + encodeURIComponent(reglages.github.branche || 'main'), { headers: this.entetes() });
+      const r = await fetch(this.api(chemin) + '?ref=' + encodeURIComponent(reglages.github.branche || 'main') + '&t=' + Date.now(), { headers: this.entetes(), cache: 'no-store' });
       if (r.status === 404) return null;
       if (!r.ok) throw this.erreur(r.status, await r.text());
       return (await r.json()).sha;
     },
     async lireTexte(chemin) {
-      const r = await fetch(this.api(chemin) + '?ref=' + encodeURIComponent(reglages.github.branche || 'main'), { headers: Object.assign(this.entetes(), { Accept: 'application/vnd.github.raw' }) });
-      if (!r.ok) throw new Error('absent');
+      const r = await fetch(this.api(chemin) + '?ref=' + encodeURIComponent(reglages.github.branche || 'main') + '&t=' + Date.now(), { headers: Object.assign(this.entetes(), { Accept: 'application/vnd.github.raw' }), cache: 'no-store' });
+      if (r.status === 404) throw new Error('absent');
+      if (!r.ok) throw this.erreur(r.status, await r.text());
       return r.text();
     },
     async base64(contenu) {
@@ -2074,12 +2078,18 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       return new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result).split(',')[1]); fr.readAsDataURL(blob); });
     },
     async envoyer(chemin, contenu, message) {
-      const sha = await this.sha(chemin);
-      const corps = { message, content: await this.base64(contenu), branch: reglages.github.branche || 'main' };
-      if (sha) corps.sha = sha;
-      const r = await fetch(this.api(chemin), { method: 'PUT', headers: Object.assign(this.entetes(), { 'Content-Type': 'application/json' }), body: JSON.stringify(corps) });
-      if (!r.ok) throw this.erreur(r.status, await r.text());
-      return r.json();
+      const content = await this.base64(contenu);
+      // GitHub peut répondre avec un temps de retard : on réessaie (avec le bon « sha ») si besoin
+      for (let essai = 0; ; essai++) {
+        const sha = await this.sha(chemin);
+        const corps = { message, content, branch: reglages.github.branche || 'main' };
+        if (sha) corps.sha = sha;
+        const r = await fetch(this.api(chemin), { method: 'PUT', headers: Object.assign(this.entetes(), { 'Content-Type': 'application/json' }), body: JSON.stringify(corps) });
+        if (r.ok) return r.json();
+        const texte = await r.text();
+        if ((r.status === 409 || r.status === 422) && essai < 4) { await new Promise(ok => setTimeout(ok, 1500 * (essai + 1))); continue; }
+        throw this.erreur(r.status, texte);
+      }
     }
   };
 
