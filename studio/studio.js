@@ -2104,13 +2104,15 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
   async function vueRejoindre(cle, conf) {
     $('#app').innerHTML = '<div class="carte" style="max-width:560px;margin:40px auto"><h2>Rejoindre l\'équipe…</h2><p class="muet" id="rj-etat">Vérification du lien…</p></div>';
     try {
-      const c = deB64(conf || '');
+      const c = conf ? deB64(conf) : (reglages.supabase ? { u: reglages.supabase.url, a: reglages.supabase.anon } : {});
       if (!c.u || !c.a) throw new Error('lien incomplet');
       if (!reglages.supabase || reglages.supabase.url !== c.u) { reglages.supabase = { url: c.u, anon: c.a }; sauverReglages(); }
       const info = await Base.rpc(reglages.supabase, 'equipe_info', { p_cle: cle });
-      const nom = await demanderNom('Bienvenue dans l\'équipe « ' + info.nom + ' »', (reglages.equipe && reglages.equipe.membre) || '');
+      const deja = reglages.equipe && reglages.equipe.id === info.id ? reglages.equipe : null;
+      // déjà dans cette équipe : on garde son nom et son accès admin (rouvrir le lien d'équipe ne le fait plus perdre)
+      const nom = deja && deja.membre ? deja.membre : await demanderNom('Bienvenue dans l\'équipe « ' + info.nom + ' »', (reglages.equipe && reglages.equipe.membre) || '');
       if (!nom) { location.hash = '#/'; return; }
-      reglages.equipe = { id: info.id, nom: info.nom, cle: info.cle, cle_admin: info.admin ? cle : '', membre: nom, auto: true };
+      reglages.equipe = { id: info.id, nom: info.nom, cle: info.cle, cle_admin: info.admin ? cle : (deja && deja.cle_admin) || '', membre: nom, auto: deja ? deja.auto !== false : true };
       sauverReglages();
       await Equipe.charger();
       toast(info.admin ? 'Vous êtes l\'admin de l\'équipe « ' + info.nom + ' »' : 'Vous avez rejoint l\'équipe « ' + info.nom + ' »');
