@@ -278,3 +278,5 @@ textarea.edition-directe { position: absolute; z-index: 8; resize: none; overflo
 .nouveautes-panneau .modale-fermer { position: static; }
 .nouveautes-panneau ul { margin: 4px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
 .np-bloc { border-top: 1px solid var(--ligne); padding-top: 8px; }
+
+.apercu-cadre.en-lecture .poignees { display: none; }

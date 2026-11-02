@@ -106,6 +106,11 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-02-2', date: '2 novembre 2026', titre: 'Film MP4 complet, transitions, compteurs', points: [
+      '<b>Film vidéo</b> : fabriqué image par image en MP4 (H.264 + son AAC). Il va jusqu\'au bout, s\'ouvre partout (téléphone, WhatsApp, QuickTime), avec la chanson qui baisse doucement à la fin. Vous pouvez changer d\'onglet pendant la fabrication.',
+      'Les <b>boutons</b> (Sarintany, Antsoy…) apparaissent maintenant dans le film ; seuls les boutons de navigation (Dingano, Jereo indray) n\'y sont pas.',
+      '<b>Transitions</b> corrigées (le texte du plan précédent ne disparaît plus d\'un coup) et 6 nouvelles : glissement vers le haut, zoom, flou, volet, rideau, cercle. Durée réglable et bouton « ▶ Voir la transition ».',
+      '<b>Compteurs</b> adultes / enfants : − et + marchent aussi dans l\'aperçu du studio ; au maximum de places, le compteur le signale.'] },
     { id: '2026-11-02-1', date: '2 novembre 2026', titre: 'Remerciement et nouveautés', points: [
       'Le plan de <b>remerciement</b> s\'affiche bien après « Ho tonga izahay », « Tsy ho afaka izahay » ou « Hamaly amin\'ny WhatsApp » (lien général), dans l\'invitation et dans l\'aperçu du studio.',
       'Quand la <b>date limite</b> des réponses est passée, le film continue tout seul vers le remerciement (au lieu de rester bloqué), et le studio vous prévient.',
@@ -397,6 +402,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
 
     function plan() { return p.plans[E.i]; }
     function afficher() {
+      const cd = $('#cadre'); if (cd) cd.classList.remove('en-lecture');
       rendrePlans(); rendreReglages();
       const pl = plan();
       const d = Number(pl.duree) || 6;
@@ -410,17 +416,18 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     E.rafraichir = () => { eng.afficherPlan(E.i, E.t); };
 
     $('#t-curseur').oninput = e => { E.t = Number(e.target.value); $('#t-aff').textContent = E.t.toFixed(1).replace('.', ',') + ' s'; eng.afficherPlan(E.i, E.t); };
-    $('#jouer-plan').onclick = () => { eng.mode = 'invitation'; eng.jouerPlan(E.i); };
+    const enLecture = on => { $('#cadre').classList.toggle('en-lecture', on); };
+    $('#jouer-plan').onclick = () => { eng.mode = 'invitation'; enLecture(true); eng.jouerPlan(E.i); };
     let son = null;
     const couperSon = () => { if (son) { son.pause(); son = null; } };
     nettoyeurs.push(couperSon);
     $('#jouer-tout').onclick = async () => {
-      eng.mode = 'invitation'; eng.jouer(eng.plansInvitation(), 0);
+      eng.mode = 'invitation'; enLecture(true); eng.jouer(eng.plansInvitation(), 0);
       couperSon();
       if (p.musique && p.musique.src) { try { son = new Audio(await resoudre(p.musique.src)); son.volume = p.musique.volume != null ? p.musique.volume : 0.8; son.currentTime = Number(p.musique.debut) || 0; son.play(); } catch (e) {} }
     };
     $('#jouer-plan').addEventListener('click', couperSon);
-    $('#stop').onclick = () => { couperSon(); eng.pause(); eng.mode = 'edition'; afficher(); };
+    $('#stop').onclick = () => { couperSon(); enLecture(false); eng.pause(); eng.mode = 'edition'; afficher(); };
     const majVoirLangue = () => { const sel = $('#voir-langue'); const ls = [p.fiche.langue].concat((p.langues || []).filter(l => l !== p.fiche.langue)); sel.style.display = ls.length > 1 ? '' : 'none'; sel.innerHTML = ls.map(l => `<option value="${l}" ${(eng.langue || p.fiche.langue) === l ? 'selected' : ''}>Voir en : ${esc(MoteurInfo.LANGUES[l] || l)}</option>`).join(''); };
     majVoirLangue();
     $('#voir-langue').onchange = e => { eng.changerLangue(e.target.value); E.rafraichir(); };
@@ -790,8 +797,9 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <details class="bloc" open><summary>Durée et transition</summary>
           <div class="deux">
             <label class="champ">Durée (s)${pl.role === 'confirmation' ? ' — 0 = attend l\'invité' : ''}<input type="number" id="p-duree" min="0" max="30" step="0.5" value="${pl.duree}"></label>
-            <label class="champ">Transition d'arrivée<select id="p-trans">${opts([['aucune', 'Aucune'], ['fondu', 'Fondu enchaîné'], ['fondu-blanc', 'Fondu au blanc'], ['fondu-noir', 'Fondu au noir'], ['glissement', 'Glissement']], (pl.transition && pl.transition.type) || 'fondu')}</select></label>
+            <label class="champ">Transition d'arrivée<select id="p-trans">${opts([['aucune', 'Aucune'], ['fondu', 'Fondu enchaîné'], ['fondu-blanc', 'Fondu au blanc'], ['fondu-noir', 'Fondu au noir'], ['glissement', 'Glissement (côté)'], ['glissement-haut', 'Glissement (vers le haut)'], ['zoom', 'Zoom'], ['flou', 'Flou'], ['volet', 'Volet'], ['rideau', 'Rideau (depuis le centre)'], ['cercle', 'Cercle']], (pl.transition && pl.transition.type) || 'fondu')}</select></label>
           </div>
+          <div class="ligne"><label class="champ" style="flex:1">Durée de la transition (s)<input type="number" id="p-trans-d" min="0.2" max="3" step="0.1" value="${(pl.transition && pl.transition.duree) || 0.8}"></label><button class="btn petit" id="p-trans-voir" style="align-self:flex-end">▶ Voir la transition</button></div>
           <button class="btn petit" id="empiler" style="margin-top:8px">Éviter les chevauchements de textes</button>
         </details>
         <details class="bloc" open><summary>Calques <span class="muet">${(pl.calques || []).length}</span></summary>
@@ -812,7 +820,11 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       $('#fond-ia').onclick = () => allerCreateur(p, E.i, {});
       $('#empiler').onclick = () => { E.modif(true); if (eng.empilerTextes(pl)) { E.rafraichir(); rendreReglages(); toast('Textes réorganisés (↶ pour annuler)'); } else toast('Rien à réorganiser'); };
       $('#p-duree').oninput = e => { E.modif(); pl.duree = Math.max(0, Number(e.target.value) || 0); $('#t-curseur').max = Number(pl.duree) || 6; rendrePlans(); };
-      $('#p-trans').onchange = e => { E.modif(true); pl.transition = pl.transition || {}; pl.transition.type = e.target.value; pl.transition.duree = pl.transition.duree || 0.8; };
+      $('#p-trans').onchange = e => { E.modif(true); pl.transition = pl.transition || {}; pl.transition.type = e.target.value; pl.transition.duree = pl.transition.duree || 0.8; voirTransition(); };
+      $('#p-trans-d').onchange = e => { E.modif(true); pl.transition = pl.transition || { type: 'fondu' }; pl.transition.duree = Math.max(0.2, Math.min(3, Number(e.target.value) || 0.8)); };
+      // montre la fin du plan précédent puis l'arrivée de ce plan
+      const voirTransition = () => { if (E.i < 1) return toast('Le premier plan n\'a pas de transition d\'arrivée'); const av = p.plans[E.i - 1]; eng.mode = 'invitation'; $('#cadre').classList.add('en-lecture'); eng.jouer([E.i - 1, E.i], 0); eng.t = Math.max(0, (Number(av.duree) || 4) - 1); };
+      $('#p-trans-voir').onclick = voirTransition;
       $('#p-ecl').oninput = e => { E.modif(); pl.fond.eclaircir = Number(e.target.value); };
       $('#p-asb').oninput = e => { E.modif(); pl.fond.assombrir = Number(e.target.value); };
       $$('[data-ajout]', col).forEach(b => b.onclick = () => ajouterCalque(b.dataset.ajout));
@@ -1712,7 +1724,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <div class="ligne"><label class="btn">${p.musique ? 'Changer' : 'Ajouter une musique'}<input type="file" id="musique" accept="audio/*,video/*,.mp3,.m4a,.aac,.wav,.wave,.ogg,.oga,.opus,.flac,.wma,.aif,.aiff,.aifc,.caf,.amr,.3gp,.3ga,.webm,.weba,.mka,.mp2,.mpga,.ac3,.mp4,.m4v,.mov,.mkv,.avi" hidden></label>${p.musique ? '<button class="btn danger" id="musique-suppr">Retirer</button>' : ''}</div>
           ${p.musique ? `<label class="champ">Volume<input type="range" id="volume" min="0" max="1" step="0.05" value="${p.musique.volume != null ? p.musique.volume : 0.8}"></label>` : ''}</div>
         <div class="carte pile"><h3>Film vidéo</h3>
-          <p class="muet">Enregistre le film (ouverture, plans intermédiaires, remerciement) directement dans le navigateur, en temps réel. Gardez cet onglet ouvert pendant l'enregistrement. Format MP4 sur Chrome récent, sinon WebM.</p>
+          <p class="muet">Fabrique le film MP4 (ouverture, plans intermédiaires, remerciement) avec la chanson, image par image : le fichier est complet, avec les transitions et les boutons, et se lit partout (téléphone, WhatsApp, Facebook, QuickTime). Comptez environ 1 à 2 minutes ; vous pouvez changer d'onglet pendant ce temps. Le plan de confirmation n'y est pas (il ne sert qu'en ligne).</p>
           <div class="apercu-cadre" style="height:340px;margin:0 auto" id="cadre-film"><div id="scene-film"></div></div>
           <div class="progres"><div id="barre"></div></div>
           <div class="ligne"><button class="btn plein" id="film">Enregistrer le film</button><span class="muet" id="film-etat"></span></div></div>
@@ -1778,10 +1790,10 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     eng.setProjet(p).then(() => eng.afficherPlan(0, 0.5));
     $('#film').onclick = async () => {
       if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) return toast('Ce navigateur ne sait pas enregistrer : utilisez Chrome sur ordinateur');
-      const b = $('#film'); b.disabled = true; $('#film-etat').textContent = 'Enregistrement…';
+      const b = $('#film'); b.disabled = true; $('#film-etat').textContent = 'Fabrication du film…';
       try {
         const mus = p.musique ? await resoudre(p.musique.src) : null;
-        const r = await eng.exporterFilm({ musique: mus, debut: p.musique ? Number(p.musique.debut) || 0 : 0, volume: p.musique ? p.musique.volume : 0.8, progres: v => { $('#barre').style.width = Math.round(v * 100) + '%'; } });
+        const r = await eng.exporterFilm({ musique: mus, debut: p.musique ? Number(p.musique.debut) || 0 : 0, volume: p.musique ? p.musique.volume : 0.8, progres: v => { $('#barre').style.width = Math.round(v * 100) + '%'; $('#film-etat').textContent = 'Fabrication du film… ' + Math.round(v * 100) + ' %'; } });
         telecharger(`${p.slug}-film.${r.extension}`, r.blob);
         $('#film-etat').textContent = `Film prêt (${Math.round(r.duree)} s, ${(r.blob.size / 1e6).toFixed(1)} Mo, ${r.extension.toUpperCase()})`;
       } catch (e) { console.error(e); $('#film-etat').textContent = 'Erreur : ' + e.message; }

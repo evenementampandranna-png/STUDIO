@@ -306,21 +306,42 @@
       ctx.fillStyle = '#f4ede2'; ctx.fillRect(0, 0, W, H);
       if (!p) { ctx.restore(); return; }
       const tr = p.transition || {};
-      const dTr = Number(tr.duree) || 0;
+      const dTr = Number(tr.duree) || (tr.type && tr.type !== 'aucune' ? 0.8 : 0);
       const avant = this.projet.plans[this.seq[this.pos - 1]];
       if (avant && dTr > 0 && this.t < dTr && tr.type && tr.type !== 'aucune' && this.planFixe == null) {
         const q = ease(this.t / dTr);
-        this._dessinerPlan(avant, (Number(avant.duree) || 0) + this.t, 1, false);
-        if (tr.type === 'fondu-blanc' || tr.type === 'fondu-noir') {
+        // le plan qui part reste figé sur son dernier instant (ses textes ne disparaissent pas d'un coup)
+        const tAvant = Math.max(0, (Number(avant.duree) || 0) - 0.02);
+        const dessinerAvant = (al) => this._dessinerPlan(avant, tAvant, al == null ? 1 : al, false);
+        const dessinerNouveau = (al) => this._dessinerPlan(p, this.t, al == null ? 1 : al, true);
+        const T = tr.type;
+        if (T === 'fondu-blanc' || T === 'fondu-noir') {
+          dessinerAvant();
           ctx.globalAlpha = q < 0.5 ? q * 2 : (1 - q) * 2;
-          ctx.fillStyle = tr.type === 'fondu-blanc' ? '#fff' : '#000';
+          ctx.fillStyle = T === 'fondu-blanc' ? '#fff' : '#000';
           ctx.fillRect(0, 0, W, H);
           ctx.globalAlpha = 1;
-          if (q >= 0.5) this._dessinerPlan(p, this.t, (q - 0.5) * 2, true);
-        } else if (tr.type === 'glissement') {
-          ctx.save(); ctx.translate(W * (1 - q), 0); this._dessinerPlan(p, this.t, 1, true); ctx.restore();
+          if (q >= 0.5) dessinerNouveau((q - 0.5) * 2);
+        } else if (T === 'glissement' || T === 'glissement-haut') {
+          ctx.save(); if (T === 'glissement') ctx.translate(-W * q, 0); else ctx.translate(0, -H * q); dessinerAvant(); ctx.restore();
+          ctx.save(); if (T === 'glissement') ctx.translate(W * (1 - q), 0); else ctx.translate(0, H * (1 - q)); dessinerNouveau(); ctx.restore();
+        } else if (T === 'zoom') {
+          ctx.save(); ctx.translate(W / 2, H / 2); ctx.scale(1 + 0.25 * q, 1 + 0.25 * q); ctx.translate(-W / 2, -H / 2); dessinerAvant(1); ctx.restore();
+          ctx.save(); ctx.translate(W / 2, H / 2); const z = 0.85 + 0.15 * q; ctx.scale(z, z); ctx.translate(-W / 2, -H / 2); dessinerNouveau(q); ctx.restore();
+        } else if (T === 'flou') {
+          ctx.save(); ctx.filter = `blur(${(q * 18).toFixed(1)}px)`; dessinerAvant(); ctx.restore();
+          ctx.save(); ctx.filter = `blur(${((1 - q) * 18).toFixed(1)}px)`; dessinerNouveau(q); ctx.restore(); ctx.filter = 'none';
+        } else if (T === 'volet') {
+          dessinerAvant();
+          ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W * q, H); ctx.clip(); dessinerNouveau(); ctx.restore();
+        } else if (T === 'cercle') {
+          dessinerAvant();
+          ctx.save(); ctx.beginPath(); ctx.arc(W / 2, H / 2, Math.hypot(W, H) / 2 * q, 0, Math.PI * 2); ctx.clip(); dessinerNouveau(); ctx.restore();
+        } else if (T === 'rideau') {
+          dessinerAvant();
+          ctx.save(); ctx.beginPath(); ctx.rect(W / 2 * (1 - q), 0, W * q, H); ctx.clip(); dessinerNouveau(); ctx.restore();
         } else {
-          this._dessinerPlan(p, this.t, q, true);
+          dessinerAvant(); dessinerNouveau(q);
         }
       } else {
         this._dessinerPlan(p, this.t, 1, true);
@@ -357,9 +378,24 @@
       (p.calques || []).forEach(c => {
         if (c.masque || (c.condition === 'famille' && !this.famille) || (c.condition === 'general' && this.famille)) { if (mesurer) delete this.bbox[c.id]; return; }
         if (c._edition && c.type === 'texte') return;   // en cours d'écriture dans l'éditeur : garder le cadre, ne pas dessiner
-        if (TYPES_HTML.includes(c.type)) { if (mesurer) this._bboxHTML(c); return; }
+        if (TYPES_HTML.includes(c.type)) { if (mesurer) this._bboxHTML(c); if (this.boutonsDessines) this._dessinerBouton(c, t, p, vars, alpha); return; }
         this._dessinerCalque(c, t, p, vars, alpha, mesurer);
       });
+      ctx.restore();
+    }
+
+    // Film : les boutons (HTML dans l'invitation) sont dessinés comme des images, sauf ceux de navigation
+    _dessinerBouton(c, t, p, vars, alphaPlan) {
+      if (c.type !== 'bouton' || ['passer', 'suivant', 'precedent', 'revoir'].includes(c.action || 'suivant')) return;
+      const deb = Number(c.debut) || 0; if (t < deb) return;
+      const ctx = this.ctx, fs = (Number(c.taille) || 2.4) / 100 * H, larg = (Number(c.largeur) || 60) / 100 * W, haut = fs * 2.3;
+      const x = (Number(c.x) || 50) / 100 * W - larg / 2, y = (Number(c.y) || 50) / 100 * H - haut / 2;
+      const coul = c.couleur || '#7a1f2b', style = c.style || 'plein';
+      ctx.save(); ctx.globalAlpha = alphaPlan * clamp((t - deb) / 0.6, 0, 1);
+      if (style !== 'lien') { arrondi(ctx, x, y, larg, haut, haut / 2); ctx.fillStyle = style === 'plein' ? coul : 'rgba(255,255,255,.85)'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = coul; ctx.stroke(); }
+      ctx.fillStyle = style === 'plein' ? '#fff' : coul; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = `600 ${fs.toFixed(1)}px "Cormorant Garamond", Georgia, serif`;
+      ctx.fillText(remplacer(texteDe(c, this.langue), vars), x + larg / 2, y + haut / 2, larg - fs);
       ctx.restore();
     }
 
@@ -521,8 +557,12 @@
             }
             return 20;
           };
-          el.querySelector('.mt-moins').addEventListener('click', ev => { ev.stopPropagation(); if (this.mode === 'edition') return; this.form[champ] = Math.max(min, (Number(this.form[champ]) || 0) - 1); maj(); });
-          el.querySelector('.mt-plus').addEventListener('click', ev => { ev.stopPropagation(); if (this.mode === 'edition') return; this.form[champ] = Math.min(maxDe(), (Number(this.form[champ]) || 0) + 1); maj(); });
+          // − / + : marchent partout (aussi dans l'aperçu du studio) ; au maximum, on montre pourquoi
+          const signaler = () => { el.classList.remove('mt-max'); void el.offsetWidth; el.classList.add('mt-max'); const places = this.famille && Number(this.famille.places);
+            if (places) { const lib = el.querySelector('.mt-lib'); const ancien = lib.textContent; lib.textContent = (lang === 'mg' ? `Toerana ${places} ihany` : lang === 'fr' ? `${places} place(s) en tout` : `${places} seat(s) in total`); clearTimeout(el._t); el._t = setTimeout(() => { lib.textContent = ancien; }, 1600); } };
+          ['pointerdown', 'mousedown'].forEach(n => el.addEventListener(n, ev => ev.stopPropagation()));
+          el.querySelector('.mt-moins').addEventListener('click', ev => { ev.stopPropagation(); ev.preventDefault(); this.form[champ] = Math.max(min, (Number(this.form[champ]) || 0) - 1); maj(); });
+          el.querySelector('.mt-plus').addEventListener('click', ev => { ev.stopPropagation(); ev.preventDefault(); const v = (Number(this.form[champ]) || 0); if (v >= maxDe()) return signaler(); this.form[champ] = v + 1; maj(); });
         } else if (c.type === 'champ') {
           const champ = c.champ || 'quartier';
           el.innerHTML = `<input type="text" class="mt-input">`;
@@ -584,8 +624,102 @@
     }
 
     /* ----- Export vidéo dans le navigateur (temps réel) ----- */
+    /* ----- Film image par image (WebCodecs) : MP4 H.264 + AAC complet, lisible partout ----- */
+    // Rendu hors temps réel : chaque image est calculée puis encodée ; rien ne saute, même si l'onglet n'est pas au premier plan.
+    async exporterFilmImages(opts) {
+      opts = opts || {};
+      const seq = opts.seq || this.plansFilm();
+      if (!seq.length) throw new Error('Aucun plan à filmer');
+      if (!window.Mp4Muxer) await new Promise((ok, ko) => { const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.1/build/mp4-muxer.min.js'; sc.onload = ok; sc.onerror = () => ko(new Error('Outil MP4 indisponible (connexion ?)')); document.head.appendChild(sc); });
+      const FPS = 30, pl = this.projet.plans;
+      const durees = seq.map(i => Number(pl[i].duree) || 4);
+      const total = durees.reduce((a, b) => a + b, 0), N = Math.round(total * FPS);
+      // vidéo
+      let vcodec = null;
+      for (const c of ['avc1.640028', 'avc1.4d0028', 'avc1.42E028']) { try { if ((await VideoEncoder.isConfigSupported({ codec: c, width: W, height: H, bitrate: 6e6, framerate: FPS })).supported) { vcodec = c; break; } } catch (e) {} }
+      if (!vcodec) throw new Error('H.264 non disponible');
+      // audio : la chanson, à partir du début choisi, en boucle si besoin, fondu à la fin
+      let audio = null, SR = 48000;
+      if (opts.musique) {
+        try {
+          const ctxA = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SR });
+          const buf = await ctxA.decodeAudioData(await (await fetch(opts.musique)).arrayBuffer()); ctxA.close();
+          const n = Math.round(total * SR), deb = Math.round((opts.debut || 0) * SR), vol = opts.volume != null ? opts.volume : 0.9, fondu = Math.min(n, 2.5 * SR);
+          const canaux = [0, 1].map(k => { const src = buf.getChannelData(Math.min(k, buf.numberOfChannels - 1)), o = new Float32Array(n); for (let i = 0; i < n; i++) { const j = (deb + i) % src.length; o[i] = src[j] * vol * (i > n - fondu ? (n - i) / fondu : 1); } return o; });
+          for (const c of ['mp4a.40.2', 'opus']) { if ((await AudioEncoder.isConfigSupported({ codec: c, sampleRate: SR, numberOfChannels: 2, bitrate: 192000 })).supported) { audio = { codec: c, canaux, n }; break; } }
+        } catch (e) { console.warn('audio du film', e); }
+      }
+      const muxer = new Mp4Muxer.Muxer({ target: new Mp4Muxer.ArrayBufferTarget(), fastStart: 'in-memory', firstTimestampBehavior: 'offset',
+        video: { codec: 'avc', width: W, height: H, frameRate: FPS }, audio: audio ? { codec: audio.codec === 'opus' ? 'opus' : 'aac', numberOfChannels: 2, sampleRate: SR } : undefined });
+      let erreur = null;
+      const venc = new VideoEncoder({ output: (ch, meta) => muxer.addVideoChunk(ch, meta), error: e => { erreur = e; } });
+      venc.configure({ codec: vcodec, width: W, height: H, bitrate: 6e6, framerate: FPS });
+      // préparer le moteur : lecture arrêtée, boutons dessinés, pas de HTML
+      const avantEtat = { lecture: this.lecture, seq: this.seq, pos: this.pos, t: this.t, planFixe: this.planFixe };
+      this.lecture = false; this.masquerHTML = true; this.boutonsDessines = true; this._construireHTML();
+      this.seq = seq; this.planFixe = null;
+      Object.values(this.medias).forEach(m => { if (m && m.pause) m.pause(); });
+      // temps de chaque vidéo : elle continue si le plan suivant garde le même fond, sinon elle repart à 0
+      const departMedia = {};
+      const caler = async (src, conf, tm) => {
+        const v = this.medias[src]; if (!v || v.tagName !== 'VIDEO') return;
+        if (v.readyState < 1) await new Promise(r => { v.addEventListener('loadedmetadata', r, { once: true }); setTimeout(r, 3000); });
+        const d = v.duration || 1; let x = tm * (conf.vitesse || 1); x = conf.boucle === false ? Math.min(x, d - 0.04) : x % d;
+        if (Math.abs(v.currentTime - x) < 0.004 && v.readyState >= 2) return;
+        await new Promise(r => { const fin = () => { v.removeEventListener('seeked', fin); r(); }; v.addEventListener('seeked', fin); try { v.currentTime = x; } catch (e) { r(); } setTimeout(fin, 1500); });
+      };
+      const mediasDe = p => { const l = []; if (p.fond && p.fond.media) l.push([p.fond.media, p.fond]); (p.calques || []).forEach(c => { if (c.type === 'video' && c.media) l.push([c.media, c]); }); return l; };
+      try {
+        let pos = 0, debPlan = 0;
+        const entrer = k => { const p = pl[seq[k]], av = k > 0 ? pl[seq[k - 1]] : null; mediasDe(p).forEach(([src]) => { const garde = av && av.fond && p.fond && av.fond.media === p.fond.media && src === p.fond.media && departMedia[src] != null; if (!garde) departMedia[src] = debPlan; }); };
+        entrer(0);
+        for (let f = 0; f < N; f++) {
+          if (erreur) throw erreur;
+          const T = f / FPS;
+          while (pos < seq.length - 1 && T >= debPlan + durees[pos]) { debPlan += durees[pos]; pos++; entrer(pos); }
+          this.pos = pos; this.t = T - debPlan;
+          const p = pl[seq[pos]];
+          for (const [src, conf] of mediasDe(p)) await caler(src, conf, T - departMedia[src]);
+          const av = pos > 0 ? pl[seq[pos - 1]] : null, dTr = Number((p.transition || {}).duree) || 0.8;
+          if (av && this.t < dTr) for (const [src, conf] of mediasDe(av)) if (!mediasDe(p).some(x => x[0] === src)) await caler(src, conf, T - (departMedia[src] || 0));
+          this.dessiner();
+          const fr = new VideoFrame(this.canvas, { timestamp: Math.round(f * 1e6 / FPS), duration: Math.round(1e6 / FPS) });
+          venc.encode(fr, { keyFrame: f % (FPS * 2) === 0 }); fr.close();
+          if (venc.encodeQueueSize > 8) await new Promise(r => venc.addEventListener('dequeue', r, { once: true }));
+          if (opts.progres && f % 5 === 0) opts.progres(f / N * (audio ? 0.92 : 1));
+        }
+        await venc.flush();
+        if (audio) {
+          const aenc = new AudioEncoder({ output: (ch, meta) => muxer.addAudioChunk(ch, meta), error: e => { erreur = e; } });
+          aenc.configure({ codec: audio.codec, sampleRate: SR, numberOfChannels: 2, bitrate: 192000 });
+          const bloc = 4800;
+          for (let i = 0; i < audio.n; i += bloc) {
+            const m = Math.min(bloc, audio.n - i), data = new Float32Array(m * 2);
+            data.set(audio.canaux[0].subarray(i, i + m), 0); data.set(audio.canaux[1].subarray(i, i + m), m);
+            const ad = new AudioData({ format: 'f32-planar', sampleRate: SR, numberOfFrames: m, numberOfChannels: 2, timestamp: Math.round(i / SR * 1e6), data });
+            aenc.encode(ad); ad.close();
+            if (aenc.encodeQueueSize > 20) await new Promise(r => setTimeout(r, 5));
+          }
+          await aenc.flush(); aenc.close();
+          if (erreur) throw erreur;
+        }
+        venc.close();
+        muxer.finalize();
+        if (opts.progres) opts.progres(1);
+        return { blob: new Blob([muxer.target.buffer], { type: 'video/mp4' }), extension: 'mp4', duree: total };
+      } finally {
+        this.boutonsDessines = false; this.masquerHTML = false;
+        Object.assign(this, avantEtat);
+        this._construireHTML();
+      }
+    }
+
     async exporterFilm(opts) {
       opts = opts || {};
+      if (window.VideoEncoder && window.AudioEncoder && window.VideoFrame && opts.tempsReel !== true) {
+        try { return await this.exporterFilmImages(opts); }
+        catch (e) { console.warn('Film image par image impossible, enregistrement en temps réel', e); }
+      }
       const seq = opts.seq || this.plansFilm();
       if (!seq.length) throw new Error('Aucun plan à filmer');
       if (location.protocol === 'file:') throw new Error('L\'enregistrement du film fonctionne quand le studio est ouvert depuis son adresse en ligne (GitHub Pages), pas depuis un dossier de l\'ordinateur.');
@@ -609,7 +743,7 @@
       const morceaux = [];
       rec.ondataavailable = e => { if (e.data && e.data.size) morceaux.push(e.data); };
       const fini = new Promise(res => { rec.onstop = res; });
-      this.masquerHTML = true;
+      this.masquerHTML = true; this.boutonsDessines = true;
       const ancienFin = this.onFin, ancienTemps = this.onTemps;
       let ecoule = 0;
       const debut = performance.now();
@@ -624,7 +758,7 @@
       if (musique) musique.pause();
       await fini;
       this.onFin = ancienFin; this.onTemps = ancienTemps;
-      this.masquerHTML = false;
+      this.masquerHTML = false; this.boutonsDessines = false;
       if (audioCtx) audioCtx.close();
       const blob = new Blob(morceaux, { type: mime || 'video/webm' });
       return { blob, extension: /mp4/.test(mime) ? 'mp4' : 'webm', duree: total };
@@ -645,6 +779,8 @@
 .mt-racine{position:relative;aspect-ratio:9/16;overflow:hidden;container-type:size;background:#f4ede2;user-select:none;-webkit-user-select:none}
 .mt-canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .mt-html{position:absolute;inset:0;pointer-events:none}
+.mt-compteur.mt-max{animation:mtSecoue .35s ease}
+@keyframes mtSecoue{25%{transform:translateY(-50%) translateX(-5px)}75%{transform:translateY(-50%) translateX(5px)}}
 .mt-el{position:absolute;transform:translateY(-50%);pointer-events:auto;display:flex;justify-content:center;align-items:center;font-size:calc(var(--mt-taille) * 1cqh);animation:mtEntree .7s ease both;font-family:"Cormorant Garamond",serif}
 @keyframes mtEntree{from{opacity:0;transform:translateY(-30%)}to{opacity:1;transform:translateY(-50%)}}
 .mt-bouton button{font:inherit;font-weight:600;width:100%;padding:.55em .8em;border-radius:999px;cursor:pointer;border:1.5px solid var(--mt-couleur);line-height:1.15;transition:transform .15s}
