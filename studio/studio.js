@@ -373,6 +373,11 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-03-3', date: '3 novembre 2026', titre: 'Le remerciement final s\'affiche toujours', points: [
+      'Après « Je confirme » ou « Je ne pourrai pas venir », le message de réponse se met en haut de l\'écran et se ferme tout seul : le plan de remerciement n\'est plus caché.',
+      'Réponse à envoyer par WhatsApp : le remerciement vient juste après l\'envoi (ou après « Fermer »).',
+      'Invitations de la vitrine (démos) : plus de nom demandé, on passe directement au remerciement.'
+    ] },
     { id: '2026-11-03-2', date: '3 novembre 2026', titre: 'Alignement du texte, rotation, nouvelles polices, fonds choisis plan par plan', points: [
       '<b>Alignement du texte</b> : 4 boutons dans la barre au-dessus de l\'aperçu (gauche, centré, droite, <b>justifié</b>), aussi pour plusieurs textes à la fois.',
       '<b>⟳ Rotation</b> : poignée ronde au-dessus de l\'élément choisi (par 15°, ou librement avec Maj), ou réglage précis dans « Position » (⟲ ⟳ 0°). Marche pour les textes, photos, vidéos, illustrations et boutons, et dans le film.',

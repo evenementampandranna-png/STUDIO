@@ -25,6 +25,8 @@
   #son { position: fixed; z-index: 15; left: 12px; bottom: 12px; width: 44px; height: 44px; border-radius: 50%; border: 0; background: rgba(255,255,255,.85); color: var(--vin); font-size: 20px; display: none; }
   #bandeau { position: fixed; z-index: 25; left: 50%; bottom: 18px; transform: translateX(-50%); width: min(92vw, 440px); background: #fffaf3; color: #3a2323; border-radius: 16px; padding: 16px 18px; box-shadow: 0 10px 40px rgba(0,0,0,.4); font-size: 18px; display: none; }
   #bandeau b { color: var(--vin); }
+  #bandeau.haut { bottom: auto; top: 14px; padding: 12px 16px; font-size: 16px; }
+  #bandeau.haut .actions { margin-top: 8px; }
   #bandeau .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
   #bandeau a, #bandeau button { font: 600 16px "Cormorant Garamond", serif; flex: 1; text-align: center; padding: 10px 12px; border-radius: 999px; border: 1.5px solid var(--vin); color: var(--vin); background: #fff; text-decoration: none; cursor: pointer; }
   #bandeau a.plein { background: var(--vin); color: #fff; }
@@ -46,10 +48,10 @@
 <button id="son" aria-label="Son">♪</button><button id="pause" aria-label="Pause">❚❚</button>
 <div id="bandeau" role="dialog"></div>
 <div id="erreur"></div>
-<script src="../config.js?v=202611031207"></script>
-<script src="../moteur/moteur.js?v=202611031207"></script>
-<script src="../moteur/fabrique.js?v=202611031207"></script>
-<script src="../moteur/base.js?v=202611031207"></script>
+<script src="../config.js?v=202611031300"></script>
+<script src="../moteur/moteur.js?v=202611031300"></script>
+<script src="../moteur/fabrique.js?v=202611031300"></script>
+<script src="../moteur/base.js?v=202611031300"></script>
 <script>
 (async function () {
   const q = new URLSearchParams(location.search);
@@ -188,7 +190,15 @@
 
   /* ---- Actions des boutons ---- */
   const tel = n => String(n || '').replace(/\D/g, '').replace(/^0/, '261');
-  function bandeau(html) { const b = $('#bandeau'); b.innerHTML = html; b.style.display = 'block'; b.querySelectorAll('[data-fermer]').forEach(x => x.onclick = () => { b.style.display = 'none'; }); }
+  // Petite fenêtre de message ; « haut » : posée en haut de l'écran (le plan de remerciement reste visible) ; auto : se ferme seule
+  let tBandeau = null;
+  function bandeau(html, o) {
+    o = o || {}; const b = $('#bandeau'); clearTimeout(tBandeau);
+    b.innerHTML = html; b.classList.toggle('haut', !!o.haut); b.style.display = 'block';
+    b.querySelectorAll('[data-fermer]').forEach(x => x.onclick = () => { b.style.display = 'none'; });
+    if (o.auto) tBandeau = setTimeout(() => { b.style.display = 'none'; }, o.auto);
+  }
+  const demo = /^demo-/.test(slug || '');   // invitation de la vitrine : rien n'est enregistré
   function messageReponse(presence, form) {
     const nom = famille ? famille.nom : '';
     if (fiche.langue === 'mg') return presence ? `Salama! ${nom}: ho tonga izahay. Olon-dehibe ${form.adultes || 0}, ankizy ${form.enfants || 0}. Misaotra!` : `Salama! ${nom}: miala tsiny fa tsy ho afaka izahay. Misaotra tamin'ny fanasana!`;
@@ -238,6 +248,11 @@
       const oui = action === 'confirmer';
       // lien général : on demande le nom ; la liste des invités propose les noms qui correspondent,
       // pour que la réponse aille directement à la bonne famille chez l'organisateur
+      if (demo) {
+        bandeau(`<b>${tr('Fanandramana ihany', 'Démonstration', 'Demo')}</b><div style="margin-top:4px;font-size:15px">${tr('Tsy voatahiry ny valiny eto. Ity ny fizarana farany amin\'ny fanasana.', 'Ici la réponse n\'est pas enregistrée. Voici la fin de l\'invitation.', 'Replies are not saved here. Here is the end of the invitation.')}</div>`, { haut: true, auto: 3500 });
+        setTimeout(() => moteur.allerRemerciement(), 300);
+        return;
+      }
       if (!famille && sbConf && !form.nom) {
         let deja = ''; try { deja = localStorage.getItem('inv.nom') || ''; } catch (e) {}
         const nom = await new Promise(res => {
@@ -273,9 +288,11 @@
       const lienWa = k ? 'https://wa.me/' + tel(k.telephone) + '?text=' + encodeURIComponent(messageReponse(oui, form)) : '';
       const merci = oui ? tr('Misaotra! Voaray ny valinteninareo.', 'Merci ! Votre réponse est enregistrée.', 'Thank you! Your reply has been saved.') : tr('Misaotra nampahafantatra.', 'Merci de nous avoir prévenus.', 'Thank you for letting us know.');
       const envoyer = tr('Alefaso amin\'ny WhatsApp', 'Envoyer sur WhatsApp', 'Send on WhatsApp');
-      if (ok) bandeau(`<b>${merci}</b><div class="actions"><button data-fermer>OK</button></div>`);
+      if (ok) bandeau(`<b>${merci}</b>`, { haut: true, auto: 3500 });
       else bandeau(`<b>${tr('Alefaso amin\'ny WhatsApp ny valinteninareo', 'Envoyez votre réponse sur WhatsApp', 'Send your reply on WhatsApp')}</b><div style="margin-top:6px">${messageReponse(oui, form)}</div><div class="actions">${lienWa ? `<a class="plein" target="_blank" href="${lienWa}">${envoyer}</a>` : ''}<button data-fermer>${tr('Hidio', 'Fermer', 'Close')}</button></div>`);
-      setTimeout(() => moteur.allerRemerciement(), 400);
+      // réponse enregistrée : remerciement tout de suite ; sinon, d'abord l'envoi par WhatsApp, puis le remerciement
+      if (ok) setTimeout(() => moteur.allerRemerciement(), 400);
+      else { let parti = false; const suite = () => { if (parti) return; parti = true; $('#bandeau').style.display = 'none'; moteur.allerRemerciement(); }; $('#bandeau').querySelectorAll('a, [data-fermer]').forEach(x => x.addEventListener('click', () => setTimeout(suite, 150))); }
     }
   }
 })();
