@@ -207,6 +207,26 @@
   const sauverMesPolices = () => Stock.ecrire('studio.polices.perso', mesPolices);
   async function chargerMesPolices(liste) { for (const x of (liste || mesPolices)) { try { const u = await resoudre(x.src); if (u) await MoteurInfo.chargerPolicePerso(x.nom, u); } catch (e) {} } }
   setTimeout(() => chargerMesPolices(), 300);
+  // Polices du studio (dossier polices/ du site) : pour toute l'équipe et toutes les invitations
+  let policesSite = [];
+  const chargementPolicesSite = fetch(BASE + 'polices/index.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []).then(async l => {
+    policesSite = (Array.isArray(l) ? l : []).filter(x => x && x.nom && x.fichier);
+    for (const x of policesSite) await MoteurInfo.chargerPolicePerso(x.nom, BASE + x.fichier);
+    return policesSite;
+  });
+  // Met une police importée dans le studio, pour toute l'équipe (fichier envoyé sur le site)
+  async function partagerPolice(nom) {
+    const g = reglages.github || {}; if (!(g.owner && g.repo && g.token)) throw new Error('Reliez d\'abord GitHub dans Réglages');
+    const x = mesPolices.find(m => m.nom === nom); if (!x) throw new Error('Police introuvable');
+    const b = await IDB.lire(x.src); if (!b) throw new Error('Fichier de police introuvable sur cet ordinateur');
+    const ext = (x.src.split('.').pop() || 'ttf').toLowerCase(), fichier = 'polices/' + nom.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.' + ext;
+    await GitHub.envoyer(fichier, b, 'Police ' + nom);
+    let liste = []; try { liste = JSON.parse(await GitHub.lireTexte('polices/index.json')) || []; } catch (e) { if (e.message !== 'absent') throw e; }
+    liste = liste.filter(p => p.nom !== nom).concat({ nom, fichier, auteur: 'ajoutée par ' + (Equipe.membre ? Equipe.membre() : '') });
+    await GitHub.envoyer('polices/index.json', JSON.stringify(liste, null, 1), 'Polices du studio : ' + nom);
+    policesSite = policesSite.filter(p => p.nom !== nom).concat({ nom, fichier });
+    return fichier;
+  }
   function nomDePolice(fichier) { return fichier.replace(/\.(ttf|otf|woff2?)$/i, '').replace(/[-_]+/g, ' ').replace(/\b(regular|normal|book)\b/ig, '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/\s+/g, ' ').trim() || 'Ma police'; }
   async function importerPolice(f) {
     if (!/\.(ttf|otf|woff2?)$/i.test(f.name)) throw new Error('Choisissez un fichier de police .ttf, .otf, .woff ou .woff2');
@@ -258,19 +278,23 @@
     const perso = [...new Set(mesPolices.map(x => x.nom).concat(ouvrirPolices.projet ? (ouvrirPolices.projet.polices_perso || []).map(x => x.nom) : []))];
     const recentes2 = Stock.lire('studio.polices.recentes', []).filter(n => cat.some(x => x[0] === n) || perso.includes(n)).slice(0, 6);
     recentes.splice(0, recentes.length, ...recentes2);
-    const groupes = [['Récentes', recentes], ['Mes polices', perso]].concat([...new Set(cat.map(x => x[1]))].map(g => [g, cat.filter(x => x[1] === g).map(x => x[0])]));
+    const site = policesSite.map(x => x.nom);
+    const groupes = [['Récentes', recentes], ['Polices du studio', site], ['Mes polices', perso.filter(n => !site.includes(n))]].concat([...new Set(cat.map(x => x[1]))].map(g => [g, cat.filter(x => x[1] === g).map(x => x[0])]));
     const d = pop(ancre, `<input type="search" class="pop-cherche" placeholder="Chercher une police…">
-      <div class="pop-onglets">${groupes.filter(g => g[1].length).map(([g]) => `<button data-g="${esc(g)}" class="${g === (recentes.length ? 'Récentes' : groupes[2][0]) ? 'on' : ''}">${esc(g)}</button>`).join('')}<button data-g="*">Toutes</button></div>
+      <div class="pop-onglets">${groupes.filter(g => g[1].length).map(([g]) => `<button data-g="${esc(g)}" class="${g === (recentes.length ? 'Récentes' : groupes[3][0]) ? 'on' : ''}">${esc(g)}</button>`).join('')}<button data-g="*">Toutes</button></div>
       <div class="pop-liste polices"></div>
       <label class="btn petit" style="margin-top:6px;width:100%;justify-content:center">+ Importer une police (.ttf, .otf, .woff)<input type="file" class="pop-import" accept=".ttf,.otf,.woff,.woff2,font/*" hidden></label>`, 'pop-polices');
     const liste = $('.polices', d);
-    const montrer = (noms) => { liste.innerHTML = noms.map(n => `<button class="police-choix ${n === actuelle ? 'on' : ''}" data-n="${esc(n)}"><span style="font-family:'${esc(n)}',serif">${esc(n)}</span><small style="font-family:'${esc(n)}',serif">Mariage · Ho tonga 2026</small></button>`).join('') || '<p class="muet">Aucune police.</p>'; };
-    const groupe = g => g === '*' ? perso.concat(cat.map(x => x[0])) : (groupes.find(x => x[0] === g) || [0, []])[1];
+    const montrer = (noms) => { liste.innerHTML = noms.map(n => `<button class="police-choix ${n === actuelle ? 'on' : ''}" data-n="${esc(n)}"><span style="font-family:'${esc(n)}',serif">${esc(n)}${site.includes(n) ? ' <em class="pc-tag">studio</em>' : perso.includes(n) ? ' <em class="pc-tag">importée</em>' : ''}</span><small style="font-family:'${esc(n)}',serif">Mariage · Ho tonga 2026</small>${perso.includes(n) && !site.includes(n) && mesPolices.some(m => m.nom === n) ? `<i class="pc-partager" data-partager="${esc(n)}" title="Mettre cette police dans le studio : toute l'équipe l'aura">⇪ pour toute l'équipe</i>` : ''}</button>`).join('') || '<p class="muet">Aucune police.</p>'; };
+    const groupe = g => g === '*' ? [...new Set(site.concat(perso, cat.map(x => x[0])))] : (groupes.find(x => x[0] === g) || [0, []])[1];
     $('.pop-import', d).onchange = async e => { const f = e.target.files[0]; if (!f) return; try { const nom = await importerPolice(f); if (!nom) return; toast('Police « ' + nom + ' » importée'); Stock.ecrire('studio.polices.recentes', [nom].concat(recentes.filter(x => x !== nom)).slice(0, 6)); fermerPop(); choisir(nom); } catch (err) { toast(err.message); } };
-    montrer(groupe(recentes.length ? 'Récentes' : groupes[2][0]));
+    montrer(groupe(recentes.length ? 'Récentes' : groupes[3][0]));
     $$('[data-g]', d).forEach(b => b.onclick = () => { $$('[data-g]', d).forEach(x => x.classList.toggle('on', x === b)); $('.pop-cherche', d).value = ''; montrer(groupe(b.dataset.g)); });
     $('.pop-cherche', d).oninput = e => { const q = e.target.value.trim().toLowerCase(); montrer(q ? groupe('*').filter(n => n.toLowerCase().includes(q)) : groupe('*')); };
-    liste.onclick = e => { const b = e.target.closest('[data-n]'); if (!b) return; const n = b.dataset.n; Stock.ecrire('studio.polices.recentes', [n].concat(recentes.filter(x => x !== n)).slice(0, 6)); fermerPop(); choisir(n); };
+    liste.onclick = async e => {
+      const pt = e.target.closest('[data-partager]');
+      if (pt) { e.stopPropagation(); const n = pt.dataset.partager; pt.textContent = 'Envoi…'; try { await partagerPolice(n); toast('« ' + n + ' » est maintenant dans le studio pour toute l\'équipe'); fermerPop(); } catch (err) { toast(err.message); pt.textContent = '⇪ pour toute l\'équipe'; } return; }
+      const b = e.target.closest('[data-n]'); if (!b) return; const n = b.dataset.n; Stock.ecrire('studio.polices.recentes', [n].concat(recentes.filter(x => x !== n)).slice(0, 6)); fermerPop(); choisir(n); };
     setTimeout(() => $('.pop-cherche', d).focus(), 30);
   }
   // Emojis rangés par thème (les derniers utilisés en premier)
@@ -373,6 +397,10 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-03-5', date: '3 novembre 2026', titre: 'Accidental Presidency, polices du studio pour toute l\'équipe', points: [
+      '<b>Accidental Presidency</b> est maintenant dans le studio pour tout le monde (onglet « Polices du studio » de la liste des polices), dans les invitations et dans le film.',
+      '<b>Intro</b> est une police payante (Fontfabric) : une fois achetée, importez son fichier (« + Importer une police »), puis « ⇪ pour toute l\'équipe » : elle est mise dans le studio et toute l\'équipe l\'a, sans rien refaire.'
+    ] },
     { id: '2026-11-03-4', date: '3 novembre 2026', titre: 'Avertissement de nouvelle version, aperçu jusqu\'au remerciement', points: [
       'Quand une nouvelle version du studio est en ligne, un bandeau « Recharger maintenant » apparaît (un onglet resté ouvert longtemps gardait l\'ancienne version).',
       'Aperçu « ▶ Toute l\'invitation » : après 8 s sur la confirmation, l\'aperçu continue tout seul vers le remerciement (sur la vraie invitation, il vient après la réponse de l\'invité).',
@@ -1513,7 +1541,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     // Police choisie : on la charge puis on redessine (le canvas a besoin de la vraie police)
     ouvrirPolices.projet = p;
     function appliquerPolice(nom) {
-      const perso = mesPolices.find(x => x.nom === nom);
+      const duSite = policesSite.find(x => x.nom === nom);
+      const perso = duSite ? { src: duSite.fichier } : mesPolices.find(x => x.nom === nom);
       if (perso) { p.polices_perso = (p.polices_perso || []).filter(x => x.nom !== nom).concat({ nom, src: perso.src }); enregistrer(p); }
       MoteurInfo.chargerPolices([nom]).then(() => document.fonts.load(`40px "${nom}"`)).catch(() => {}).then(() => { E.rafraichir(); rendreReglages(); });
     }
