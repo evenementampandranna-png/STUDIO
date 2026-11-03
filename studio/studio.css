@@ -349,3 +349,25 @@ textarea.edition-directe { position: absolute; z-index: 8; resize: none; overflo
 .il-item { display: flex; flex-direction: column; align-items: center; gap: 4px; border: 1px solid var(--ligne); background: #fff; border-radius: 12px; padding: 8px; cursor: pointer; font: 500 12px Inter, sans-serif; color: #4a3a34; }
 .il-item img { width: 100%; height: 84px; object-fit: contain; }
 .il-item:hover { border-color: var(--vin); box-shadow: 0 4px 14px rgba(122,31,43,.15); }
+/* Rotation */
+.poignee .h-rot { top: -34px; left: calc(50% - 10px); width: 20px; height: 20px; border-radius: 50%; cursor: grab; font-size: 13px; line-height: 17px; text-align: center; color: #c33a4c; font-style: normal; }
+.poignee .h-rot::after { content: ""; position: absolute; left: 9px; top: 19px; height: 14px; border-left: 1.5px solid #c33a4c; }
+/* Alignement du texte */
+.groupe-align { display: inline-flex; gap: 2px; }
+.groupe-align svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
+/* Nouvel événement : fonds plan par plan */
+.e3 { display: grid; grid-template-columns: 340px 1fr; gap: 16px; align-items: start; }
+@media (max-width: 900px) { .e3 { grid-template-columns: 1fr; } }
+.e3-plans { padding: 12px; position: sticky; top: 70px; max-height: calc(100vh - 90px); overflow: auto; }
+.e3-plan { display: grid; grid-template-columns: 44px 1fr auto; gap: 10px; align-items: center; padding: 7px; border: 1.5px solid transparent; border-radius: 12px; cursor: pointer; margin-bottom: 4px; }
+.e3-plan:hover { background: #faf4ec; }
+.e3-plan.actif { border-color: var(--vin); background: #fbf1ee; }
+.e3-plan.vide .e3-mini { border: 1.5px dashed #c9a; color: #b77; }
+.e3-mini { width: 44px; aspect-ratio: 9/16; border-radius: 6px; overflow: hidden; background: #f1e8dc; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+.e3-mini img { width: 100%; height: 100%; object-fit: cover; }
+.e3-txt { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.e3-nom { font-size: 12.5px; color: #5b4a44; }
+.alerte-txt { color: #b0453a; font-weight: 600; }
+.e3-x { border: 0; background: none; color: #a88; cursor: pointer; font-size: 14px; }
+.e3-biblio { padding: 12px; }
+.couleur-choix .couleur-apercu { width: 100%; aspect-ratio: 9/16; border-radius: 8px; border: 1px solid var(--ligne); }

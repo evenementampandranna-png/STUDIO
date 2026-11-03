@@ -150,6 +150,7 @@
         const d = JSON.parse(JSON.stringify(p)); delete d.cle_hote;
         d.plans.forEach(pl => { if (pl.fond) pl.fond.media = loc(pl.fond.media); (pl.calques || []).forEach(c => { if (c.media) c.media = loc(c.media); }); });
         if (d.musique && d.musique.src) d.musique.src = loc(d.musique.src);
+        for (const x of (d.polices_perso || [])) { if (/^idb:/.test(x.src || '')) { try { const b = await IDB.lire(x.src); if (b && b.size < 1.5e6) x.src = await new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(b); }); } catch (e) {} } }
         const v = vignetteDe(((p.plans.find(x => x.role !== 'ouverture') || p.plans[0] || {}).fond || {}).media || '');
         this.rpc('equipe_travail', { p_travail: { projet: p.id, auteur: this.membre(), titre: p.fiche.titre || '', slug: p.slug || '', plans: p.plans.length, publie: p.publie || null, vignette: /^data:/.test(v) ? (v.length < 150000 ? v : '') : (v ? new URL(v, location.href).href : ''), donnees: d } }).catch(() => {});
       }, 8000);
@@ -201,6 +202,35 @@
     if (onOuvre) onOuvre($('.modale-contenu', m), fermer);
     return fermer;
   }
+  /* ---------- Mes polices : fichiers .ttf / .otf / .woff importés (polices qui ne sont pas chez Google) ---------- */
+  let mesPolices = Stock.lire('studio.polices.perso', []);
+  const sauverMesPolices = () => Stock.ecrire('studio.polices.perso', mesPolices);
+  async function chargerMesPolices(liste) { for (const x of (liste || mesPolices)) { try { const u = await resoudre(x.src); if (u) await MoteurInfo.chargerPolicePerso(x.nom, u); } catch (e) {} } }
+  setTimeout(() => chargerMesPolices(), 300);
+  function nomDePolice(fichier) { return fichier.replace(/\.(ttf|otf|woff2?)$/i, '').replace(/[-_]+/g, ' ').replace(/\b(regular|normal|book)\b/ig, '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/\s+/g, ' ').trim() || 'Ma police'; }
+  async function importerPolice(f) {
+    if (!/\.(ttf|otf|woff2?)$/i.test(f.name)) throw new Error('Choisissez un fichier de police .ttf, .otf, .woff ou .woff2');
+    if (f.size > 3e6) throw new Error('Fichier de police trop lourd (plus de 3 Mo)');
+    let nom = prompt('Nom de la police (tel qu\'il apparaîtra dans la liste) :', nomDePolice(f.name)); if (nom === null) return null;
+    nom = nom.trim().replace(/["\\]/g, '') || nomDePolice(f.name);
+    if (MoteurInfo.CATALOGUE_POLICES.some(x => x[0] === nom)) nom += ' (importée)';
+    const src = 'idb:police-' + uid() + '.' + f.name.split('.').pop().toLowerCase();
+    await IDB.mettre(src, f);
+    const u = await resoudre(src);
+    try { await new FontFace(nom, `url("${u}")`).load(); } catch (e) { throw new Error('Ce fichier n\'est pas une police lisible'); }
+    await MoteurInfo.chargerPolicePerso(nom, u);
+    mesPolices = mesPolices.filter(x => x.nom !== nom).concat({ nom, src, fichier: f.name }); sauverMesPolices();
+    return nom;
+  }
+  // Polices d'un projet reçu (modèle d'équipe…) : rangées dans « Mes polices » de cet ordinateur
+  async function recevoirPolices(projet) {
+    for (const x of (projet.polices_perso || [])) {
+      if (!/^data:/.test(x.src || '')) continue;
+      try { const b = dataURLversBlob(x.src); const src = 'idb:police-' + uid() + '.' + (/woff2/.test(b.type) ? 'woff2' : /woff/.test(b.type) ? 'woff' : /otf|opentype/.test(b.type) ? 'otf' : 'ttf'); await IDB.mettre(src, b); x.src = src; if (!mesPolices.some(m => m.nom === x.nom)) { mesPolices.push({ nom: x.nom, src, fichier: x.nom }); sauverMesPolices(); } } catch (e) {}
+    }
+    await chargerMesPolices(projet.polices_perso || []);
+  }
+
   /* ---------- Petites fenêtres flottantes (polices, emojis) ---------- */
   let popOuvert = null;
   function fermerPop() { if (popOuvert) { popOuvert.remove(); popOuvert = null; } }
@@ -225,16 +255,21 @@
     const cat = MoteurInfo.CATALOGUE_POLICES;
     MoteurInfo.chargerPolices(cat.map(x => x[0]));
     const recentes = Stock.lire('studio.polices.recentes', []).filter(n => cat.some(x => x[0] === n)).slice(0, 6);
-    const groupes = [['Récentes', recentes]].concat([...new Set(cat.map(x => x[1]))].map(g => [g, cat.filter(x => x[1] === g).map(x => x[0])]));
+    const perso = [...new Set(mesPolices.map(x => x.nom).concat(ouvrirPolices.projet ? (ouvrirPolices.projet.polices_perso || []).map(x => x.nom) : []))];
+    const recentes2 = Stock.lire('studio.polices.recentes', []).filter(n => cat.some(x => x[0] === n) || perso.includes(n)).slice(0, 6);
+    recentes.splice(0, recentes.length, ...recentes2);
+    const groupes = [['Récentes', recentes], ['Mes polices', perso]].concat([...new Set(cat.map(x => x[1]))].map(g => [g, cat.filter(x => x[1] === g).map(x => x[0])]));
     const d = pop(ancre, `<input type="search" class="pop-cherche" placeholder="Chercher une police…">
-      <div class="pop-onglets">${groupes.filter(g => g[1].length).map(([g], k) => `<button data-g="${esc(g)}" class="${k === (recentes.length ? 0 : 1) ? 'on' : ''}">${esc(g)}</button>`).join('')}<button data-g="*">Toutes</button></div>
-      <div class="pop-liste polices"></div>`, 'pop-polices');
+      <div class="pop-onglets">${groupes.filter(g => g[1].length).map(([g]) => `<button data-g="${esc(g)}" class="${g === (recentes.length ? 'Récentes' : groupes[2][0]) ? 'on' : ''}">${esc(g)}</button>`).join('')}<button data-g="*">Toutes</button></div>
+      <div class="pop-liste polices"></div>
+      <label class="btn petit" style="margin-top:6px;width:100%;justify-content:center">+ Importer une police (.ttf, .otf, .woff)<input type="file" class="pop-import" accept=".ttf,.otf,.woff,.woff2,font/*" hidden></label>`, 'pop-polices');
     const liste = $('.polices', d);
     const montrer = (noms) => { liste.innerHTML = noms.map(n => `<button class="police-choix ${n === actuelle ? 'on' : ''}" data-n="${esc(n)}"><span style="font-family:'${esc(n)}',serif">${esc(n)}</span><small style="font-family:'${esc(n)}',serif">Mariage · Ho tonga 2026</small></button>`).join('') || '<p class="muet">Aucune police.</p>'; };
-    const groupe = g => g === '*' ? cat.map(x => x[0]) : (groupes.find(x => x[0] === g) || [0, []])[1];
-    montrer(groupe(recentes.length ? 'Récentes' : groupes[1][0]));
+    const groupe = g => g === '*' ? perso.concat(cat.map(x => x[0])) : (groupes.find(x => x[0] === g) || [0, []])[1];
+    $('.pop-import', d).onchange = async e => { const f = e.target.files[0]; if (!f) return; try { const nom = await importerPolice(f); if (!nom) return; toast('Police « ' + nom + ' » importée'); Stock.ecrire('studio.polices.recentes', [nom].concat(recentes.filter(x => x !== nom)).slice(0, 6)); fermerPop(); choisir(nom); } catch (err) { toast(err.message); } };
+    montrer(groupe(recentes.length ? 'Récentes' : groupes[2][0]));
     $$('[data-g]', d).forEach(b => b.onclick = () => { $$('[data-g]', d).forEach(x => x.classList.toggle('on', x === b)); $('.pop-cherche', d).value = ''; montrer(groupe(b.dataset.g)); });
-    $('.pop-cherche', d).oninput = e => { const q = e.target.value.trim().toLowerCase(); montrer(q ? cat.map(x => x[0]).filter(n => n.toLowerCase().includes(q)) : groupe('*')); };
+    $('.pop-cherche', d).oninput = e => { const q = e.target.value.trim().toLowerCase(); montrer(q ? groupe('*').filter(n => n.toLowerCase().includes(q)) : groupe('*')); };
     liste.onclick = e => { const b = e.target.closest('[data-n]'); if (!b) return; const n = b.dataset.n; Stock.ecrire('studio.polices.recentes', [n].concat(recentes.filter(x => x !== n)).slice(0, 6)); fermerPop(); choisir(n); };
     setTimeout(() => $('.pop-cherche', d).focus(), 30);
   }
@@ -338,6 +373,13 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-03-2', date: '3 novembre 2026', titre: 'Alignement du texte, rotation, nouvelles polices, fonds choisis plan par plan', points: [
+      '<b>Alignement du texte</b> : 4 boutons dans la barre au-dessus de l\'aperçu (gauche, centré, droite, <b>justifié</b>), aussi pour plusieurs textes à la fois.',
+      '<b>⟳ Rotation</b> : poignée ronde au-dessus de l\'élément choisi (par 15°, ou librement avec Maj), ou réglage précis dans « Position » (⟲ ⟳ 0°). Marche pour les textes, photos, vidéos, illustrations et boutons, et dans le film.',
+      '<b>Polices</b> : League Spartan, Cabin, Outfit, Archivo et Archivo Black ajoutées ; nouveau choix « Épaisseur des lettres » (de très fine à noire, ex. Archivo 800 ou 900).',
+      '<b>Mes polices</b> : « + Importer une police » (fichier .ttf, .otf, .woff) dans la liste des polices, pour les polices qui ne sont pas chez Google (Intro, Accidental Presidency…). Elle part avec l\'invitation publiée, le film et les modèles d\'équipe.',
+      '<b>Nouvel événement</b> : l\'étape 3 devient « Fonds, plan par plan » : vous choisissez vous-même le fond de chaque plan, dans l\'ordre (le studio passe au plan suivant), ou une couleur unie ; « Ce fond pour les plans suivants » ; rien n\'est réparti au hasard.'
+    ] },
     { id: '2026-11-03-1', date: '3 novembre 2026', titre: 'Règles, sélection multiple, polices, emojis, illustrations, fonds couleur / photo / sans fond, rogner, pause', points: [
       '<b>📏 Règles</b> (sous l\'aperçu) : règles graduées autour de l\'aperçu ; tirez depuis une règle pour poser un repère bleu (double-clic ou glisser dehors pour l\'effacer). En déplaçant un élément, il s\'aimante au centre, aux repères et aux bords des autres éléments (traits roses). Maj pour déplacer sans aimant.',
       '<b>Plusieurs éléments à la fois</b> : Maj+clic (ou Ctrl+clic), ou tracez un cadre sur l\'aperçu, ou Ctrl+A. Ils se déplacent ensemble (souris ou flèches), et la barre propose : aligner (gauche, centre, droite, haut, milieu, bas), répartir, couleur et police pour tous, agrandir, dupliquer, copier-coller, supprimer.',
@@ -479,7 +521,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
   function vueNouveau() {
     brouillon = brouillon || { etape: 1, texte: '', fiche: null, fonds: tousFonds().map(f => f.id) };
     const e = brouillon.etape;
-    const etapes = `<div class="etapes"><span class="${e === 1 ? 'actif' : ''}">1. Texte de l'invitation</span><span class="${e === 2 ? 'actif' : ''}">2. Fiche événement</span><span class="${e === 3 ? 'actif' : ''}">3. Fonds vidéo</span></div>`;
+    const etapes = `<div class="etapes"><span class="${e === 1 ? 'actif' : ''}">1. Texte de l'invitation</span><span class="${e === 2 ? 'actif' : ''}">2. Fiche événement</span><span class="${e === 3 ? 'actif' : ''}">3. Fonds, plan par plan</span></div>`;
     if (e === 1) {
       $('#app').innerHTML = `<div class="entete"><div><h1>Nouvel événement</h1><p>Collez le texte de l'invitation tel que le client l'a écrit, en malgache ou en français.</p></div></div>${etapes}
         <div class="ia-grille">
@@ -567,21 +609,70 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       };
       return;
     }
-    // Étape 3 : fonds
+    // Étape 3 : le fond de chaque plan, choisi à la main, plan par plan
     const fonds = tousFonds();
-    $('#app').innerHTML = `<div class="entete"><div><h1>Fonds vidéo</h1><p>Cochez les fonds à utiliser. Le studio répartit les plans selon l'usage de chaque fond.</p></div><a class="btn" href="#/bibliotheque">Importer d'autres fonds</a></div>${etapes}
-      <div class="carte"><div class="fonds-choix">${fonds.map(f => `
-        <div class="fond-choix ${brouillon.fonds.includes(f.id) ? 'actif' : ''}" data-id="${f.id}"><img src="${esc(/^data:/.test(f.vignette) ? f.vignette : BASE + f.vignette)}" alt=""><b>${esc(f.nom)}</b><div class="muet">${esc(f.usage)} · ${f.duree ? f.duree.toFixed(1) + ' s' : ''}</div></div>`).join('')}</div></div>
-      <div class="ligne" style="margin-top:16px;justify-content:space-between"><button class="btn" id="retour">‹ Fiche</button><button class="btn plein" id="creer">Créer les plans ›</button></div>`;
-    $$('.fond-choix').forEach(c => c.onclick = () => { const id = c.dataset.id; brouillon.fonds = brouillon.fonds.includes(id) ? brouillon.fonds.filter(x => x !== id) : brouillon.fonds.concat(id); c.classList.toggle('actif'); });
-    $('#retour').onclick = () => { brouillon.etape = 2; vueNouveau(); };
-    $('#creer').onclick = () => {
-      const choisis = fonds.filter(f => brouillon.fonds.includes(f.id));
-      if (!choisis.length) return toast('Choisissez au moins un fond');
-      const p = Fabrique.nouveauProjet(brouillon.fiche, choisis);
-      projets[p.id] = p; sauverProjets(); brouillon = null;
-      location.hash = '#/p/' + p.id + '/plans';
+    const squelette = Fabrique.genererPlans(brouillon.fiche, Fabrique.FONDS);
+    brouillon.choix = (brouillon.choix || []).slice(0, squelette.length);
+    while (brouillon.choix.length < squelette.length) brouillon.choix.push(null);
+    if (brouillon.planActif == null || brouillon.planActif >= squelette.length) brouillon.planActif = 0;
+    const NOMS_ROLE = { ouverture: 'Ouverture', intermediaire: 'Plan', confirmation: 'Confirmation', remerciement: 'Remerciement' };
+    const fondDe = id => { if (!id) return null; if (/^couleur:/.test(id)) return { id, nom: 'Couleur unie', couleur: id.slice(8), usage: 'couleur' }; return fonds.find(f => f.id === id) || null; };
+    const imgDe = f => !f ? '' : f.couleur ? '' : (/^data:/.test(f.vignette || '') ? f.vignette : (f.vignette ? BASE + f.vignette : ''));
+    let filtre = brouillon.filtreFonds || 'tous';
+    const rendre = () => {
+      const k = brouillon.planActif, restants = brouillon.choix.filter(x => !x).length;
+      const usages = [...new Set(fonds.map(f => f.usage).filter(Boolean))];
+      $('#app').innerHTML = `<div class="entete"><div><h1>Fonds, plan par plan</h1><p>Choisissez vous-même le fond de chaque plan, dans l'ordre : cliquez un fond, le studio passe tout seul au plan suivant.</p></div><label class="btn">Importer un fond<input type="file" id="e3-import" accept="video/*,image/*" multiple hidden></label></div>${etapes}
+        <div class="e3">
+          <div class="carte e3-plans">
+            <div class="ligne" style="justify-content:space-between;margin-bottom:8px"><b>${squelette.length} plans</b><span class="badge ${restants ? 'alerte' : 'ok'}">${restants ? restants + ' à choisir' : 'tout est choisi ✓'}</span></div>
+            ${squelette.map((pl, i) => { const f = fondDe(brouillon.choix[i]); const txt = (pl.calques || []).filter(c => c.type === 'texte').map(c => c.texte).join(' · ').replace(/\{famille\}/g, '…').slice(0, 70); return `<div class="e3-plan ${i === k ? 'actif' : ''} ${f ? '' : 'vide'}" data-k="${i}">
+              <div class="e3-mini" style="${f && f.couleur ? 'background:' + f.couleur : ''}">${f && !f.couleur ? `<img src="${esc(imgDe(f))}" alt="">` : f ? '' : '?'}</div>
+              <div style="min-width:0"><b>${i + 1}. ${NOMS_ROLE[pl.role] || pl.role}</b><div class="muet e3-txt">${esc(txt || (pl.role === 'ouverture' ? 'Ouverture de l\'invitation' : '—'))}</div><div class="e3-nom">${f ? esc(f.nom) : '<span class="alerte-txt">Fond à choisir</span>'}</div></div>
+              ${f ? `<button class="e3-x" data-effacer="${i}" title="Retirer ce fond">✕</button>` : ''}</div>`; }).join('')}
+            <div class="ligne" style="gap:6px;margin-top:10px;flex-wrap:wrap"><button class="btn petit" id="e3-suivants" ${brouillon.choix.some(Boolean) && restants ? '' : 'disabled'} title="Met le dernier fond choisi sur tous les plans qui n'en ont pas encore">Dernier fond choisi → plans restants</button><button class="btn petit" id="e3-vider">Tout effacer</button></div>
+          </div>
+          <div class="carte e3-biblio">
+            <div class="ligne" style="justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px"><b>Fond du plan ${k + 1} · ${NOMS_ROLE[squelette[k].role] || ''}</b>
+              <div class="seg">${[['tous', 'Tous']].concat(usages.map(u => [u, u])).map(([u, n]) => `<button data-filtre="${esc(u)}" class="${filtre === u ? 'on' : ''}">${esc(n)}</button>`).join('')}</div></div>
+            <div class="fonds-choix">${fonds.filter(f => filtre === 'tous' || f.usage === filtre).map(f => `
+              <div class="fond-choix ${brouillon.choix[k] === f.id ? 'actif' : ''}" data-id="${esc(f.id)}"><img src="${esc(imgDe(f))}" alt="" loading="lazy"><b>${esc(f.nom)}</b><div class="muet">${esc(f.usage || '')}${f.duree ? ' · ' + f.duree.toFixed(1) + ' s' : ''}${f.equipe ? ' · équipe' : ''}${brouillon.choix.filter(x => x === f.id).length ? ' · ' + brouillon.choix.filter(x => x === f.id).length + ' plan(s)' : ''}</div></div>`).join('')}
+              <div class="fond-choix couleur-choix ${/^couleur:/.test(brouillon.choix[k] || '') ? 'actif' : ''}"><div class="couleur-apercu" style="background:${/^couleur:/.test(brouillon.choix[k] || '') ? brouillon.choix[k].slice(8) : '#f4ede2'}"></div><b>Couleur unie</b><div class="ligne" style="gap:6px"><input type="color" id="e3-couleur" value="${/^couleur:/.test(brouillon.choix[k] || '') ? brouillon.choix[k].slice(8) : '#f4ede2'}"><button class="btn petit" id="e3-couleur-ok">Choisir</button></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="ligne" style="margin-top:16px;justify-content:space-between"><button class="btn" id="retour">‹ Fiche</button><button class="btn plein" id="creer">Créer les plans ›</button></div>`;
+      const attribuer = id => {
+        brouillon.choix[k] = id; brouillon.dernier = id;
+        const suivant = brouillon.choix.findIndex((x, i) => i > k && !x);
+        if (suivant >= 0) brouillon.planActif = suivant; else if (k < squelette.length - 1 && !brouillon.choix.every(Boolean)) brouillon.planActif = brouillon.choix.findIndex(x => !x);
+        rendre();
+      };
+      $$('.e3-plan').forEach(el => el.onclick = e => { if (e.target.dataset.effacer != null) { brouillon.choix[Number(e.target.dataset.effacer)] = null; brouillon.planActif = Number(e.target.dataset.effacer); return rendre(); } brouillon.planActif = Number(el.dataset.k); rendre(); });
+      $$('.fond-choix[data-id]').forEach(el => el.onclick = () => attribuer(el.dataset.id));
+      $('#e3-couleur-ok').onclick = () => attribuer('couleur:' + $('#e3-couleur').value);
+      $$('[data-filtre]').forEach(b => b.onclick = () => { filtre = brouillon.filtreFonds = b.dataset.filtre; rendre(); });
+      $('#e3-suivants').onclick = () => { const id = brouillon.dernier || brouillon.choix.filter(Boolean).pop(); if (!id) return; brouillon.choix = brouillon.choix.map(x => x || id); rendre(); toast('« ' + ((fondDe(id) || {}).nom || 'Fond') + ' » mis sur les plans qui n\'avaient pas de fond'); };
+      $('#e3-vider').onclick = () => { if (!confirm('Retirer tous les fonds choisis ?')) return; brouillon.choix = brouillon.choix.map(() => null); brouillon.planActif = 0; rendre(); };
+      $('#e3-import').onchange = async e => {
+        const fs = [...e.target.files]; if (!fs.length) return;
+        toast('Import de ' + fs.length + ' fichier(s)…');
+        for (const f of fs) { const m = await importerFichier(f, /^video/.test(f.type) ? 'fond' : 'image', ''); if (m.type === 'image') { m.type = 'fond'; m.usage = m.usage || 'programme'; } sauverMedias(); Equipe.apresAjout(m, null); }
+        vueNouveau();
+      };
+      $('#retour').onclick = () => { brouillon.etape = 2; vueNouveau(); };
+      $('#creer').onclick = () => {
+        const manque = brouillon.choix.findIndex(x => !x);
+        if (manque >= 0) { brouillon.planActif = manque; rendre(); return toast(`Il reste ${brouillon.choix.filter(x => !x).length} plan(s) sans fond : choisissez le fond du plan ${manque + 1}`); }
+        const parPlan = brouillon.choix.map(fondDe);
+        const p = Fabrique.nouveauProjet(brouillon.fiche, fonds, parPlan);
+        // une photo choisie comme fond : fond « photo »
+        p.plans.forEach((pl, i) => { const f = parPlan[i]; if (f && /\.(png|jpe?g|webp|gif)$/i.test(f.src || '')) pl.fond.type = 'image'; });
+        projets[p.id] = p; sauverProjets(); brouillon = null;
+        location.hash = '#/p/' + p.id + '/plans';
+      };
     };
+    rendre();
   }
 
   /* ================= Projet ================= */
@@ -755,8 +846,9 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       const pl = plan(), seule = E.multi.size <= 1;
       const html = (pl.calques || []).filter(c => eng.bbox[c.id] && !c.masque && !c._edition).map(c => {
         const b = eng.bbox[c.id], actif = E.sel === c.id, groupe = E.multi.has(c.id) && !seule;
-        const hs = actif && seule ? (POIGNEES[c.type] || []).map(h => `<i class="h h-${h}" data-h="${h}"></i>`).join('') : '';
-        return `<div class="poignee ${actif && seule ? 'actif' : ''} ${groupe ? 'groupe' : ''}" data-id="${c.id}" style="left:${b.x}%;top:${b.y}%;width:${b.w}%;height:${b.h}%"><span class="nom">${esc(nomType(c))}</span>${hs}</div>`;
+        const hs = actif && seule ? (POIGNEES[c.type] || []).map(h => `<i class="h h-${h}" data-h="${h}"></i>`).join('') + '<i class="h h-rot" data-h="rot" title="Tourner (Maj : librement, sinon par 15°)">⟳</i>' : '';
+        const rot = Number(c.rotation) || 0;
+        return `<div class="poignee ${actif && seule ? 'actif' : ''} ${groupe ? 'groupe' : ''}" data-id="${c.id}" style="left:${b.x}%;top:${b.y}%;width:${b.w}%;height:${b.h}%${rot ? `;transform:rotate(${rot}deg)` : ''}"><span class="nom">${esc(nomType(c))}${drag && drag.mode === 'rotation' && drag.c === c ? ' · ' + rot + '°' : ''}</span>${hs}</div>`;
       }).join('') + (regles ? p.guides.v.map((x, k) => `<div class="guide guide-v" data-gv="${k}" style="left:${x}%" title="Glisser pour déplacer · double-clic ou glisser hors du cadre pour effacer"></div>`).join('') + p.guides.h.map((y, k) => `<div class="guide guide-h" data-gh="${k}" style="top:${y}%" title="Glisser pour déplacer · double-clic ou glisser hors du cadre pour effacer"></div>`).join('') : '')
         + (cadreSel ? `<div class="cadre-selection" style="left:${Math.min(cadreSel.x0, cadreSel.x1)}%;top:${Math.min(cadreSel.y0, cadreSel.y1)}%;width:${Math.abs(cadreSel.x1 - cadreSel.x0)}%;height:${Math.abs(cadreSel.y1 - cadreSel.y0)}%"></div>` : '');
       if (zone._html !== html) { zone.innerHTML = html; zone._html = html; dessinerRegles(); }
@@ -767,7 +859,12 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     function calqueA(e) {
       const r = zone.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * 100, y = (e.clientY - r.top) / r.height * 100;
       const cs = (plan().calques || []).filter(c => eng.bbox[c.id] && !c.masque);
-      for (let i = cs.length - 1; i >= 0; i--) { const b = eng.bbox[cs[i].id]; if (x >= b.x - 0.8 && x <= b.x + b.w + 0.8 && y >= b.y - 0.8 && y <= b.y + b.h + 0.8) return cs[i]; }
+      for (let i = cs.length - 1; i >= 0; i--) {
+        const b = eng.bbox[cs[i].id], rot = (Number(cs[i].rotation) || 0) * Math.PI / 180;
+        let px = x, py = y;
+        if (rot) { const cx = b.x + b.w / 2, cy = b.y + b.h / 2, X = (x - cx) * r.width, Y = (y - cy) * r.height; px = cx + (X * Math.cos(-rot) - Y * Math.sin(-rot)) / r.width; py = cy + (X * Math.sin(-rot) + Y * Math.cos(-rot)) / r.height; }
+        if (px >= b.x - 0.8 && px <= b.x + b.w + 0.8 && py >= b.y - 0.8 && py <= b.y + b.h + 0.8) return cs[i];
+      }
       return null;
     }
     function choisir(id, ajout) {
@@ -810,6 +907,12 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       const gd = e.target.closest('.guide');
       if (gd) { drag = { mode: 'guide', axe: gd.dataset.gv != null ? 'v' : 'h', k: Number(gd.dataset.gv != null ? gd.dataset.gv : gd.dataset.gh), w: r.width, h: r.height, r }; zone.setPointerCapture(e.pointerId); e.preventDefault(); return; }
       const h = e.target.closest('.h');
+      if (h && h.dataset.h === 'rot' && calqueSel()) {
+        const c = calqueSel(), b = eng.bbox[c.id];
+        drag = { mode: 'rotation', c, cx: r.left + (b.x + b.w / 2) / 100 * r.width, cy: r.top + (b.y + b.h / 2) / 100 * r.height, r0: Number(c.rotation) || 0, bouge: false };
+        drag.a0 = Math.atan2(e.clientY - drag.cy, e.clientX - drag.cx);
+        zone.setPointerCapture(e.pointerId); e.preventDefault(); return;
+      }
       if (h && calqueSel() && E.multi.size <= 1) {
         const c = calqueSel(), b = eng.bbox[c.id];
         drag = { mode: 'taille', h: h.dataset.h, c, x0: e.clientX, y0: e.clientY, w: r.width, hz: r.height, b: Object.assign({}, b), v: { largeur: Number(c.largeur) || 60, taille: Number(c.taille) || 4, hauteur: Number(c.hauteur) || 22, x: Number(c.x), y: Number(c.y) }, bouge: false };
@@ -850,7 +953,19 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         E.multi = new Set(ids); E.sel = ids[ids.length - 1] || null; zone._html = '';
         return;
       }
-      const dxp = e.clientX - drag.x0, dyp = e.clientY - drag.y0;
+      if (drag.mode === 'rotation') {
+        if (!drag.bouge) { snapshot(); drag.bouge = true; }
+        let a = drag.r0 + (Math.atan2(e.clientY - drag.cy, e.clientX - drag.cx) - drag.a0) * 180 / Math.PI;
+        a = ((a % 360) + 540) % 360 - 180;                 // entre −180 et 180
+        a = e.shiftKey ? Math.round(a) : Math.round(a / 15) * 15;
+        if (Math.abs(a) < 1) a = 0;
+        drag.c.rotation = a; zone._html = '';
+        if (I.TYPES_HTML.includes(drag.c.type)) E.rafraichir();
+        const ir = $('#props [data-k="rotation"]'); if (ir) ir.value = a;
+        return;
+      }
+      let dxp = e.clientX - drag.x0, dyp = e.clientY - drag.y0;
+      if (drag.mode === 'taille' && Number(drag.c.rotation)) { const t = -Number(drag.c.rotation) * Math.PI / 180, X = dxp, Y = dyp; dxp = X * Math.cos(t) - Y * Math.sin(t); dyp = X * Math.sin(t) + Y * Math.cos(t); }
       if (!drag.bouge && Math.abs(dxp) + Math.abs(dyp) < 3) return;
       if (!drag.bouge) { snapshot(); drag.bouge = true; }
       const c = drag.c;
@@ -886,7 +1001,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         enregistrer(p); drag = null; zone._html = ''; return;
       }
       if (drag && drag.mode === 'cadre') { cadreSel = null; zone._html = ''; drag = null; rendreReglages(); return; }
-      if (drag && drag.bouge) { enregistrer(p); if (drag.mode === 'taille' || (drag.groupe && drag.groupe.length > 1)) rendreReglages(); }
+      if (drag && drag.bouge) { enregistrer(p); if (drag.mode === 'taille' || drag.mode === 'rotation' || (drag.groupe && drag.groupe.length > 1)) rendreReglages(); }
       drag = null; aimants.innerHTML = '';
     });
     zone.addEventListener('dblclick', e => { const gd = e.target.closest('.guide'); if (!gd) return; e.stopPropagation(); if (gd.dataset.gv != null) p.guides.v.splice(Number(gd.dataset.gv), 1); else p.guides.h.splice(Number(gd.dataset.gh), 1); enregistrer(p); zone._html = ''; }, true);
@@ -1041,8 +1156,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       pl.calques = pl.calques.filter(x => !cs.includes(x)); if (sens === 'avant') pl.calques.push(...cs); else pl.calques.unshift(...cs); E.rafraichir(); rendreReglages();
     }
     // Mise en forme : copier / coller le style d'un calque sur un autre (pinceau)
-    const STYLE_TEXTE = ['police', 'taille', 'couleur', 'gras', 'italique', 'majuscules', 'align', 'interligne', 'ombre', 'ombre_couleur', 'ombre_force', 'ombre_opacite', 'ombre_decalage', 'contour', 'contour_epaisseur', 'fond_couleur', 'fond_opacite', 'fond_marge', 'fond_arrondi', 'opacite', 'animation', 'duree_animation', 'sortie', 'duree_sortie'];
-    const STYLE_BOUTON = ['police', 'taille', 'couleur', 'style'];
+    const STYLE_TEXTE = ['police', 'graisse', 'rotation', 'taille', 'couleur', 'gras', 'italique', 'majuscules', 'align', 'interligne', 'ombre', 'ombre_couleur', 'ombre_force', 'ombre_opacite', 'ombre_decalage', 'contour', 'contour_epaisseur', 'fond_couleur', 'fond_opacite', 'fond_marge', 'fond_arrondi', 'opacite', 'animation', 'duree_animation', 'sortie', 'duree_sortie'];
+    const STYLE_BOUTON = ['police', 'graisse', 'taille', 'couleur', 'style'];
     const STYLE_MEDIA = ['forme', 'bordure', 'opacite', 'remplir', 'animation', 'duree_animation', 'sortie', 'duree_sortie'];
     const clesStyle = t => t === 'texte' ? STYLE_TEXTE : (t === 'bouton' || t === 'compteur' || t === 'champ') ? STYLE_BOUTON : STYLE_MEDIA;
     let pinceau = false;
@@ -1162,7 +1277,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         ${ecr ? '<button class="btn petit" data-b="editer" title="Modifier le texte (double-clic)">✎ Écrire</button>' : '<button class="btn petit" data-b="remplacer">Remplacer</button>'}
         ${c.type !== 'image' && c.type !== 'video' ? `<button class="btn petit icone" data-b="moins" title="Plus petit">A−</button><button class="btn petit icone" data-b="plus" title="Plus grand">A+</button>` : `<button class="btn petit icone" data-b="moins" title="Plus petit">−</button><button class="btn petit icone" data-b="plus" title="Plus grand">+</button>`}
         ${c.type === 'texte' || c.type === 'bouton' || c.type === 'compteur' ? `<input type="color" data-b="couleur" value="${c.couleur || '#7a1f2b'}" title="Couleur">` : ''}
-        ${c.type === 'texte' ? `<button class="btn petit icone ${c.gras ? 'on' : ''}" data-b="gras" title="Gras"><b>G</b></button><button class="btn petit icone ${c.italique ? 'on' : ''}" data-b="italique" title="Italique"><i>I</i></button><button class="btn petit icone" data-b="align" title="Alignement du texte">${{ left: '⇤', right: '⇥' }[c.align] || '↔'}</button>` : ''}
+        ${c.type === 'texte' ? `<button class="btn petit icone ${c.gras ? 'on' : ''}" data-b="gras" title="Gras"><b>G</b></button><button class="btn petit icone ${c.italique ? 'on' : ''}" data-b="italique" title="Italique"><i>I</i></button><span class="groupe-align">${[['left', 'Aligner le texte à gauche', '<svg viewBox="0 0 16 16"><path d="M2 3h12M2 6.5h8M2 10h12M2 13.5h7"/></svg>'], ['center', 'Centrer le texte', '<svg viewBox="0 0 16 16"><path d="M2 3h12M4 6.5h8M2 10h12M4.5 13.5h7"/></svg>'], ['right', 'Aligner le texte à droite', '<svg viewBox="0 0 16 16"><path d="M2 3h12M6 6.5h8M2 10h12M7 13.5h7"/></svg>'], ['justify', 'Justifier le texte', '<svg viewBox="0 0 16 16"><path d="M2 3h12M2 6.5h12M2 10h12M2 13.5h7"/></svg>']].map(([k, t, ic]) => `<button class="btn petit icone ${(c.align || 'center') === k ? 'on' : ''}" data-talign="${k}" title="${t}">${ic}</button>`).join('')}</span>` : ''}
         ${ecr ? `<button class="btn petit police-btn" data-b="police" title="Choisir la police" style="font-family:'${esc(c.police || 'Cormorant Garamond')}'">${esc((c.police || 'Cormorant Garamond').slice(0, 16))} ▾</button>` : ''}${c.type === 'texte' ? '<button class="btn petit icone" data-b="emoji" title="Ajouter un emoji">😊</button>' : ''}
         ${c.type === 'image' || c.type === 'video' ? '<button class="btn petit" data-b="recadrer" title="Rogner : garder une partie de la photo ou de la vidéo">⬚ Rogner</button>' : ''}
         <span class="sep"></span><button class="btn petit icone" data-al="centre-h" title="Centrer sur la page (horizontal)">⇔</button><button class="btn petit icone" data-al="centre-v" title="Centrer sur la page (vertical)">⇕</button>
@@ -1176,6 +1291,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     }
     function lierBarre(bar, c) {
       $$('[data-al]', bar).forEach(el => el.onclick = () => aligner(el.dataset.al));
+      $$('[data-talign]', bar).forEach(el => el.onclick = () => { E.modif(true); (E.multi.size > 1 ? selection() : [c]).filter(x => x.type === 'texte').forEach(x => { x.align = el.dataset.talign; }); E.rafraichir(); rendreReglages(); });
       const groupe = () => E.multi.size > 1 ? selection() : (c ? [c] : []);
       $$('[data-b]', bar).forEach(el => {
         const a = el.dataset.b;
@@ -1364,7 +1480,10 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     E.rendreReglages = rendreReglages;
 
     // Police choisie : on la charge puis on redessine (le canvas a besoin de la vraie police)
+    ouvrirPolices.projet = p;
     function appliquerPolice(nom) {
+      const perso = mesPolices.find(x => x.nom === nom);
+      if (perso) { p.polices_perso = (p.polices_perso || []).filter(x => x.nom !== nom).concat({ nom, src: perso.src }); enregistrer(p); }
       MoteurInfo.chargerPolices([nom]).then(() => document.fonts.load(`40px "${nom}"`)).catch(() => {}).then(() => { E.rafraichir(); rendreReglages(); });
     }
     function recadrerCalque(c) {
@@ -1495,14 +1614,16 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     function formulaireCalque(c) {
       const position = `<details class="bloc" open><summary>Position</summary>
         <div class="trois"><label class="champ">X (%)<input type="number" id="cx" data-k="x" step="0.5" value="${c.x}"></label><label class="champ">Y (%)<input type="number" id="cy" data-k="y" step="0.5" value="${c.y}"></label><label class="champ">Largeur (%)<input type="number" data-k="largeur" step="1" value="${c.largeur || 60}"></label></div>
+        <div class="ligne" style="gap:6px;align-items:flex-end;margin-top:8px"><label class="champ" style="flex:1">Rotation (°)<input type="range" data-k="rotation" min="-180" max="180" step="1" value="${Number(c.rotation) || 0}"></label><input type="number" data-k="rotation" min="-180" max="180" step="1" value="${Number(c.rotation) || 0}" style="width:70px"><button class="btn petit" data-rot="-15" title="−15°">⟲</button><button class="btn petit" data-rot="15" title="+15°">⟳</button><button class="btn petit" data-rot="0" title="Remettre droit">0°</button></div>
         <label class="champ" style="margin-top:8px">Visible pour<select data-k="condition">${opts([['', 'Tous'], ['famille', 'Lien personnel'], ['general', 'Lien général']], c.condition || '')}</select></label></details>`;
       let s = `<div class="section-titre">${nomType(c)} choisi${c.illu ? 'e' : ''}</div>`;
       if (c.type === 'texte') s += `<details class="bloc" open><summary>Texte</summary><div class="pile">
         <label class="champ">Texte <span class="muet">— variables : {famille} {places} {date} {heure} {date_limite} {compte_a_rebours}</span><textarea data-k="texte" rows="3">${esc(c.texte)}</textarea></label>
         <div class="ligne" style="gap:6px"><button class="btn petit" data-emoji-texte>😊 Ajouter un emoji</button></div>
         <div class="deux"><label class="champ">Police<button class="btn police-btn" data-police style="font-family:'${esc(c.police || 'Cormorant Garamond')}',serif">${esc(c.police || 'Cormorant Garamond')} ▾</button></label><label class="champ">Taille<input type="range" data-k="taille" min="1.5" max="12" step="0.1" value="${c.taille || 4}"></label></div>
-        <div class="trois"><label class="champ">Couleur<input type="color" data-k="couleur" value="${c.couleur || '#7a1f2b'}"></label><label class="champ">Alignement<select data-k="align">${opts([['center', 'Centré'], ['left', 'Gauche'], ['right', 'Droite']], c.align || 'center')}</select></label><label class="champ">Interligne<input type="number" data-k="interligne" step="0.05" min="0.8" max="2" value="${c.interligne || 1.25}"></label></div>
+        <div class="trois"><label class="champ">Couleur<input type="color" data-k="couleur" value="${c.couleur || '#7a1f2b'}"></label><label class="champ">Alignement<select data-k="align">${opts([['center', 'Centré'], ['left', 'Gauche'], ['right', 'Droite'], ['justify', 'Justifié']], c.align || 'center')}</select></label><label class="champ">Interligne<input type="number" data-k="interligne" step="0.05" min="0.8" max="2" value="${c.interligne || 1.25}"></label></div>
         <div class="cases"><label><input type="checkbox" data-k="gras" ${c.gras ? 'checked' : ''}> Gras</label><label><input type="checkbox" data-k="italique" ${c.italique ? 'checked' : ''}> Italique</label><label><input type="checkbox" data-k="majuscules" ${c.majuscules ? 'checked' : ''}> Majuscules</label></div>
+        <label class="champ">Épaisseur des lettres<select data-k="graisse">${opts([['', c.gras ? 'Gras (auto)' : 'Normale (auto)'], ['100', 'Très fine (100)'], ['300', 'Fine (300)'], ['400', 'Normale (400)'], ['500', 'Moyenne (500)'], ['600', 'Demi-grasse (600)'], ['700', 'Grasse (700)'], ['800', 'Extra-grasse (800)'], ['900', 'Noire (900)']], c.graisse || '')}</select></label>
         <label class="champ">Superposition (mode de fusion)<select data-k="fusion">${opts(I.FUSIONS, c.fusion || 'normal')}</select></label>
         </div></details>` + blocStyleTexte(c) + blocTraductions(c) + blocAnimation(c);
       if (c.type === 'bouton') s += `<details class="bloc" open><summary>Bouton</summary><div class="pile">
@@ -1537,6 +1658,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       const rp = $('#props [data-remplacer]');
       if (rp) rp.onchange = async e => { const f = e.target.files[0]; if (!f) return; const m = await importerFichier(f, null, p.id); sauverMedias(); E.modif(true); c.media = m.src; c.type = m.type === 'video' ? 'video' : 'image'; eng.precharger().then(() => { E.rafraichir(); rendreReglages(); }); };
       const vi = $('#props [data-vitesse]'); if (vi) vi.onchange = () => { E.modif(true); const v = Number(vi.value) || 1; if (v === 1) delete c.vitesse; else c.vitesse = v; const el = eng.medias[c.media]; if (el && el.tagName === 'VIDEO') el.playbackRate = v; E.rafraichir(); };
+      $$('#props [data-rot]').forEach(b => b.onclick = () => { E.modif(true); const d = Number(b.dataset.rot); c.rotation = d ? (((Number(c.rotation) || 0) + d + 540) % 360) - 180 : 0; if (!c.rotation) delete c.rotation; if (I.TYPES_HTML.includes(c.type)) E.rafraichir(); rendreReglages(); });
+      $$('#props [data-k="rotation"]').forEach(inp => inp.addEventListener('input', () => { $$('#props [data-k="rotation"]').forEach(o => { if (o !== inp) o.value = inp.value; }); zone._html = ''; }));
       const pb = $('#props [data-police]'); if (pb) pb.onclick = () => ouvrirPolices(pb, c.police, nom => { E.modif(true); c.police = nom; appliquerPolice(nom); });
       const et = $('#props [data-emoji-texte]'); if (et) et.onclick = () => ouvrirEmojis(et, em => { const ta = $('#props [data-k="texte"]'); E.modif(true); if (ta && document.activeElement === ta) { const a = ta.selectionStart, b = ta.selectionEnd; ta.value = ta.value.slice(0, a) + em + ta.value.slice(b); ta.selectionStart = ta.selectionEnd = a + em.length; c.texte = ta.value; } else { c.texte = (c.texte || '') + (c.texte && !/\s$/.test(c.texte) ? ' ' : '') + em; if (ta) ta.value = c.texte; } E.rafraichir(); const l = $(`.calque-ligne[data-id="${c.id}"] .t`); if (l) l.textContent = c.texte; });
       const rg = $('#props [data-rogner]'); if (rg) rg.onclick = () => recadrerCalque(c);
@@ -2362,6 +2485,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     pub.langues = [p.fiche.langue].concat((p.langues || []).filter(l => l !== p.fiche.langue));
     if (!apercu) pub.plans.forEach(pl => { (pl.calques || []).forEach(c => { if (c.media && /^idb:/.test(c.media)) c.media = 'medias/' + c.media.slice(4); }); if (pl.fond && /^idb:/.test(pl.fond.media)) pl.fond.media = 'medias/' + pl.fond.media.slice(4); });
     if (!apercu && pub.musique && /^idb:/.test(pub.musique.src)) pub.musique.src = 'medias/' + pub.musique.src.slice(4);
+    if (!apercu) (pub.polices_perso || []).forEach(x => { if (/^idb:/.test(x.src || '')) x.src = 'medias/' + x.src.slice(4); });
     // fichiers de la bibliothèque d'équipe : copiés à côté de l'invitation (l'adresse de l'équipe ne sort pas)
     if (!apercu) { const loc = src => Equipe.estUrl(src) ? 'medias/eq-' + src.split('/').pop() : src; pub.plans.forEach(pl => { if (pl.fond) pl.fond.media = loc(pl.fond.media); (pl.calques || []).forEach(c => { if (c.media) c.media = loc(c.media); }); }); if (pub.musique && pub.musique.src) pub.musique.src = loc(pub.musique.src); }
     return pub;
@@ -2424,6 +2548,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     const fichiersIdb = [];
     p.plans.forEach(pl => { if (/^idb:/.test(pl.fond.media)) fichiersIdb.push(pl.fond.media); pl.calques.forEach(c => { if (/^idb:/.test(c.media || '')) fichiersIdb.push(c.media); }); });
     if (p.musique && /^idb:/.test(p.musique.src)) fichiersIdb.push(p.musique.src);
+    (p.polices_perso || []).forEach(x => { if (/^idb:/.test(x.src || '')) fichiersIdb.push(x.src); });
     const fichiersEquipe = srcsEquipe(p);
     $('#onglet').innerHTML = `<div class="ia-grille">
       <div class="pile">
@@ -2810,6 +2935,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         const c = JSON.parse(JSON.stringify(src)); c.id = uid(); c.slug = (c.slug || 'modele') + '-' + c.id.slice(0, 4);
         ['publie', 'cle_hote', 'familles', 'vitrine', 'vitrine_publiee', 'reponses_generales'].forEach(k => delete c[k]); c.familles = [];
         c.fiche.titre = (c.fiche.titre || 'Modèle') + ' (copie)';
+        await recevoirPolices(c);
         projets[c.id] = c; sauverProjets(); toast('Nouvel événement créé à partir du modèle'); location.hash = '#/p/' + c.id + '/plans';
       } catch (err) { toast(err.message); }
     });
@@ -2914,6 +3040,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           const src = await Equipe.rpc('equipe_projet', { p_projet: b.dataset.copie });
           if (!src) return toast('Projet introuvable');
           const c = JSON.parse(JSON.stringify(src)); c.id = uid(); c.slug = (c.slug || 'copie') + '-' + c.id.slice(0, 4); delete c.publie; delete c.cle_hote; c.fiche.titre = (c.fiche.titre || '') + ' (copie)';
+          await recevoirPolices(c);
           projets[c.id] = c; sauverProjets();
           const manque = c.plans.some(pl => /^idb:/.test((pl.fond || {}).media || '') || (pl.calques || []).some(x => /^idb:/.test(x.media || '')));
           toast(manque ? 'Copie ouverte. Certains fichiers non partagés par le membre ne sont pas sur cet ordinateur.' : 'Copie ouverte');

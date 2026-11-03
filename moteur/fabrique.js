@@ -158,23 +158,27 @@
   }
 
   function plan(role, fond, duree, calques, o) {
-    return Object.assign({ id: uid(), role, duree, fond: { media: fond ? fond.src : '', boucle: true, assombrir: 0, eclaircir: 0 }, transition: { type: role === 'ouverture' ? 'aucune' : 'fondu', duree: 0.8 }, calques: calques || [] }, o || {});
+    const fd = fond && fond.couleur ? { type: 'couleur', couleur: fond.couleur, assombrir: 0, eclaircir: 0 } : { media: fond ? fond.src : '', boucle: true, assombrir: 0, eclaircir: 0 };
+    if (fond && fond.type === 'image' && fond.src) fd.type = 'image';
+    return Object.assign({ id: uid(), role, duree, fond: fd, transition: { type: role === 'ouverture' ? 'aucune' : 'fondu', duree: 0.8 }, calques: calques || [] }, o || {});
   }
 
-  function genererPlans(fiche, fonds) {
+  // parPlan (facultatif) : le fond choisi à la main pour chaque plan, dans l'ordre des plans
+  function genererPlans(fiche, fonds, parPlan) {
     fonds = fonds && fonds.length ? fonds : FONDS;
     const L = LIB[fiche.langue] || LIB.fr;
     const plans = [];
     const zone = f => (f && f.zone) || { x: 50, y: 50, largeur: 66 };
+    const pour = defaut => (parPlan && parPlan[plans.length]) || defaut;
 
     // Ouverture
-    const fOuv = fonds.find(f => f.usage === 'ouverture') || fonds[0];
-    plans.push(plan('ouverture', fOuv, Math.max(3, fOuv.duree || 4.5), [
+    const fOuv = pour(fonds.find(f => f.usage === 'ouverture') || fonds[0]);
+    plans.push(plan('ouverture', fOuv, Math.max(3, Math.min(8, fOuv.duree || 4.5)), [
       bouton(L.passer, 'passer', 84, 4, { largeur: 26, style: 'lien', taille: 2 })
     ]));
 
     // Titre
-    const fTit = fondPour(fonds, 'titre', 0);
+    const fTit = pour(fondPour(fonds, 'titre', 0));
     const zT = zone(fTit);
     if (fiche.titre) {
       const morceaux = fiche.titre.split(/\s+[—–-]\s+/);
@@ -192,7 +196,7 @@
       if (reLimite.test(ph) && /\d{4}/.test(ph)) { phrasesLimite.push(ph); return; }
       decouper(ph).forEach(bout => {
         const cycle = fonds.filter(x => x.usage !== 'ouverture');
-        const fz = cycle[Math.floor(k / 2) % (cycle.length || 1)] || fonds[0];
+        const fz = pour(cycle[Math.floor(k / 2) % (cycle.length || 1)] || fonds[0]);
         const z = zone(fz);
         const cs = [];
         const hote = bout.match(/^(.+?\s+sy\s+.+?)\s+(dia\s+.+)$/i) || bout.match(/^(.+?\s+et\s+.+?)\s+((?:ont|sont|vous)\s+.+)$/i);
@@ -215,7 +219,7 @@
     });
 
     // Confirmation
-    const fConf = fonds.find(f => f.usage === 'confirmation') || fondPour(fonds, 'x', 3);
+    const fConf = pour(fonds.find(f => f.usage === 'confirmation') || fondPour(fonds, 'x', 3));
     const zc = zone(fConf);
     const cc = [];
     cc.push(texte(L.pour + ' {famille}', zc.x, 9, { police: STYLE.police_titre, taille: 4.2, condition: 'famille', debut: 0.2, largeur: 78 }));
@@ -243,7 +247,7 @@
     plans.push(plan('confirmation', fConf, 0, cc));
 
     // Remerciement
-    const fM = fondPour(fonds, 'titre', 0);
+    const fM = pour(fondPour(fonds, 'titre', 0));
     const zm = zone(fM);
     const surnoms = (fiche.hotes || []).map(h => h.surnom).filter(Boolean).join(fiche.langue === 'mg' ? ' sy ' : ' & ');
     const cm = [
@@ -258,9 +262,9 @@
     return plans;
   }
 
-  function nouveauProjet(fiche, fonds) {
+  function nouveauProjet(fiche, fonds, parPlan) {
     const slug = (fiche.titre || 'invitation').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) + '-' + Math.random().toString(36).slice(2, 6);
-    return { id: uid(), slug, version: 1, cree: new Date().toISOString(), modifie: new Date().toISOString(), fiche, style: Object.assign({}, STYLE), musique: null, mise_en_page: false, plans: genererPlans(fiche, fonds), familles: [], historique_ia: [] };
+    return { id: uid(), slug, version: 1, cree: new Date().toISOString(), modifie: new Date().toISOString(), fiche, style: Object.assign({}, STYLE), musique: null, mise_en_page: false, plans: genererPlans(fiche, fonds, parPlan), familles: [], historique_ia: [] };
   }
 
   /* ---------- Lecture tolérante d'une réponse d'IA ----------

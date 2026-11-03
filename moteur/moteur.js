@@ -19,10 +19,19 @@
     ['Montserrat', 'Modernes', 'ital,wght@0,400;0,600;0,700;1,400'], ['Poppins', 'Modernes', 'ital,wght@0,400;0,600;0,700;1,400'], ['Raleway', 'Modernes', 'ital,wght@0,400;0,600;0,700;1,400'], ['Josefin Sans', 'Modernes', 'ital,wght@0,400;0,600;0,700;1,400'],
     ['Lato', 'Modernes', 'ital,wght@0,400;0,700;1,400'], ['Open Sans', 'Modernes', 'ital,wght@0,400;0,700;1,400'], ['Roboto', 'Modernes', 'ital,wght@0,400;0,700;1,400'], ['Nunito', 'Modernes', 'ital,wght@0,400;0,700;1,400'], ['Quicksand', 'Modernes', 'wght@400;600;700'],
     ['Oswald', 'Modernes', 'wght@400;600;700'], ['Bebas Neue', 'Modernes', ''], ['Tenor Sans', 'Modernes', ''], ['Questrial', 'Modernes', ''],
+    ['League Spartan', 'Modernes', 'wght@100..900'], ['Cabin', 'Modernes', 'ital,wght@0,400..700;1,400..700'], ['Outfit', 'Modernes', 'wght@100..900'], ['Archivo', 'Modernes', 'ital,wght@0,100..900;1,100..900'], ['Archivo Black', 'Modernes', ''],
     ['Lobster', 'Fantaisie', ''], ['Comfortaa', 'Fantaisie', 'wght@400;700'], ['Amatic SC', 'Fantaisie', 'wght@400;700'], ['Fredoka', 'Fantaisie', 'wght@400;600;700'], ['Baloo 2', 'Fantaisie', 'wght@400;600;700'], ['Righteous', 'Fantaisie', ''],
     ['Bungee', 'Fantaisie', ''], ['Chewy', 'Fantaisie', ''], ['Luckiest Guy', 'Fantaisie', ''], ['Indie Flower', 'Fantaisie', ''], ['Shadows Into Light', 'Fantaisie', ''], ['Permanent Marker', 'Fantaisie', ''], ['Cookie', 'Fantaisie', ''], ['Yellowtail', 'Fantaisie', '']
   ];
   const POLICES = CATALOGUE_POLICES.map(x => x[0]);
+  // Polices importées (fichier .ttf / .otf / .woff) : chargées depuis leur fichier
+  const persoChargees = {};
+  function chargerPolicePerso(nom, url) {
+    if (!nom || !url || typeof FontFace === 'undefined') return Promise.resolve();
+    if (persoChargees[nom] && persoChargees[nom].url === url) return persoChargees[nom].p;
+    const p = new FontFace(nom, `url("${url}")`).load().then(f => { document.fonts.add(f); }).catch(e => console.warn('police', nom, e));
+    persoChargees[nom] = { url, p }; return p;
+  }
   const POLICE_EMOJI = '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji"';
   // Charge les polices demandées depuis Google Fonts (une seule fois chacune)
   const policesChargees = new Set();
@@ -69,6 +78,8 @@
   const JOURS_FR = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
   const JOURS_MG = ['Alahady', 'Alatsinainy', 'Talata', 'Alarobia', 'Alakamisy', 'Zoma', 'Sabotsy'];
   // Vidéo coupée (début / fin en secondes) : position dans le fichier pour un temps t de lecture
+  function graisse(c) { return Number(c.graisse) || (c.gras ? 700 : 400); }
+  function tourner(ctx, c) { const r = Number(c.rotation); if (!r) return; const cx = (Number(c.x) || 50) / 100 * W, cy = (Number(c.y) || 50) / 100 * H; ctx.translate(cx, cy); ctx.rotate(r * Math.PI / 180); ctx.translate(-cx, -cy); }
   // Fond d'un plan : vidéo (par défaut), photo, couleur unie / dégradé, ou aucun (transparent)
   function typeFond(f) { f = f || {}; if (f.type === 'couleur' || f.type === 'aucun') return f.type; if (!f.media) return 'defaut'; if (f.type === 'image' || /\.(png|jpe?g|webp|gif|svg)(\?|$)/i.test(f.media) || /^data:image/.test(f.media)) return 'image'; return 'video'; }
   function fondMedia(p) { const t = typeFond(p && p.fond); return (t === 'video' || t === 'image') ? p.fond.media : null; }
@@ -117,14 +128,16 @@
     const out = [];
     String(texte).split('\n').forEach(par => {
       const mots = par.split(/\s+/).filter(Boolean);
-      if (!mots.length) { out.push(''); return; }
+      out.fin = out.fin || [];
+      if (!mots.length) { out.push(''); out.fin.push(true); return; }
       let l = mots[0];
       for (let i = 1; i < mots.length; i++) {
         const essai = l + ' ' + mots[i];
-        if (ctx.measureText(essai).width > largeurPx) { out.push(l); l = mots[i]; } else l = essai;
+        if (ctx.measureText(essai).width > largeurPx) { out.push(l); out.fin.push(false); l = mots[i]; } else l = essai;
       }
-      out.push(l);
+      out.push(l); out.fin.push(true);
     });
+    out.fin = out.fin || [];
     return out;
   }
 
@@ -231,6 +244,7 @@
       // les photos doivent être vraiment chargées (sinon elles manquent dans le film)
       await Promise.all(els.filter(e => e && e.tagName === 'IMG' && !e.complete).map(e => new Promise(ok => { e.addEventListener('load', ok, { once: true }); e.addEventListener('error', ok, { once: true }); setTimeout(ok, 15000); })));
       await chargerPolices([...polices]);
+      await Promise.all((this.projet.polices_perso || []).filter(x => x && x.nom && x.src).map(async x => chargerPolicePerso(x.nom, await this.url(x.src))));
       if (document.fonts && document.fonts.load) {
         await Promise.all([...polices].map(p => document.fonts.load(`40px "${p}"`).catch(() => null)));
       }
@@ -482,10 +496,10 @@
       const ctx = this.ctx, fs = (Number(c.taille) || 2.4) / 100 * H, larg = (Number(c.largeur) || 60) / 100 * W, haut = fs * 2.3;
       const x = (Number(c.x) || 50) / 100 * W - larg / 2, y = (Number(c.y) || 50) / 100 * H - haut / 2;
       const coul = c.couleur || '#7a1f2b', style = c.style || 'plein';
-      ctx.save(); ctx.globalAlpha = alphaPlan * clamp((t - deb) / 0.6, 0, 1);
+      ctx.save(); ctx.globalAlpha = alphaPlan * clamp((t - deb) / 0.6, 0, 1); tourner(ctx, c);
       if (style !== 'lien') { arrondi(ctx, x, y, larg, haut, haut / 2); ctx.fillStyle = style === 'plein' ? coul : 'rgba(255,255,255,.85)'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = coul; ctx.stroke(); }
       ctx.fillStyle = style === 'plein' ? '#fff' : coul; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.font = `600 ${fs.toFixed(1)}px "${c.police || 'Cormorant Garamond'}", Georgia, serif, ${POLICE_EMOJI}`;
+      ctx.font = `${c.graisse || 600} ${fs.toFixed(1)}px "${c.police || 'Cormorant Garamond'}", Georgia, serif, ${POLICE_EMOJI}`;
       ctx.fillText(remplacer(texteDe(c, this.langue), vars), x + larg / 2, y + haut / 2, larg - fs);
       ctx.restore();
     }
@@ -494,7 +508,7 @@
       const deb = Number(c.debut) || 0; if (t < deb) return;
       const ctx = this.ctx, fs = (Number(c.taille) || 2.3) / 100 * H, larg = (Number(c.largeur) || 66) / 100 * W, haut = fs * 2.3;
       const x = (Number(c.x) || 50) / 100 * W - larg / 2, y = (Number(c.y) || 50) / 100 * H - haut / 2, coul = c.couleur || '#7a1f2b';
-      ctx.save(); ctx.globalAlpha = alphaPlan * clamp((t - deb) / 0.6, 0, 1);
+      ctx.save(); ctx.globalAlpha = alphaPlan * clamp((t - deb) / 0.6, 0, 1); tourner(ctx, c);
       arrondi(ctx, x, y, larg, haut, fs * 0.7); ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = coul; ctx.globalAlpha *= 0.8; ctx.stroke();
       ctx.fillStyle = '#8a7a7a'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.font = `400 ${fs.toFixed(1)}px "Cormorant Garamond", Georgia, serif`;
       ctx.fillText(remplacer(texteDe(c, this.langue), vars) || 'Écrire ici', x + fs * 0.7, y + haut / 2, larg - fs * 1.4);
@@ -505,7 +519,7 @@
       const deb = Number(c.debut) || 0; if (t < deb) return;
       const ctx = this.ctx, fs = (Number(c.taille) || 2.3) / 100 * H, larg = (Number(c.largeur) || 66) / 100 * W, haut = fs * 2.4;
       const x = (Number(c.x) || 50) / 100 * W - larg / 2, y = (Number(c.y) || 50) / 100 * H - haut / 2, coul = c.couleur || '#7a1f2b';
-      ctx.save(); ctx.globalAlpha = alphaPlan * clamp((t - deb) / 0.6, 0, 1);
+      ctx.save(); ctx.globalAlpha = alphaPlan * clamp((t - deb) / 0.6, 0, 1); tourner(ctx, c);
       arrondi(ctx, x, y, larg, haut, fs * 0.9); ctx.fillStyle = 'rgba(255,255,255,.82)'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = coul; ctx.globalAlpha *= 0.9; ctx.stroke();
       ctx.fillStyle = coul; ctx.textBaseline = 'middle'; ctx.font = `600 ${fs.toFixed(1)}px "Cormorant Garamond", Georgia, serif`;
       ctx.textAlign = 'left'; ctx.fillText(remplacer(texteDe(c, this.langue), vars), x + fs * 0.7, y + haut / 2, larg * 0.55);
@@ -571,15 +585,16 @@
       if (r.flou > 0.3) ctx.filter = `blur(${r.flou.toFixed(1)}px)`;
       ctx.globalAlpha = clamp(a, 0, 1);
       ctx.translate(cx + dx, cy + dy);
+      if (Number(c.rotation)) ctx.rotate(Number(c.rotation) * Math.PI / 180);
       if (sc !== 1) ctx.scale(sc, sc);
 
       if (c.type === 'texte') {
         const taille = (Number(c.taille) || 4) / 100 * H;
         const police = c.police || 'Cormorant Garamond';
-        ctx.font = `${c.italique ? 'italic ' : ''}${c.gras ? '700 ' : '400 '}${taille}px "${police}", serif, ${POLICE_EMOJI}`;
+        ctx.font = `${c.italique ? 'italic ' : ''}${graisse(c)} ${taille}px "${police}", serif, ${POLICE_EMOJI}`;
         ctx.textBaseline = 'middle';
-        const align = c.align || 'center';
-        ctx.textAlign = align;
+        const align = c.align || 'center', justifie = align === 'justify';
+        ctx.textAlign = justifie ? 'left' : align;
         let txt = remplacer(texteDe(c, this.langue), vars);
         if (c.majuscules) txt = txt.toUpperCase();
         const ls = lignes(ctx, txt, larg);
@@ -589,7 +604,15 @@
         const motsTxt = txt.split(/(\s+)/);
         if (e.entree === 'ecriture') montrer = Math.floor(e.brutE * total);
         if (e.entree === 'mot-par-mot') { const nm = Math.ceil(e.brutE * txt.split(/\s+/).length); let k = 0, n = 0; for (const m of motsTxt) { if (!/^\s+$/.test(m)) { n++; if (n > nm) break; } k += m.length; } montrer = k; }
-        const ax = align === 'left' ? -larg / 2 : align === 'right' ? larg / 2 : 0;
+        const ax = align === 'left' || justifie ? -larg / 2 : align === 'right' ? larg / 2 : 0;
+        // une ligne justifiée : les mots s'étalent sur toute la largeur (sauf la dernière ligne d'un paragraphe)
+        const ecrire = (morceau, complet, x, y, i, contour) => {
+          const mots = complet.split(' ');
+          if (!justifie || ls.fin[i] || mots.length < 2) { if (contour) ctx.strokeText(morceau, x, y); else ctx.fillText(morceau, x, y); return; }
+          const lmots = mots.map(m => ctx.measureText(m).width), ecart = (larg - lmots.reduce((a, b) => a + b, 0)) / (mots.length - 1);
+          let px = x, reste = morceau.length;
+          for (let k = 0; k < mots.length && reste > 0; k++) { const m = mots[k].slice(0, reste); if (contour) ctx.strokeText(m, px, y); else ctx.fillText(m, px, y); reste -= mots[k].length + 1; px += lmots[k] + ecart; }
+        };
         if (c.fond_couleur) {   // arrière-plan du texte (bandeau / cartouche)
           ctx.save(); ctx.globalAlpha *= (c.fond_opacite != null && c.fond_opacite !== '' ? Number(c.fond_opacite) : 0.6);
           ctx.fillStyle = c.fond_couleur;
@@ -611,9 +634,9 @@
           const y = -hTot / 2 + inter * (i + 0.5);
           let morceau = l;
           if (e.entree === 'ecriture' || e.entree === 'mot-par-mot') { const reste = montrer - compte; morceau = reste <= 0 ? '' : l.slice(0, reste); compte += l.length + 1; }
-          if (c.contour) { ctx.lineWidth = Number(c.contour_epaisseur) || taille * 0.06; ctx.lineJoin = 'round'; ctx.miterLimit = 2; ctx.strokeStyle = c.contour; ctx.strokeText(morceau, ax, y); }
+          if (c.contour) { ctx.lineWidth = Number(c.contour_epaisseur) || taille * 0.06; ctx.lineJoin = 'round'; ctx.miterLimit = 2; ctx.strokeStyle = c.contour; ecrire(morceau, l, ax, y, i, true); }
           ctx.fillStyle = c.couleur || '#7a1f2b';
-          ctx.fillText(morceau, ax, y);
+          ecrire(morceau, l, ax, y, i, false);
         });
         if (mesurer) this.bbox[c.id] = { x: (cx - larg / 2) / W * 100, y: (cy - hTot / 2) / H * 100, w: larg / W * 100, h: hTot / H * 100 };
       } else if (c.type === 'image' || c.type === 'video') {
@@ -658,6 +681,7 @@
         el.style.setProperty('--mt-taille', (Number(c.taille) || 2.6));
         el.style.setProperty('--mt-couleur', c.couleur || '#7a1f2b');
         if (c.police) el.style.fontFamily = `"${c.police}", serif`;
+        if (Number(c.rotation)) el.style.rotate = Number(c.rotation) + 'deg';
         const t0 = Number(c.debut) || 0;
         if (this.mode !== 'edition' && t0 > 0) { el.style.animationDelay = t0 + 's'; }
         if (c.type === 'bouton') {
@@ -723,7 +747,7 @@
       const ctx = this.ctx;
       const taille = (Number(c.taille) || 4) / 100 * H;
       ctx.save();
-      ctx.font = `${c.italique ? 'italic ' : ''}${c.gras ? '700 ' : '400 '}${taille}px "${c.police || 'Cormorant Garamond'}", serif`;
+      ctx.font = `${c.italique ? 'italic ' : ''}${graisse(c)} ${taille}px "${c.police || 'Cormorant Garamond'}", serif`;
       let txt = remplacer(texteDe(c, this.langue), variablesDe(this.projet, this.famille || { nom: 'Fianakaviana Rakotomalala', places: 4 }, this.form, this.langue));
       if (c.majuscules) txt = txt.toUpperCase();
       const n = lignes(ctx, txt, (Number(c.largeur) || 80) / 100 * W).length;
@@ -948,5 +972,5 @@
   // Langues proposées pour les invitations
   const LANGUES = { mg: 'Malagasy', fr: 'Français', en: 'English', de: 'Deutsch', it: 'Italiano', es: 'Español', pt: 'Português', zh: '中文', ar: 'العربية', ru: 'Русский', ja: '日本語' };
   const FUSIONS = [['normal', 'Normale'], ['multiply', 'Produit (assombrit, garde les ombres)'], ['screen', 'Écran (éclaircit, garde les lumières)'], ['overlay', 'Superposition'], ['soft-light', 'Lumière douce'], ['hard-light', 'Lumière crue'], ['color-dodge', 'Densité couleur −'], ['color-burn', 'Densité couleur +'], ['darken', 'Obscurcir'], ['lighten', 'Éclaircir'], ['difference', 'Différence'], ['luminosity', 'Luminosité'], ['color', 'Couleur']];
-  global.MoteurInfo = { CATALOGUE_POLICES, chargerPolices, typeFond, fondMedia, FUSIONS, plage, positionVideo, LANGUES, texteDe, W, H, POLICES, ANIMATIONS, SORTIES, NOMS_EFFETS, ACTIONS, TYPES_HTML, uid, variablesDe, dateLisible, remplacer, MOIS_MG, MOIS_FR };
+  global.MoteurInfo = { CATALOGUE_POLICES, chargerPolices, chargerPolicePerso, typeFond, fondMedia, FUSIONS, plage, positionVideo, LANGUES, texteDe, W, H, POLICES, ANIMATIONS, SORTIES, NOMS_EFFETS, ACTIONS, TYPES_HTML, uid, variablesDe, dateLisible, remplacer, MOIS_MG, MOIS_FR };
 })(window);
