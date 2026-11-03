@@ -174,6 +174,14 @@
     });
     Stock.ecrire('studio.medias', medias); Stock.ecrire('studio.medias.evt', true);
   }
+  // Vignette d'un plan : couleur, transparence, photo ou vidéo
+  function vignettePlan(pl) {
+    const f = (pl && pl.fond) || {}, t = MoteurInfo.typeFond(f);
+    if (t === 'couleur') return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 9 16"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${f.couleur || '#f4ede2'}"/><stop offset="1" stop-color="${f.couleur2 || f.couleur || '#f4ede2'}"/></linearGradient></defs><rect width="9" height="16" fill="url(#g)"/></svg>`);
+    if (t === 'aucun') return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8"><rect width="8" height="8" fill="#fff"/><rect width="4" height="4" fill="#ddd"/><rect x="4" y="4" width="4" height="4" fill="#ddd"/></svg>');
+    if (t === 'image') { const m = medias.find(x => x.src === f.media) || Equipe.medias().find(x => x.src === f.media); return (m && m.vignette) || (/^data:image/.test(f.media) ? f.media : ''); }
+    return vignetteDe(f.media);
+  }
   function vignetteDe(src) {
     const f = tousFonds().find(x => x.src === src);
     if (!f) return '';
@@ -193,6 +201,116 @@
     if (onOuvre) onOuvre($('.modale-contenu', m), fermer);
     return fermer;
   }
+  /* ---------- Petites fenêtres flottantes (polices, emojis) ---------- */
+  let popOuvert = null;
+  function fermerPop() { if (popOuvert) { popOuvert.remove(); popOuvert = null; } }
+  function pop(ancre, html, classe) {
+    fermerPop();
+    const d = document.createElement('div'); d.className = 'pop ' + (classe || ''); d.innerHTML = html;
+    document.body.appendChild(d); popOuvert = d;
+    const r = ancre.getBoundingClientRect(), w = d.offsetWidth, h = d.offsetHeight;
+    let x = Math.min(window.innerWidth - w - 8, Math.max(8, r.left + r.width / 2 - w / 2)), y = r.bottom + 6;
+    if (y + h > window.innerHeight - 8) y = Math.max(8, r.top - h - 6);
+    d.style.left = x + 'px'; d.style.top = y + 'px';
+    setTimeout(() => {
+      const dehors = e => { if (!d.isConnected) return document.removeEventListener('pointerdown', dehors, true); if (!d.contains(e.target) && e.target !== ancre) { fermerPop(); document.removeEventListener('pointerdown', dehors, true); } };
+      document.addEventListener('pointerdown', dehors, true);
+      const echap = e => { if (e.key === 'Escape') { fermerPop(); document.removeEventListener('keydown', echap, true); } };
+      document.addEventListener('keydown', echap, true);
+    }, 0);
+    return d;
+  }
+  // Choix de la police : chaque police est montrée avec son propre dessin
+  function ouvrirPolices(ancre, actuelle, choisir) {
+    const cat = MoteurInfo.CATALOGUE_POLICES;
+    MoteurInfo.chargerPolices(cat.map(x => x[0]));
+    const recentes = Stock.lire('studio.polices.recentes', []).filter(n => cat.some(x => x[0] === n)).slice(0, 6);
+    const groupes = [['Récentes', recentes]].concat([...new Set(cat.map(x => x[1]))].map(g => [g, cat.filter(x => x[1] === g).map(x => x[0])]));
+    const d = pop(ancre, `<input type="search" class="pop-cherche" placeholder="Chercher une police…">
+      <div class="pop-onglets">${groupes.filter(g => g[1].length).map(([g], k) => `<button data-g="${esc(g)}" class="${k === (recentes.length ? 0 : 1) ? 'on' : ''}">${esc(g)}</button>`).join('')}<button data-g="*">Toutes</button></div>
+      <div class="pop-liste polices"></div>`, 'pop-polices');
+    const liste = $('.polices', d);
+    const montrer = (noms) => { liste.innerHTML = noms.map(n => `<button class="police-choix ${n === actuelle ? 'on' : ''}" data-n="${esc(n)}"><span style="font-family:'${esc(n)}',serif">${esc(n)}</span><small style="font-family:'${esc(n)}',serif">Mariage · Ho tonga 2026</small></button>`).join('') || '<p class="muet">Aucune police.</p>'; };
+    const groupe = g => g === '*' ? cat.map(x => x[0]) : (groupes.find(x => x[0] === g) || [0, []])[1];
+    montrer(groupe(recentes.length ? 'Récentes' : groupes[1][0]));
+    $$('[data-g]', d).forEach(b => b.onclick = () => { $$('[data-g]', d).forEach(x => x.classList.toggle('on', x === b)); $('.pop-cherche', d).value = ''; montrer(groupe(b.dataset.g)); });
+    $('.pop-cherche', d).oninput = e => { const q = e.target.value.trim().toLowerCase(); montrer(q ? cat.map(x => x[0]).filter(n => n.toLowerCase().includes(q)) : groupe('*')); };
+    liste.onclick = e => { const b = e.target.closest('[data-n]'); if (!b) return; const n = b.dataset.n; Stock.ecrire('studio.polices.recentes', [n].concat(recentes.filter(x => x !== n)).slice(0, 6)); fermerPop(); choisir(n); };
+    setTimeout(() => $('.pop-cherche', d).focus(), 30);
+  }
+  // Emojis rangés par thème (les derniers utilisés en premier)
+  const EMOJIS = {
+    'Amour': '❤️ 🧡 💛 💚 💙 💜 🤍 🤎 🖤 💕 💞 💓 💗 💖 💘 💝 💌 💋 😍 🥰 😘 💑 💏 👩‍❤️‍👨 💍 💒 👰 🤵 🥂 🍾 💐',
+    'Fête': '🎉 🎊 🎈 🎁 🎂 🍰 🧁 🥳 🎶 🎵 🎤 💃 🕺 🪅 🎆 🎇 ✨ 🌟 ⭐ 💫 🔥 🍽️ 🍷 🥤 🍹 🪩',
+    'Fleurs': '🌸 🌹 🌺 🌷 🌻 🌼 💮 🏵️ 💐 🌿 🍃 🍀 🌱 🌴 🌾 🪷 🦋 🕊️',
+    'Bébé et foi': '👶 🍼 🧸 🎀 👣 🤱 🙏 ✝️ ⛪ 🕊️ 👼 📿 ☀️ 🌙 ⭐ ☁️ 🌈',
+    'Visages': '😊 😃 😄 😁 😂 🤩 😇 🙂 😉 🥹 😭 😢 🤗 🤭 😎 🥺 👏 🙌 👍 🤝 ✌️ 👋',
+    'Infos': '📍 🗺️ 📅 🗓️ ⏰ 🕐 📞 📱 ✉️ 📩 🚗 🚌 🏠 🏡 🏛️ ⛪ 🎫 ✅ ❌ ➡️ ⬇️ ❗ ❓ ℹ️',
+    'Drapeaux': '🇲🇬 🇫🇷 🇬🇧 🇺🇸 🇨🇦 🇩🇪 🇮🇹 🇪🇸 🇵🇹 🇨🇳 🇯🇵 🇷🇺 🇿🇦 🇲🇺 🇷🇪 🇰🇲 🇸🇨'
+  };
+  function ouvrirEmojis(ancre, choisir) {
+    const recents = Stock.lire('studio.emojis.recents', []);
+    const cats = (recents.length ? [['Récents', recents]] : []).concat(Object.entries(EMOJIS).map(([k, v]) => [k, v.split(' ')]));
+    const d = pop(ancre, `<div class="pop-onglets">${cats.map(([k], i) => `<button data-c="${i}" class="${i ? '' : 'on'}">${esc(k)}</button>`).join('')}</div><div class="pop-liste emojis"></div><p class="muet" style="margin:6px 4px 0;font-size:11.5px">Astuce : sur l'ordinateur, Windows + . (point) ou Ctrl + Cmd + Espace sur Mac ouvre tous les emojis.</p>`, 'pop-emojis');
+    const liste = $('.emojis', d);
+    const montrer = i => { liste.innerHTML = cats[i][1].map(e => `<button data-e="${esc(e)}">${e}</button>`).join(''); };
+    montrer(0);
+    $$('[data-c]', d).forEach(b => b.onclick = () => { $$('[data-c]', d).forEach(x => x.classList.toggle('on', x === b)); montrer(Number(b.dataset.c)); });
+    liste.onclick = e => { const b = e.target.closest('[data-e]'); if (!b) return; const em = b.dataset.e; Stock.ecrire('studio.emojis.recents', [em].concat(recents.filter(x => x !== em)).slice(0, 24)); choisir(em); };
+  }
+
+  /* ---------- Rogner une photo ou une vidéo (garder une partie) ---------- */
+  // conf.recadrage = { x, y, w, h } en fractions de l'image d'origine
+  async function modaleRecadrer(conf, src, ratioCadre, fini, opts) {
+    opts = opts || {};
+    const url = await resoudre(src);
+    const video = !/\.(png|jpe?g|webp|gif|svg)(\?|$)/i.test(src) && !/^data:image/.test(src);
+    let r = Object.assign({ x: 0, y: 0, w: 1, h: 1 }, conf.recadrage || {});
+    let ratio = null;   // proportion imposée (largeur / hauteur, en pixels)
+    modale(`<h2>⬚ Rogner ${video ? 'la vidéo' : 'la photo'}</h2>
+      <p class="muet">Déplacez le cadre et tirez ses coins : seule la partie claire est gardée. ${opts.fond ? 'Le fond remplit tout l\'écran : le format 9:16 garde exactement ce que vous voyez.' : ''}</p>
+      <div class="ligne rg-formats" style="gap:6px;flex-wrap:wrap;margin-bottom:8px">${[['libre', 'Libre'], ['cadre', opts.fond ? 'Écran 9:16' : 'Comme le cadre'], ['1', 'Carré 1:1'], ['0.8', 'Portrait 4:5'], ['0.5625', '9:16'], ['1.7778', '16:9'], ['0.75', '3:4']].map(([k, n]) => `<button class="btn petit" data-ratio="${k}">${n}</button>`).join('')}</div>
+      <div class="rg-boite"><div class="rg-media"></div><div class="rg-voile"></div><div class="rg-cadre"><i data-p="nw"></i><i data-p="ne"></i><i data-p="sw"></i><i data-p="se"></i><i data-p="n"></i><i data-p="s"></i><i data-p="e"></i><i data-p="w"></i></div></div>
+      ${video ? '<input type="range" id="rg-temps" min="0" max="1" step="0.01" value="0.2" style="width:100%;margin-top:8px" title="Choisir l\'image de la vidéo">' : ''}
+      ${opts.adapter ? '<label class="cases" style="margin-top:8px"><input type="checkbox" id="rg-adapter" checked> Adapter la forme du calque à la partie gardée</label>' : ''}
+      <div class="ligne" style="margin-top:12px;justify-content:space-between"><button class="btn" id="rg-tout">Tout garder (annuler le rognage)</button><button class="btn plein" id="rg-ok">Appliquer</button></div>`, (racine, fermer) => {
+      const boite = $('.rg-boite', racine), zoneM = $('.rg-media', racine), cadreR = $('.rg-cadre', racine), voile = $('.rg-voile', racine);
+      const el = video ? document.createElement('video') : new Image();
+      if (video) { el.muted = true; el.playsInline = true; el.preload = 'auto'; el.crossOrigin = /^https?:/.test(url) && new URL(url, location.href).origin !== location.origin ? 'anonymous' : null; }
+      el.src = url; zoneM.appendChild(el);
+      let iw = 1, ih = 1;
+      const pret = () => { iw = el.videoWidth || el.naturalWidth || 1; ih = el.videoHeight || el.naturalHeight || 1; boite.style.aspectRatio = iw + ' / ' + ih; boite.style.setProperty('--r', (iw / ih).toFixed(4)); if (video) { try { el.currentTime = Math.min(1, (el.duration || 2) * 0.2); } catch (e) {} } maj(); };
+      if (video) el.addEventListener('loadedmetadata', pret, { once: true }); else el.onload = pret;
+      const ts = $('#rg-temps', racine); if (ts) ts.oninput = () => { try { el.currentTime = Number(ts.value) * (el.duration || 1); } catch (e) {} };
+      const borner = () => { r.w = Math.max(0.05, Math.min(1, r.w)); r.h = Math.max(0.05, Math.min(1, r.h)); r.x = Math.max(0, Math.min(1 - r.w, r.x)); r.y = Math.max(0, Math.min(1 - r.h, r.y)); };
+      const imposer = () => { if (!ratio) return; const cx = r.x + r.w / 2, cy = r.y + r.h / 2; let w = r.w, h = w * iw / ih / ratio; if (h > 1) { h = 1; w = h * ih * ratio / iw; } if (w > 1) { w = 1; h = w * iw / ih / ratio; } r.w = w; r.h = h; r.x = cx - w / 2; r.y = cy - h / 2; borner(); };
+      function maj() { borner(); Object.assign(cadreR.style, { left: r.x * 100 + '%', top: r.y * 100 + '%', width: r.w * 100 + '%', height: r.h * 100 + '%' }); voile.style.clipPath = `polygon(0 0,100% 0,100% 100%,0 100%,0 0,${r.x * 100}% ${r.y * 100}%,${r.x * 100}% ${(r.y + r.h) * 100}%,${(r.x + r.w) * 100}% ${(r.y + r.h) * 100}%,${(r.x + r.w) * 100}% ${r.y * 100}%,${r.x * 100}% ${r.y * 100}%)`; }
+      $$('[data-ratio]', racine).forEach(b => b.onclick = () => { $$('[data-ratio]', racine).forEach(x => x.classList.toggle('plein', x === b)); const k = b.dataset.ratio; ratio = k === 'libre' ? null : k === 'cadre' ? ratioCadre : Number(k); if (ratio) { r.w = 1; r.h = 1; r.x = 0; r.y = 0; imposer(); } maj(); });
+      let dr = null;
+      boite.addEventListener('pointerdown', e => { const rb = boite.getBoundingClientRect(); dr = { p: e.target.dataset.p || (e.target === cadreR ? 'deplacer' : null), x0: e.clientX, y0: e.clientY, r0: Object.assign({}, r), w: rb.width, h: rb.height }; if (!dr.p) { dr = null; return; } boite.setPointerCapture(e.pointerId); e.preventDefault(); });
+      boite.addEventListener('pointermove', e => {
+        if (!dr) return; const dx = (e.clientX - dr.x0) / dr.w, dy = (e.clientY - dr.y0) / dr.h, o = dr.r0, P = dr.p;
+        if (P === 'deplacer') { r.x = o.x + dx; r.y = o.y + dy; }
+        else {
+          let x1 = o.x, y1 = o.y, x2 = o.x + o.w, y2 = o.y + o.h;
+          if (P.includes('w')) x1 = Math.min(x2 - 0.05, Math.max(0, o.x + dx)); if (P.includes('e')) x2 = Math.max(x1 + 0.05, Math.min(1, o.x + o.w + dx));
+          if (P.includes('n')) y1 = Math.min(y2 - 0.05, Math.max(0, o.y + dy)); if (P.includes('s')) y2 = Math.max(y1 + 0.05, Math.min(1, o.y + o.h + dy));
+          r = { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+          if (ratio) { const h = r.w * iw / ih / ratio; if (P.includes('n')) r.y = y2 - h; r.h = h; if (r.y < 0 || r.y + r.h > 1) { r.h = Math.min(1, r.h); r.w = r.h * ih * ratio / iw; } }
+        }
+        maj();
+      });
+      boite.addEventListener('pointerup', () => { dr = null; });
+      $('#rg-tout', racine).onclick = () => { delete conf.recadrage; fermer(); fini(null); };
+      $('#rg-ok', racine).onclick = () => {
+        const garde = r.x < 0.002 && r.y < 0.002 && r.w > 0.997 && r.h > 0.997;
+        if (garde) delete conf.recadrage; else conf.recadrage = { x: +r.x.toFixed(4), y: +r.y.toFixed(4), w: +r.w.toFixed(4), h: +r.h.toFixed(4) };
+        const ad = $('#rg-adapter', racine);
+        fermer(); fini(garde ? null : conf.recadrage, { iw, ih, adapter: ad ? ad.checked : false });
+      };
+    });
+  }
+
   async function copier(t) { try { await navigator.clipboard.writeText(t); toast('Copié'); } catch (e) { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('Copié'); } }
   function telecharger(nom, contenu, type) {
     const blob = contenu instanceof Blob ? contenu : new Blob([contenu], { type: type || 'application/json' });
@@ -220,6 +338,18 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-03-1', date: '3 novembre 2026', titre: 'Règles, sélection multiple, polices, emojis, illustrations, fonds couleur / photo / sans fond, rogner, pause', points: [
+      '<b>📏 Règles</b> (sous l\'aperçu) : règles graduées autour de l\'aperçu ; tirez depuis une règle pour poser un repère bleu (double-clic ou glisser dehors pour l\'effacer). En déplaçant un élément, il s\'aimante au centre, aux repères et aux bords des autres éléments (traits roses). Maj pour déplacer sans aimant.',
+      '<b>Plusieurs éléments à la fois</b> : Maj+clic (ou Ctrl+clic), ou tracez un cadre sur l\'aperçu, ou Ctrl+A. Ils se déplacent ensemble (souris ou flèches), et la barre propose : aligner (gauche, centre, droite, haut, milieu, bas), répartir, couleur et police pour tous, agrandir, dupliquer, copier-coller, supprimer.',
+      '<b>⏸ Pause</b> pendant la lecture (bouton ou barre d\'espace), et aussi sur la page de l\'invitation pour les invités.',
+      '<b>Polices</b> : plus de 60 polices Google (manuscrites, élégantes, modernes, fantaisie), chacune montrée avec son dessin, avec recherche et « Récentes ».',
+      '<b>😊 Emojis</b> : dans un texte (bouton 😊) ou en élément seul (« + Emoji »), rangés par thème.',
+      '<b>✿ Illustrations</b> : « + Illustration » : cœurs, alliances, coupes, colombe, bouquet, fleurs, croix, église, ourson, ballons, fanions, cadres, séparateurs… aux couleurs de l\'invitation, recolorables.',
+      '<b>Fond du plan</b> : 🎬 Vidéo, 🖼 Photo, 🎨 Couleur (unie ou dégradé) ou ▦ Sans fond (transparent). « Appliquer ce fond à tous les plans ».',
+      '<b>▦ Vidéo sans fond (WebM)</b> dans Film et publication : vidéo transparente à poser sur une autre vidéo (CapCut, Premiere…).',
+      '<b>⬚ Rogner</b> une vidéo ou une photo (fond ou élément posé) : formats libre, 1:1, 4:5, 9:16, 16:9…',
+      '<b>Plus rien ne disparaît</b> : le film télécharge d\'abord les vidéos en ligne (fonds de l\'équipe) pour que chaque image ait son fond ; une vidéo qui se recharge garde sa dernière image ; les photos sont attendues ; les boutons de réponse sont toujours dans le film ; « Film pour » une famille met les textes à son nom (« Ho an\'i {famille} »).'
+    ] },
     { id: '2026-11-02-7', date: '2 novembre 2026', titre: 'Fond, ombre et contour des textes · vitesse des vidéos · toutes les vidéos de l\'équipe', points: [
       '<b>Textes</b> : nouveau panneau « Fond, ombre, contour » : arrière-plan (couleur, opacité, marge, arrondi), ombre (halo ou ombre portée : couleur, flou, intensité, décalage), contour (couleur, épaisseur). Styles rapides : Lisible sur fond chargé, Bandeau, Néon.',
       '<b>Vitesse des vidéos</b> : du ralenti ×0,25 à l\'accéléré ×3, pour le fond d\'un plan (panneau Fond vidéo) et pour chaque vidéo posée. Le film MP4 respecte la vitesse.',
@@ -314,7 +444,7 @@
         <div class="ligne"><label class="btn">Importer un projet<input type="file" accept=".json" id="imp-projet" hidden></label><a class="btn plein" href="#/nouveau">+ Nouvel événement</a></div></div>
       ${liste.length ? `<div class="grille">${liste.map(p => `
         <div class="carte projet-carte" data-id="${p.id}">
-          <img src="${esc(vignetteDe((p.plans.find(x => x.role !== 'ouverture') || p.plans[0] || {}).fond ? (p.plans.find(x => x.role !== 'ouverture') || p.plans[0]).fond.media : ''))}" alt="">
+          <img src="${esc(vignettePlan(p.plans.find(x => x.role !== 'ouverture') || p.plans[0] || {}))}" alt="">
           <div><h3>${esc(p.fiche.titre)}</h3>
             <div class="muet">${esc(MoteurInfo.dateLisible(p.fiche.date, p.fiche.langue))}</div>
             <div class="muet">${p.plans.length} plans · ${(p.familles || []).length} familles</div>
@@ -506,8 +636,11 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
   }
 
   /* ---------- Plans (éditeur) ---------- */
+  const PALETTE_FONDS = [['#f4ede2'], ['#ffffff'], ['#fdf6ec'], ['#f6e1e1'], ['#e9efe4'], ['#e7eef6'], ['#1d1414'], ['#7a1f2b'], ['#b08a4f'], ['#3b4a3a'], ['#1f2a44'],
+    ['#fdf6ec', '#ead5b8'], ['#fff5f5', '#f2c4ce'], ['#eef3ea', '#b9cdb0'], ['#f1f5fb', '#b9c9e2'], ['#7a1f2b', '#2b0b10'], ['#1f2a44', '#0b0f1c'], ['#f7e7c6', '#c9a15a'], ['#ffffff', '#e6dccb']];
   const ROLES = { ouverture: 'Ouverture', intermediaire: 'Plan intermédiaire', confirmation: 'Confirmation', remerciement: 'Remerciement' };
   const NOMS_TYPE = { texte: 'Texte', bouton: 'Bouton', compteur: 'Compteur', champ: 'Champ', image: 'Image', video: 'Vidéo' };
+  const nomType = c => c.illu ? 'Illustration' : NOMS_TYPE[c.type];
   const FAMILLE_TEST = { code: 'TEST', nom: 'Fianakaviana Rakoto', places: 4, adultes: 2, enfants: 2 };
 
   function ongletPlans(p) {
@@ -517,11 +650,13 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <div class="col-plans" id="col-plans"></div>
         <div class="col-apercu">
           <div class="barre-sel" id="barre-sel"></div>
-          <div class="apercu-cadre" id="cadre" tabindex="0"><div id="scene"></div><div class="poignees" id="poignees"></div></div>
-          <div class="astuce">Double-clic : écrire dans le texte · Coins : agrandir · Côtés : élargir · Ctrl+C / Ctrl+V : copier-coller (aussi entre plans) · Ctrl+Alt+C / Ctrl+Alt+V : copier-coller la mise en forme · 🖌 : pinceau · Ctrl+D : dupliquer · Suppr : supprimer · Flèches : déplacer · Clic droit : menu</div>
+          <div class="cadre-regles" id="cadre-regles"><canvas class="regle regle-h" id="regle-h"></canvas><canvas class="regle regle-v" id="regle-v"></canvas><span class="regle-coin" title="Règles"></span>
+          <div class="apercu-cadre" id="cadre" tabindex="0"><div id="scene"></div><div class="poignees" id="poignees"></div><div class="aimants" id="aimants"></div></div></div>
+          <div class="astuce">Maj+clic ou cadre de sélection : choisir plusieurs éléments · Double-clic : écrire dans le texte · Coins : agrandir · Côtés : élargir · Ctrl+C / Ctrl+V : copier-coller (aussi entre plans) · Ctrl+Alt+C / Ctrl+Alt+V : copier-coller la mise en forme · 🖌 : pinceau · Ctrl+D : dupliquer · Suppr : supprimer · Flèches : déplacer · Clic droit : menu</div>
           <div class="temps"><span id="t-aff">0,0 s</span><input type="range" id="t-curseur" min="0" max="6" step="0.05" value="0"><span id="t-dur"></span></div>
           <div class="commandes">
-            <button class="btn petit" id="jouer-plan">▶ Plan</button><button class="btn petit" id="jouer-tout">▶ Toute l'invitation</button><button class="btn petit" id="stop">■</button>
+            <button class="btn petit" id="jouer-plan">▶ Plan</button><button class="btn petit" id="jouer-tout">▶ Toute l'invitation</button><button class="btn petit" id="pause" title="Pause / reprendre (barre d'espace)" disabled>⏸ Pause</button><button class="btn petit" id="stop">■</button>
+            <button class="btn petit ${Stock.lire('studio.regles', false) ? 'on' : ''}" id="regles-btn" title="Afficher les règles et les repères">📏 Règles</button>
             <select id="vue" class="btn petit"><option value="famille">Voir : lien personnel</option><option value="general">Voir : lien général</option></select>
             <button class="btn petit icone" id="annuler" title="Annuler">↶</button><button class="btn petit icone" id="refaire" title="Rétablir">↷</button>
           </div>
@@ -572,14 +707,25 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       if (p.musique && p.musique.src) { try { son = new Audio(await resoudre(p.musique.src)); son.volume = p.musique.volume != null ? p.musique.volume : 0.8; son.currentTime = Number(p.musique.debut) || 0; son.play(); } catch (e) {} }
     };
     $('#jouer-plan').addEventListener('click', couperSon);
-    $('#stop').onclick = () => { couperSon(); enLecture(false); eng.pause(); eng.mode = 'edition'; afficher(); };
+    $('#stop').onclick = () => { couperSon(); enLecture(false); eng.pause(); eng.mode = 'edition'; E.enPause = false; majPause(); afficher(); };
+    // Pause / reprendre (bouton ou barre d'espace) pendant la lecture
+    E.enPause = false;
+    const majPause = () => { const b = $('#pause'); if (!b) return; const actif = eng.lecture || E.enPause; b.disabled = !actif; b.textContent = E.enPause ? '▶ Reprendre' : '⏸ Pause'; b.classList.toggle('on', E.enPause); };
+    const basculerPause = () => {
+      if (E.enPause) { E.enPause = false; eng.reprendre(); if (son) son.play().catch(() => {}); }
+      else if (eng.lecture) { E.enPause = true; eng.pause(); if (son) son.pause(); }
+      majPause();
+    };
+    $('#pause').onclick = basculerPause;
+    ['#jouer-plan', '#jouer-tout'].forEach(id => $(id).addEventListener('click', () => { E.enPause = false; setTimeout(majPause, 30); }));
+    E.basculerPause = basculerPause;
     const majVoirLangue = () => { const sel = $('#voir-langue'); const ls = [p.fiche.langue].concat((p.langues || []).filter(l => l !== p.fiche.langue)); sel.style.display = ls.length > 1 ? '' : 'none'; sel.innerHTML = ls.map(l => `<option value="${l}" ${(eng.langue || p.fiche.langue) === l ? 'selected' : ''}>Voir en : ${esc(MoteurInfo.LANGUES[l] || l)}</option>`).join(''); };
     majVoirLangue();
     $('#voir-langue').onchange = e => { eng.changerLangue(e.target.value); E.rafraichir(); };
     $('#traduire').onclick = () => modaleTraduction(p, () => { majVoirLangue(); E.afficher(); });
     $('#musique-btn').onclick = () => modaleMusique(p, () => { $('#musique-btn').textContent = '♪ ' + (p.musique ? (p.musique.nom || 'Chanson').replace(/\.\w+$/, '').slice(0, 18) : 'Ajouter une chanson'); });
     eng.onTemps = (t) => { $('#t-aff').textContent = t.toFixed(1).replace('.', ',') + ' s'; if (eng.planFixe != null) $('#t-curseur').value = t; };
-    eng.onFin = () => { eng.mode = 'edition'; afficher(); };
+    eng.onFin = () => { eng.mode = 'edition'; E.enPause = false; majPause(); afficher(); };
     eng.onAction = (a) => {
       if (a === 'whatsapp' && eng.planCourant() && eng.planCourant().role === 'confirmation') { toast('Réponse par WhatsApp (simulée) : suite du film'); return eng.allerRemerciement(); }
       if (a === 'confirmer' || a === 'refuser') { toast(a === 'confirmer' ? 'Réponse « vient » (simulée) : suite du film' : 'Réponse « ne vient pas » (simulée) : suite du film'); return eng.allerRemerciement(); }
@@ -596,15 +742,24 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     let drag = null, editeur = null;
     const POIGNEES = { texte: ['nw', 'ne', 'sw', 'se', 'e', 'w'], bouton: ['nw', 'ne', 'sw', 'se', 'e', 'w'], compteur: ['e', 'w'], champ: ['e', 'w'], image: ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'], video: ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] };
     function calqueSel() { return (plan().calques || []).find(x => x.id === E.sel); }
+    // ---- Sélection multiple : E.multi contient tous les éléments choisis (E.sel = le dernier cliqué)
+    E.multi = new Set();
+    const selection = () => { const pl = plan(); const ids = E.multi.size ? E.multi : new Set(E.sel ? [E.sel] : []); return (pl.calques || []).filter(c => ids.has(c.id)); };
+    E.selection = selection;
+    // ---- Règles et repères (en % de l'invitation, gardés avec l'événement)
+    p.guides = p.guides || { v: [], h: [] };
+    let regles = !!Stock.lire('studio.regles', false);
+    let cadreSel = null;
     function rendrePoignees() {
       if (eng.lecture) { if (zone._html) { zone.innerHTML = ''; zone._html = ''; } return; }
-      const pl = plan();
+      const pl = plan(), seule = E.multi.size <= 1;
       const html = (pl.calques || []).filter(c => eng.bbox[c.id] && !c.masque && !c._edition).map(c => {
-        const b = eng.bbox[c.id], actif = E.sel === c.id;
-        const hs = actif ? (POIGNEES[c.type] || []).map(h => `<i class="h h-${h}" data-h="${h}"></i>`).join('') : '';
-        return `<div class="poignee ${actif ? 'actif' : ''}" data-id="${c.id}" style="left:${b.x}%;top:${b.y}%;width:${b.w}%;height:${b.h}%"><span class="nom">${esc(NOMS_TYPE[c.type])}</span>${hs}</div>`;
-      }).join('');
-      if (zone._html !== html) { zone.innerHTML = html; zone._html = html; }
+        const b = eng.bbox[c.id], actif = E.sel === c.id, groupe = E.multi.has(c.id) && !seule;
+        const hs = actif && seule ? (POIGNEES[c.type] || []).map(h => `<i class="h h-${h}" data-h="${h}"></i>`).join('') : '';
+        return `<div class="poignee ${actif && seule ? 'actif' : ''} ${groupe ? 'groupe' : ''}" data-id="${c.id}" style="left:${b.x}%;top:${b.y}%;width:${b.w}%;height:${b.h}%"><span class="nom">${esc(nomType(c))}</span>${hs}</div>`;
+      }).join('') + (regles ? p.guides.v.map((x, k) => `<div class="guide guide-v" data-gv="${k}" style="left:${x}%" title="Glisser pour déplacer · double-clic ou glisser hors du cadre pour effacer"></div>`).join('') + p.guides.h.map((y, k) => `<div class="guide guide-h" data-gh="${k}" style="top:${y}%" title="Glisser pour déplacer · double-clic ou glisser hors du cadre pour effacer"></div>`).join('') : '')
+        + (cadreSel ? `<div class="cadre-selection" style="left:${Math.min(cadreSel.x0, cadreSel.x1)}%;top:${Math.min(cadreSel.y0, cadreSel.y1)}%;width:${Math.abs(cadreSel.x1 - cadreSel.x0)}%;height:${Math.abs(cadreSel.y1 - cadreSel.y0)}%"></div>` : '');
+      if (zone._html !== html) { zone.innerHTML = html; zone._html = html; dessinerRegles(); }
     }
     function tick() { rendrePoignees(); boucleUI = requestAnimationFrame(tick); }
     boucleUI = requestAnimationFrame(tick);
@@ -615,39 +770,96 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       for (let i = cs.length - 1; i >= 0; i--) { const b = eng.bbox[cs[i].id]; if (x >= b.x - 0.8 && x <= b.x + b.w + 0.8 && y >= b.y - 0.8 && y <= b.y + b.h + 0.8) return cs[i]; }
       return null;
     }
-    function choisir(id) { if (E.sel !== id) { E.sel = id; rendreReglages(); zone._html = ''; } }
+    function choisir(id, ajout) {
+      if (ajout && id) {
+        if (!E.multi.size && E.sel) E.multi.add(E.sel);
+        if (E.multi.has(id)) { E.multi.delete(id); E.sel = [...E.multi].pop() || null; } else { E.multi.add(id); E.sel = id; }
+        if (E.multi.size <= 1) { E.multi.clear(); if (E.sel) E.multi.add(E.sel); }
+        rendreReglages(); zone._html = ''; return;
+      }
+      if (E.sel !== id || E.multi.size > 1) { E.sel = id; E.multi.clear(); if (id) E.multi.add(id); rendreReglages(); zone._html = ''; }
+    }
+    E.choisir = choisir;
+    function choisirPlusieurs(ids) { E.multi = new Set(ids); E.sel = ids[ids.length - 1] || null; rendreReglages(); zone._html = ''; }
+    E.choisirPlusieurs = choisirPlusieurs;
+
+    // ---- Aimants : centre de la page, repères, bords et centres des autres éléments
+    const aimants = $('#aimants');
+    function cibles(exclus) {
+      const v = [50], h = [50];
+      if (regles) { v.push(...p.guides.v); h.push(...p.guides.h); }
+      (plan().calques || []).forEach(c => { if (exclus.has(c.id) || c.masque) return; const b = eng.bbox[c.id]; if (!b) return; v.push(b.x, b.x + b.w / 2, b.x + b.w); h.push(b.y, b.y + b.h / 2, b.y + b.h); });
+      return { v, h };
+    }
+    function aimanter(b, dx, dy, exclus, seuilX, seuilY) {
+      const t = cibles(exclus); let mx = null, my = null, bx = seuilX, by = seuilY;
+      [b.x + dx, b.x + dx + b.w / 2, b.x + dx + b.w].forEach(e => t.v.forEach(g => { const d = Math.abs(g - e); if (d < bx) { bx = d; mx = { g, d: g - e }; } }));
+      [b.y + dy, b.y + dy + b.h / 2, b.y + dy + b.h].forEach(e => t.h.forEach(g => { const d = Math.abs(g - e); if (d < by) { by = d; my = { g, d: g - e }; } }));
+      aimants.innerHTML = (mx ? `<i class="ai-v" style="left:${mx.g}%"></i>` : '') + (my ? `<i class="ai-h" style="top:${my.g}%"></i>` : '');
+      return { dx: dx + (mx ? mx.d : 0), dy: dy + (my ? my.d : 0) };
+    }
+
     zone.addEventListener('pointerdown', e => {
       if (e.button === 2) return;
       fermerMenu();
       if (editeur) terminerEdition();
       cadre.focus({ preventScroll: true });
       const r = zone.getBoundingClientRect();
+      const px = (e.clientX - r.left) / r.width * 100, py = (e.clientY - r.top) / r.height * 100;
+      // repère : déplacer
+      const gd = e.target.closest('.guide');
+      if (gd) { drag = { mode: 'guide', axe: gd.dataset.gv != null ? 'v' : 'h', k: Number(gd.dataset.gv != null ? gd.dataset.gv : gd.dataset.gh), w: r.width, h: r.height, r }; zone.setPointerCapture(e.pointerId); e.preventDefault(); return; }
       const h = e.target.closest('.h');
-      if (h && calqueSel()) {
+      if (h && calqueSel() && E.multi.size <= 1) {
         const c = calqueSel(), b = eng.bbox[c.id];
         drag = { mode: 'taille', h: h.dataset.h, c, x0: e.clientX, y0: e.clientY, w: r.width, hz: r.height, b: Object.assign({}, b), v: { largeur: Number(c.largeur) || 60, taille: Number(c.taille) || 4, hauteur: Number(c.hauteur) || 22, x: Number(c.x), y: Number(c.y) }, bouge: false };
         zone.setPointerCapture(e.pointerId); e.preventDefault(); return;
       }
       const c = calqueA(e);
       if (pinceau) { if (c) { appliquerStyle([c]); } else { pinceau = false; zone.classList.remove('pinceau'); rendreBarre(); } return; }
-      if (!c) { choisir(null); return; }
-      choisir(c.id);
-      drag = { mode: 'deplacer', c, x0: e.clientX, y0: e.clientY, cx: Number(c.x), cy: Number(c.y), w: r.width, h: r.height, bouge: false };
+      const ajout = e.shiftKey || e.ctrlKey || e.metaKey;
+      if (!c) {
+        // cadre de sélection
+        if (!ajout) choisir(null);
+        drag = { mode: 'cadre', ajout, avant: new Set(E.multi), w: r.width, h: r.height, r, bouge: false };
+        cadreSel = { x0: px, y0: py, x1: px, y1: py };
+        zone.setPointerCapture(e.pointerId); return;
+      }
+      if (ajout) { choisir(c.id, true); if (!E.multi.has(c.id)) return; }
+      else if (!E.multi.has(c.id) || E.multi.size <= 1) choisir(c.id);
+      else { E.sel = c.id; rendreBarre(); }
+      const groupe = selection();
+      drag = { mode: 'deplacer', c, groupe: groupe.map(x => ({ c: x, x: Number(x.x), y: Number(x.y) })), b: Object.assign({}, eng.bbox[c.id] || { x: c.x, y: c.y, w: 0, h: 0 }), x0: e.clientX, y0: e.clientY, w: r.width, h: r.height, bouge: false };
+      // boîte qui englobe tout le groupe (c'est elle qu'on aimante)
+      const bs = groupe.map(x => eng.bbox[x.id]).filter(Boolean);
+      if (bs.length > 1) { const x1 = Math.min(...bs.map(b => b.x)), y1 = Math.min(...bs.map(b => b.y)); drag.b = { x: x1, y: y1, w: Math.max(...bs.map(b => b.x + b.w)) - x1, h: Math.max(...bs.map(b => b.y + b.h)) - y1 }; }
       zone.setPointerCapture(e.pointerId);
     });
     zone.addEventListener('pointermove', e => {
-      if (!drag) return;
+      if (!drag) { if (regles) { const r = zone.getBoundingClientRect(); majCurseurRegles((e.clientX - r.left) / r.width * 100, (e.clientY - r.top) / r.height * 100); } return; }
+      if (drag.mode === 'guide') {
+        const x = (e.clientX - drag.r.left) / drag.w * 100, y = (e.clientY - drag.r.top) / drag.h * 100;
+        p.guides[drag.axe][drag.k] = Math.round((drag.axe === 'v' ? x : y) * 10) / 10; drag.bouge = true; zone._html = ''; return;
+      }
+      if (drag.mode === 'cadre') {
+        const x = (e.clientX - drag.r.left) / drag.w * 100, y = (e.clientY - drag.r.top) / drag.h * 100;
+        cadreSel.x1 = Math.max(0, Math.min(100, x)); cadreSel.y1 = Math.max(0, Math.min(100, y)); drag.bouge = true;
+        const x1 = Math.min(cadreSel.x0, cadreSel.x1), x2 = Math.max(cadreSel.x0, cadreSel.x1), y1 = Math.min(cadreSel.y0, cadreSel.y1), y2 = Math.max(cadreSel.y0, cadreSel.y1);
+        const dedans = (plan().calques || []).filter(c => { const b = eng.bbox[c.id]; return b && !c.masque && b.x < x2 && b.x + b.w > x1 && b.y < y2 && b.y + b.h > y1; }).map(c => c.id);
+        const ids = drag.ajout ? [...new Set([...drag.avant, ...dedans])] : dedans;
+        E.multi = new Set(ids); E.sel = ids[ids.length - 1] || null; zone._html = '';
+        return;
+      }
       const dxp = e.clientX - drag.x0, dyp = e.clientY - drag.y0;
       if (!drag.bouge && Math.abs(dxp) + Math.abs(dyp) < 3) return;
       if (!drag.bouge) { snapshot(); drag.bouge = true; }
       const c = drag.c;
       if (drag.mode === 'deplacer') {
-        let nx = drag.cx + dxp / drag.w * 100, ny = drag.cy + dyp / drag.h * 100;
-        // aimant au centre horizontal
-        if (Math.abs(nx - 50) < 1.2 && !e.shiftKey) nx = 50;
-        c.x = Math.round(Math.max(0, Math.min(100, nx)) * 10) / 10;
-        c.y = Math.round(Math.max(0, Math.min(100, ny)) * 10) / 10;
-        zone.classList.toggle('aimant', c.x === 50);
+        let dx = dxp / drag.w * 100, dy = dyp / drag.h * 100;
+        if (!e.shiftKey) { const a = aimanter(drag.b, dx, dy, new Set(drag.groupe.map(g => g.c.id)), 6 / drag.w * 100, 6 / drag.h * 100); dx = a.dx; dy = a.dy; }
+        else aimants.innerHTML = '';
+        drag.groupe.forEach(g => { g.c.x = Math.round(Math.max(0, Math.min(100, g.x + dx)) * 10) / 10; g.c.y = Math.round(Math.max(0, Math.min(100, g.y + dy)) * 10) / 10; });
+        if (regles) majCurseurRegles(drag.b.x + dx + drag.b.w / 2, drag.b.y + dy + drag.b.h / 2);
       } else {
         const H = drag.h, v = drag.v, b = drag.b;
         const dx = dxp / drag.w * 100, dy = dyp / drag.hz * 100;
@@ -664,10 +876,90 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           c.hauteur = Math.round(Math.max(4, Math.min(100, v.hauteur + 2 * sy * dy)) * 10) / 10;
         }
       }
-      if (I.TYPES_HTML.includes(c.type)) E.rafraichir();
+      if (selection().some(x => I.TYPES_HTML.includes(x.type)) || I.TYPES_HTML.includes(c.type)) E.rafraichir();
       majChamps(c);
     });
-    zone.addEventListener('pointerup', () => { if (drag && drag.bouge) { enregistrer(p); if (drag.mode === 'taille') rendreReglages(); } drag = null; zone.classList.remove('aimant'); });
+    zone.addEventListener('pointerup', () => {
+      if (drag && drag.mode === 'guide') {
+        const g = p.guides[drag.axe][drag.k];
+        if (drag.bouge && (g < -1 || g > 101)) { p.guides[drag.axe].splice(drag.k, 1); toast('Repère effacé'); }
+        enregistrer(p); drag = null; zone._html = ''; return;
+      }
+      if (drag && drag.mode === 'cadre') { cadreSel = null; zone._html = ''; drag = null; rendreReglages(); return; }
+      if (drag && drag.bouge) { enregistrer(p); if (drag.mode === 'taille' || (drag.groupe && drag.groupe.length > 1)) rendreReglages(); }
+      drag = null; aimants.innerHTML = '';
+    });
+    zone.addEventListener('dblclick', e => { const gd = e.target.closest('.guide'); if (!gd) return; e.stopPropagation(); if (gd.dataset.gv != null) p.guides.v.splice(Number(gd.dataset.gv), 1); else p.guides.h.splice(Number(gd.dataset.gh), 1); enregistrer(p); zone._html = ''; }, true);
+
+    // ---- Règles graduées (0 à 100 %) : tirer depuis une règle pour poser un repère
+    const regleH = $('#regle-h'), regleV = $('#regle-v'), boiteRegles = $('#cadre-regles');
+    let curseurR = null;
+    function majCurseurRegles(x, y) { curseurR = { x, y }; dessinerRegles(); }
+    function dessinerRegles() {
+      boiteRegles.classList.toggle('actives', regles);
+      if (!regles) return;
+      const rc = cadre.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+      const bs = selection().map(c => eng.bbox[c.id]).filter(Boolean);
+      const b = bs.length ? (() => { const x1 = Math.min(...bs.map(q => q.x)), y1 = Math.min(...bs.map(q => q.y)); return { x: x1, y: y1, w: Math.max(...bs.map(q => q.x + q.w)) - x1, h: Math.max(...bs.map(q => q.y + q.h)) - y1 }; })() : null;
+      [[regleH, rc.width, 18, 'h'], [regleV, 18, rc.height, 'v']].forEach(([cv, w, h, axe]) => {
+        cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); cv.style.width = w + 'px'; cv.style.height = h + 'px';
+        const x = cv.getContext('2d'); x.scale(dpr, dpr); x.fillStyle = '#fbf7f1'; x.fillRect(0, 0, w, h);
+        const L = axe === 'h' ? w : h;
+        if (b) { x.fillStyle = 'rgba(195,58,76,.16)'; if (axe === 'h') x.fillRect(b.x / 100 * w, 0, b.w / 100 * w, h); else x.fillRect(0, b.y / 100 * h, w, b.h / 100 * h); }
+        x.strokeStyle = '#a89484'; x.fillStyle = '#6b5a50'; x.font = '9px Inter, sans-serif'; x.lineWidth = 1;
+        for (let k = 0; k <= 100; k += 2) {
+          const pos = Math.round(k / 100 * L) + 0.5, long = k % 10 === 0 ? 9 : k % 5 === 0 ? 6 : 3;
+          x.beginPath(); if (axe === 'h') { x.moveTo(pos, 18); x.lineTo(pos, 18 - long); } else { x.moveTo(18, pos); x.lineTo(18 - long, pos); } x.stroke();
+          if (k % 10 === 0 && k > 0 && k < 100) { if (axe === 'h') x.fillText(String(k), pos + 2, 9); else { x.save(); x.translate(9, pos - 2); x.rotate(-Math.PI / 2); x.fillText(String(k), 0, 0); x.restore(); } }
+        }
+        x.strokeStyle = '#3d7ad6'; (axe === 'h' ? p.guides.v : p.guides.h).forEach(g => { const pos = g / 100 * L; x.beginPath(); if (axe === 'h') { x.moveTo(pos, 0); x.lineTo(pos, 18); } else { x.moveTo(0, pos); x.lineTo(18, pos); } x.stroke(); });
+        if (curseurR) { x.strokeStyle = '#c33a4c'; const pos = (axe === 'h' ? curseurR.x : curseurR.y) / 100 * L; x.beginPath(); if (axe === 'h') { x.moveTo(pos, 0); x.lineTo(pos, 18); } else { x.moveTo(0, pos); x.lineTo(18, pos); } x.stroke(); }
+      });
+    }
+    E.dessinerRegles = dessinerRegles;
+    [[regleH, 'h'], [regleV, 'v']].forEach(([cv, axe]) => cv.addEventListener('pointerdown', e => {
+      // tirer depuis la règle du haut → repère horizontal ; depuis celle de gauche → repère vertical
+      e.preventDefault(); const nouveau = axe;
+      p.guides[nouveau].push(-5); const k = p.guides[nouveau].length - 1;
+      const r = zone.getBoundingClientRect();
+      const bouger = ev => { const v = nouveau === 'v' ? (ev.clientX - r.left) / r.width * 100 : (ev.clientY - r.top) / r.height * 100; p.guides[nouveau][k] = Math.round(v * 10) / 10; zone._html = ''; };
+      const fin = () => { document.removeEventListener('pointermove', bouger); document.removeEventListener('pointerup', fin); const g = p.guides[nouveau][k]; if (g < 0 || g > 100) p.guides[nouveau].splice(k, 1); else toast('Repère posé à ' + String(g).replace('.', ',') + ' % : les éléments s\'y aimantent'); enregistrer(p); zone._html = ''; };
+      document.addEventListener('pointermove', bouger); document.addEventListener('pointerup', fin);
+    }));
+    const basculerRegles = () => { regles = !regles; Stock.ecrire('studio.regles', regles); $('#regles-btn').classList.toggle('on', regles); zone._html = ''; dessinerRegles(); if (regles) toast('Règles : tirez depuis une règle pour poser un repère'); };
+    $('#regles-btn').onclick = basculerRegles;
+    ecouter(window, 'resize', () => dessinerRegles());
+    setTimeout(dessinerRegles, 50);
+    E.effacerReperes = () => { p.guides = { v: [], h: [] }; enregistrer(p); zone._html = ''; dessinerRegles(); };
+
+    // ---- Alignement de plusieurs éléments (ou d'un seul sur la page)
+    function aligner(mode) {
+      const cs = selection(); if (!cs.length) return;
+      E.modif(true);
+      const bs = cs.map(c => ({ c, b: eng.bbox[c.id] || { x: Number(c.x), y: Number(c.y), w: 0, h: 0 } }));
+      const seul = cs.length === 1;
+      const x1 = seul ? 0 : Math.min(...bs.map(q => q.b.x)), x2 = seul ? 100 : Math.max(...bs.map(q => q.b.x + q.b.w));
+      const y1 = seul ? 0 : Math.min(...bs.map(q => q.b.y)), y2 = seul ? 100 : Math.max(...bs.map(q => q.b.y + q.b.h));
+      const marge = seul ? 6 : 0;
+      const dep = (q, dx, dy) => { q.c.x = Math.round(Math.max(0, Math.min(100, Number(q.c.x) + dx)) * 10) / 10; q.c.y = Math.round(Math.max(0, Math.min(100, Number(q.c.y) + dy)) * 10) / 10; };
+      if (mode === 'gauche') bs.forEach(q => dep(q, x1 + marge - q.b.x, 0));
+      if (mode === 'centre-h') bs.forEach(q => dep(q, (x1 + x2) / 2 - (q.b.x + q.b.w / 2), 0));
+      if (mode === 'droite') bs.forEach(q => dep(q, x2 - marge - (q.b.x + q.b.w), 0));
+      if (mode === 'haut') bs.forEach(q => dep(q, 0, y1 + marge - q.b.y));
+      if (mode === 'centre-v') bs.forEach(q => dep(q, 0, (y1 + y2) / 2 - (q.b.y + q.b.h / 2)));
+      if (mode === 'bas') bs.forEach(q => dep(q, 0, y2 - marge - (q.b.y + q.b.h)));
+      if (mode === 'page') { const cx = (x1 + x2) / 2; bs.forEach(q => dep(q, 50 - cx, 0)); }
+      if (mode === 'repartir-v' && bs.length > 2) {
+        const tri = bs.slice().sort((a, b) => a.b.y - b.b.y), total = tri.reduce((s, q) => s + q.b.h, 0), ecart = ((y2 - y1) - total) / (tri.length - 1);
+        let y = y1; tri.forEach(q => { dep(q, 0, y - q.b.y); y += q.b.h + ecart; });
+      }
+      if (mode === 'repartir-h' && bs.length > 2) {
+        const tri = bs.slice().sort((a, b) => a.b.x - b.b.x), total = tri.reduce((s, q) => s + q.b.w, 0), ecart = ((x2 - x1) - total) / (tri.length - 1);
+        let x = x1; tri.forEach(q => { dep(q, x - q.b.x, 0); x += q.b.w + ecart; });
+      }
+      E.rafraichir(); rendreReglages();
+    }
+    E.aligner = aligner;
     function majChamps(c) { ['x', 'y', 'largeur', 'taille', 'hauteur'].forEach(k => { const i = $(`#props [data-k="${k}"]`); if (i && document.activeElement !== i) i.value = c[k]; }); }
 
     // Double-clic : écrire directement dans le texte
@@ -713,28 +1005,41 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
 
     // Presse-papiers : copier, coller, dupliquer (aussi entre plans et entre événements)
     const MARQUE = '[[calque-studio]]';
+    const jsonSelection = c => { const cs = E.multi.size > 1 ? selection() : [c]; return JSON.stringify(cs.length > 1 ? cs : cs[0], (k, v) => k === '_edition' ? undefined : v); };
     function copierCalque(c, couper) {
       if (!c) return;
-      const json = JSON.stringify(c, (k, v) => k === '_edition' ? undefined : v);
+      const json = jsonSelection(c);
       Stock.ecrire('studio.presse', json);
       try { navigator.clipboard && navigator.clipboard.writeText(MARQUE + json).catch(() => {}); } catch (e) {}
-      if (couper) supprimerCalque(c); else toast('Calque copié');
+      if (couper) supprimerCalque(c); else toast(E.multi.size > 1 ? E.multi.size + ' éléments copiés' : 'Calque copié');
     }
     function collerCalque(json) {
-      let c;
-      try { c = JSON.parse(json || Stock.lire('studio.presse', null)); if (typeof c === 'string') c = JSON.parse(c); } catch (e) { c = null; }
-      if (!c || !c.type) return toast('Rien à coller : copiez d\'abord un calque (Ctrl+C)');
+      let lot;
+      try { lot = JSON.parse(json || Stock.lire('studio.presse', null)); if (typeof lot === 'string') lot = JSON.parse(lot); } catch (e) { lot = null; }
+      if (lot && !Array.isArray(lot)) lot = [lot];
+      lot = (lot || []).filter(c => c && c.type);
+      if (!lot.length) return toast('Rien à coller : copiez d\'abord un calque (Ctrl+C)');
       E.modif(true);
-      c.id = uid();
-      const memePlan = plan().calques.some(x => Math.abs(Number(x.x) - Number(c.x)) < 0.5 && Math.abs(Number(x.y) - Number(c.y)) < 0.5);
-      if (memePlan) { c.x = Math.min(95, Number(c.x) + 2); c.y = Math.min(95, Number(c.y) + 2); }
-      plan().calques.push(c); E.sel = c.id;
+      const memePlan = lot.some(c => plan().calques.some(x => Math.abs(Number(x.x) - Number(c.x)) < 0.5 && Math.abs(Number(x.y) - Number(c.y)) < 0.5));
+      lot.forEach(c => { c.id = uid(); if (memePlan) { c.x = Math.min(95, Number(c.x) + 2); c.y = Math.min(95, Number(c.y) + 2); } plan().calques.push(c); });
+      E.multi = new Set(lot.map(c => c.id)); E.sel = lot[lot.length - 1].id;
       eng.precharger().then(() => { E.rafraichir(); rendreReglages(); rendrePlans(); });
-      toast('Calque collé');
+      toast(lot.length > 1 ? lot.length + ' éléments collés' : 'Calque collé');
     }
-    function dupliquerCalque(c) { if (!c) return; const d = JSON.parse(JSON.stringify(c)); delete d._edition; E.modif(true); d.id = uid(); d.x = Math.min(95, Number(d.x) + 2); d.y = Math.min(95, Number(d.y) + 2); plan().calques.push(d); E.sel = d.id; E.rafraichir(); rendreReglages(); rendrePlans(); }
-    function supprimerCalque(c) { if (!c) return; E.modif(true); const pl = plan(); pl.calques = pl.calques.filter(x => x.id !== c.id); E.sel = null; E.rafraichir(); rendreReglages(); rendrePlans(); }
-    function ordreCalque(c, sens) { if (!c) return; const pl = plan(); const k = pl.calques.indexOf(c); E.modif(true); pl.calques.splice(k, 1); if (sens === 'avant') pl.calques.push(c); else pl.calques.unshift(c); E.rafraichir(); rendreReglages(); }
+    function dupliquerCalque(c) {
+      if (!c) return; const cs = E.multi.size > 1 ? selection() : [c]; E.modif(true);
+      const ds = cs.map(x => { const d = JSON.parse(JSON.stringify(x)); delete d._edition; d.id = uid(); d.x = Math.min(95, Number(d.x) + 2); d.y = Math.min(95, Number(d.y) + 2); plan().calques.push(d); return d; });
+      E.multi = new Set(ds.map(d => d.id)); E.sel = ds[ds.length - 1].id; E.rafraichir(); rendreReglages(); rendrePlans();
+    }
+    function supprimerCalque(c) {
+      if (!c) return; const ids = new Set(E.multi.size > 1 ? [...E.multi] : [c.id]); E.modif(true);
+      const pl = plan(); pl.calques = pl.calques.filter(x => !ids.has(x.id)); E.sel = null; E.multi.clear(); E.rafraichir(); rendreReglages(); rendrePlans();
+      if (ids.size > 1) toast(ids.size + ' éléments supprimés (Ctrl+Z pour annuler)');
+    }
+    function ordreCalque(c, sens) {
+      if (!c) return; const pl = plan(); const cs = E.multi.size > 1 ? selection() : [c]; E.modif(true);
+      pl.calques = pl.calques.filter(x => !cs.includes(x)); if (sens === 'avant') pl.calques.push(...cs); else pl.calques.unshift(...cs); E.rafraichir(); rendreReglages();
+    }
     // Mise en forme : copier / coller le style d'un calque sur un autre (pinceau)
     const STYLE_TEXTE = ['police', 'taille', 'couleur', 'gras', 'italique', 'majuscules', 'align', 'interligne', 'ombre', 'ombre_couleur', 'ombre_force', 'ombre_opacite', 'ombre_decalage', 'contour', 'contour_epaisseur', 'fond_couleur', 'fond_opacite', 'fond_marge', 'fond_arrondi', 'opacite', 'animation', 'duree_animation', 'sortie', 'duree_sortie'];
     const STYLE_BOUTON = ['police', 'taille', 'couleur', 'style'];
@@ -791,16 +1096,18 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       if (mod && e.altKey && e.code === 'KeyV' && c) { e.preventDefault(); collerStyle(c); return; }
       if (e.key === 'Escape' && pinceau) { pinceau = false; zone.classList.remove('pinceau'); rendreBarre(); return; }
       if (mod && e.key.toLowerCase() === 'd' && c) { e.preventDefault(); dupliquerCalque(c); return; }
+      if (mod && e.key.toLowerCase() === 'a') { e.preventDefault(); choisirPlusieurs((plan().calques || []).filter(x => !x.masque).map(x => x.id)); toast('Tout est choisi : glissez pour déplacer ensemble'); return; }
+      if (e.key === ' ' && (eng.lecture || E.enPause)) { e.preventDefault(); E.basculerPause(); return; }
       if (!c) return;
       if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); supprimerCalque(c); return; }
-      if (e.key === 'Enter' && (c.type === 'texte' || c.type === 'bouton' || c.type === 'compteur')) { e.preventDefault(); editer(c); return; }
+      if (e.key === 'Enter' && E.multi.size <= 1 && (c.type === 'texte' || c.type === 'bouton' || c.type === 'compteur')) { e.preventDefault(); editer(c); return; }
       if (e.key === 'Escape') { choisir(null); return; }
       const pas = e.shiftKey ? 2 : 0.5;
       const dep = { ArrowLeft: [-pas, 0], ArrowRight: [pas, 0], ArrowUp: [0, -pas], ArrowDown: [0, pas] }[e.key];
-      if (dep) { e.preventDefault(); E.modif(); c.x = Math.round(Math.max(0, Math.min(100, Number(c.x) + dep[0])) * 10) / 10; c.y = Math.round(Math.max(0, Math.min(100, Number(c.y) + dep[1])) * 10) / 10; if (I.TYPES_HTML.includes(c.type)) E.rafraichir(); majChamps(c); }
+      if (dep) { e.preventDefault(); E.modif(); const cs = E.multi.size > 1 ? selection() : [c]; cs.forEach(x => { x.x = Math.round(Math.max(0, Math.min(100, Number(x.x) + dep[0])) * 10) / 10; x.y = Math.round(Math.max(0, Math.min(100, Number(x.y) + dep[1])) * 10) / 10; }); if (cs.some(x => I.TYPES_HTML.includes(x.type))) E.rafraichir(); majChamps(c); }
     });
-    ecouter(document, 'copy', e => { if (dansChamp(document.activeElement) || !$('#modale').hidden) return; const c = calqueSel(); if (!c) return; e.preventDefault(); const json = JSON.stringify(c, (k, v) => k === '_edition' ? undefined : v); e.clipboardData.setData('text/plain', MARQUE + json); Stock.ecrire('studio.presse', json); toast('Calque copié'); });
-    ecouter(document, 'cut', e => { if (dansChamp(document.activeElement) || !$('#modale').hidden) return; const c = calqueSel(); if (!c) return; e.preventDefault(); const json = JSON.stringify(c, (k, v) => k === '_edition' ? undefined : v); e.clipboardData.setData('text/plain', MARQUE + json); Stock.ecrire('studio.presse', json); supprimerCalque(c); });
+    ecouter(document, 'copy', e => { if (dansChamp(document.activeElement) || !$('#modale').hidden) return; const c = calqueSel(); if (!c) return; e.preventDefault(); const json = jsonSelection(c); e.clipboardData.setData('text/plain', MARQUE + json); Stock.ecrire('studio.presse', json); toast(E.multi.size > 1 ? E.multi.size + ' éléments copiés' : 'Calque copié'); });
+    ecouter(document, 'cut', e => { if (dansChamp(document.activeElement) || !$('#modale').hidden) return; const c = calqueSel(); if (!c) return; e.preventDefault(); const json = jsonSelection(c); e.clipboardData.setData('text/plain', MARQUE + json); Stock.ecrire('studio.presse', json); supprimerCalque(c); });
     ecouter(document, 'paste', async e => {
       if (dansChamp(document.activeElement) || !$('#modale').hidden || !$('#cadre')) return;
       const dt = e.clipboardData; if (!dt) return;
@@ -818,7 +1125,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     function fermerMenu() { if (menu) { menu.remove(); menu = null; } }
     zone.addEventListener('contextmenu', e => {
       e.preventDefault(); fermerMenu();
-      const c = calqueA(e); if (c) choisir(c.id);
+      const c = calqueA(e); if (c && !(E.multi.size > 1 && E.multi.has(c.id))) choisir(c.id);
       const r = $('.col-apercu').getBoundingClientRect();
       menu = document.createElement('div'); menu.className = 'menu-ctx';
       const it = (a, t, ok) => `<button data-m="${a}" ${ok === false ? 'disabled' : ''}>${t}</button>`;
@@ -841,13 +1148,24 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     function rendreBarre() {
       const bar = $('#barre-sel'); if (!bar) return;
       const c = calqueSel();
+      const ALIGN = `<span class="sep"></span><button class="btn petit icone" data-al="gauche" title="Aligner à gauche">⫷</button><button class="btn petit icone" data-al="centre-h" title="Centrer horizontalement">⇔</button><button class="btn petit icone" data-al="droite" title="Aligner à droite">⫸</button><button class="btn petit icone" data-al="haut" title="Aligner en haut">⤒</button><button class="btn petit icone" data-al="centre-v" title="Centrer verticalement">⇕</button><button class="btn petit icone" data-al="bas" title="Aligner en bas">⤓</button>`;
+      if (c && E.multi.size > 1) {
+        const cs = selection(), ecrits = cs.filter(x => x.type === 'texte' || x.type === 'bouton' || x.type === 'compteur');
+        bar.innerHTML = `<b class="type-sel">${cs.length} éléments</b>${ALIGN}<button class="btn petit icone" data-al="repartir-v" title="Répartir verticalement (espaces égaux)" ${cs.length > 2 ? '' : 'disabled'}>☰</button><button class="btn petit icone" data-al="repartir-h" title="Répartir horizontalement" ${cs.length > 2 ? '' : 'disabled'}>⫼</button><button class="btn petit icone" data-al="page" title="Centrer le groupe sur la page">◎</button>
+          <span class="sep"></span>${ecrits.length ? `<input type="color" data-b="couleur" value="${ecrits[0].couleur || '#7a1f2b'}" title="Couleur de tous les textes choisis"><button class="btn petit" data-b="police" title="Police de tous les textes choisis">Police</button>` : ''}<button class="btn petit icone" data-b="moins" title="Tout réduire">−</button><button class="btn petit icone" data-b="plus" title="Tout agrandir">+</button>
+          <span class="sep"></span><button class="btn petit icone" data-b="copier" title="Copier (Ctrl+C)">⧉</button><button class="btn petit icone" data-b="dupliquer" title="Dupliquer (Ctrl+D)">⊕</button><button class="btn petit icone" data-b="avant" title="Premier plan">⬆</button><button class="btn petit icone" data-b="arriere" title="Arrière-plan">⬇</button><button class="btn petit icone danger" data-b="suppr" title="Supprimer (Suppr)">🗑</button>`;
+        lierBarre(bar, c); return;
+      }
       if (!c) { bar.innerHTML = pinceau ? `<span class="muet">🖌 Pinceau actif : cliquez les calques à mettre en forme</span><button class="btn petit" data-b="pinceau">Arrêter</button>` : `<span class="muet">Cliquez un élément de l'aperçu pour le modifier</span>${Stock.lire('studio.presse', null) ? '<button class="btn petit" data-b="coller">Coller</button>' : ''}`; lierBarre(bar, c); return; }
       const ecr = c.type === 'texte' || c.type === 'bouton' || c.type === 'compteur';
-      bar.innerHTML = `<b class="type-sel">${esc(NOMS_TYPE[c.type])}</b>
+      bar.innerHTML = `<b class="type-sel">${esc(nomType(c))}</b>
         ${ecr ? '<button class="btn petit" data-b="editer" title="Modifier le texte (double-clic)">✎ Écrire</button>' : '<button class="btn petit" data-b="remplacer">Remplacer</button>'}
         ${c.type !== 'image' && c.type !== 'video' ? `<button class="btn petit icone" data-b="moins" title="Plus petit">A−</button><button class="btn petit icone" data-b="plus" title="Plus grand">A+</button>` : `<button class="btn petit icone" data-b="moins" title="Plus petit">−</button><button class="btn petit icone" data-b="plus" title="Plus grand">+</button>`}
         ${c.type === 'texte' || c.type === 'bouton' || c.type === 'compteur' ? `<input type="color" data-b="couleur" value="${c.couleur || '#7a1f2b'}" title="Couleur">` : ''}
-        ${c.type === 'texte' ? `<button class="btn petit icone ${c.gras ? 'on' : ''}" data-b="gras" title="Gras"><b>G</b></button><button class="btn petit icone ${c.italique ? 'on' : ''}" data-b="italique" title="Italique"><i>I</i></button><button class="btn petit icone" data-b="align" title="Alignement">${{ left: '⇤', right: '⇥' }[c.align] || '↔'}</button>` : ''}
+        ${c.type === 'texte' ? `<button class="btn petit icone ${c.gras ? 'on' : ''}" data-b="gras" title="Gras"><b>G</b></button><button class="btn petit icone ${c.italique ? 'on' : ''}" data-b="italique" title="Italique"><i>I</i></button><button class="btn petit icone" data-b="align" title="Alignement du texte">${{ left: '⇤', right: '⇥' }[c.align] || '↔'}</button>` : ''}
+        ${ecr ? `<button class="btn petit police-btn" data-b="police" title="Choisir la police" style="font-family:'${esc(c.police || 'Cormorant Garamond')}'">${esc((c.police || 'Cormorant Garamond').slice(0, 16))} ▾</button>` : ''}${c.type === 'texte' ? '<button class="btn petit icone" data-b="emoji" title="Ajouter un emoji">😊</button>' : ''}
+        ${c.type === 'image' || c.type === 'video' ? '<button class="btn petit" data-b="recadrer" title="Rogner : garder une partie de la photo ou de la vidéo">⬚ Rogner</button>' : ''}
+        <span class="sep"></span><button class="btn petit icone" data-al="centre-h" title="Centrer sur la page (horizontal)">⇔</button><button class="btn petit icone" data-al="centre-v" title="Centrer sur la page (vertical)">⇕</button>
         <span class="sep"></span>
         <button class="btn petit icone ${pinceau ? 'on' : ''}" data-b="pinceau" title="Pinceau : copier la mise en forme puis cliquer les calques à mettre en forme">🖌</button><button class="btn petit icone" data-b="style-v" title="Coller la mise en forme (Ctrl+Alt+V)" ${Stock.lire('studio.style', null) ? '' : 'disabled'}>🎨</button>
         <span class="sep"></span>
@@ -857,9 +1175,14 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       lierBarre(bar, c);
     }
     function lierBarre(bar, c) {
+      $$('[data-al]', bar).forEach(el => el.onclick = () => aligner(el.dataset.al));
+      const groupe = () => E.multi.size > 1 ? selection() : (c ? [c] : []);
       $$('[data-b]', bar).forEach(el => {
         const a = el.dataset.b;
-        if (a === 'couleur') { el.oninput = () => { E.modif(); c.couleur = el.value; if (I.TYPES_HTML.includes(c.type)) E.rafraichir(); const i = $('#props [data-k="couleur"]'); if (i) i.value = el.value; }; return; }
+        if (a === 'couleur') { el.oninput = () => { E.modif(); groupe().filter(x => x.type !== 'image' && x.type !== 'video').forEach(x => { x.couleur = el.value; }); if (groupe().some(x => I.TYPES_HTML.includes(x.type))) E.rafraichir(); const i = $('#props [data-k="couleur"]'); if (i) i.value = el.value; }; return; }
+        if (a === 'police') { el.onclick = () => ouvrirPolices(el, c.police, nom => { E.modif(true); groupe().filter(x => x.type === 'texte' || x.type === 'bouton' || x.type === 'compteur').forEach(x => { x.police = nom; }); appliquerPolice(nom); }); return; }
+        if (a === 'emoji') { el.onclick = () => ouvrirEmojis(el, em => { E.modif(true); c.texte = (c.texte || '') + (c.texte && !/\s$/.test(c.texte) ? ' ' : '') + em; E.rafraichir(); rendreReglages(); }); return; }
+        if (a === 'recadrer') { el.onclick = () => recadrerCalque(c); return; }
         el.onclick = () => {
           if (a === 'coller') return collerCalque(null);
           if (a === 'pinceau' && !c) return basculerPinceau();
@@ -868,9 +1191,11 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           if (a === 'remplacer') { const inp = $('#props [data-remplacer]'); if (inp) inp.click(); }
           if (a === 'plus' || a === 'moins') {
             E.modif(); const f = a === 'plus' ? 1.1 : 1 / 1.1;
-            if (c.type === 'image' || c.type === 'video') { c.largeur = Math.round(Math.min(100, (Number(c.largeur) || 40) * f) * 10) / 10; c.hauteur = Math.round(Math.min(100, (Number(c.hauteur) || 22) * f) * 10) / 10; }
-            else c.taille = Math.round(Math.max(1, Math.min(15, (Number(c.taille) || 3) * f)) * 10) / 10;
-            if (I.TYPES_HTML.includes(c.type)) E.rafraichir(); majChamps(c);
+            groupe().forEach(x => {
+              if (x.type === 'image' || x.type === 'video') { x.largeur = Math.round(Math.min(100, (Number(x.largeur) || 40) * f) * 10) / 10; x.hauteur = Math.round(Math.min(100, (Number(x.hauteur) || 22) * f) * 10) / 10; }
+              else x.taille = Math.round(Math.max(1, Math.min(15, (Number(x.taille) || 3) * f)) * 10) / 10;
+            });
+            if (groupe().some(x => I.TYPES_HTML.includes(x.type))) E.rafraichir(); majChamps(c);
           }
           if (a === 'gras' || a === 'italique') { E.modif(true); c[a] = !c[a]; rendreReglages(); }
           if (a === 'align') { E.modif(true); c.align = { center: 'left', left: 'right', right: 'center' }[c.align || 'center']; rendreReglages(); }
@@ -892,7 +1217,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         const textes = (pl.calques || []).filter(c => c.type === 'texte').map(c => c.texte).join(' · ');
         const mobile = pl.role === 'intermediaire';
         return `<div class="plan-carte ${k === E.i ? 'actif' : ''}" data-k="${k}">
-          <img src="${esc(vignetteDe(pl.fond && pl.fond.media))}" alt="">
+          <img src="${esc(vignettePlan(pl))}" alt="">
           <div style="min-width:0"><div class="role ${mobile ? '' : 'fixe'}">${k + 1}. ${ROLES[pl.role] || pl.role}</div><div class="resume">${esc(textes || '—')}</div><div class="muet">${Number(pl.duree) ? Number(pl.duree).toFixed(1) + ' s' : 'interactif'}</div></div>
           <div class="actions">${mobile ? `<button data-a="haut" title="Monter">▲</button><button data-a="bas" title="Descendre">▼</button><button data-a="dup" title="Dupliquer">⧉</button><button data-a="suppr" title="Supprimer">✕</button>` : ''}</div>
         </div>`;
@@ -928,18 +1253,35 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       const c = (pl.calques || []).find(x => x.id === E.sel);
       const fondActuel = fonds.find(f => f.src === pl.fond.media);
       const nbMemeFond = p.plans.filter(x => x.fond && x.fond.media === pl.fond.media).length;
+      const typeF = MoteurInfo.typeFond(pl.fond);
+      const photosFond = medias.filter(m => m.type === 'image' && (pourEvt(m, p.id) || m.src === pl.fond.media)).concat(Equipe.medias().filter(m => m.type === 'image'));
+      $('#cadre').classList.toggle('sans-fond', typeF === 'aucun');
       col.innerHTML = `
         <div class="section-titre" style="margin-top:0">Plan ${E.i + 1} · ${ROLES[pl.role]}</div>
-        <details class="bloc" open><summary>Fond vidéo</summary>
+        <details class="bloc" open><summary>Fond</summary>
+          <div class="seg fond-types">${[['video', '🎬 Vidéo'], ['image', '🖼 Photo'], ['couleur', '🎨 Couleur'], ['aucun', '▦ Sans fond']].map(([k, n]) => `<button data-ftype="${k}" class="${typeF === k || (k === 'video' && typeF === 'defaut') ? 'on' : ''}">${n}</button>`).join('')}</div>
+          ${typeF === 'video' || typeF === 'defaut' ? `
           <div class="fond-actuel"><img src="${esc(vignetteDe(pl.fond.media))}" alt=""><div style="min-width:0"><b>${esc(fondActuel ? fondActuel.nom : '—')}</b>
             <div class="muet">${nbMemeFond > 1 ? `Utilisé par ${nbMemeFond} plans` : 'Utilisé par ce plan seulement'}</div></div></div>
           <label class="champ">Choisir dans la bibliothèque<select id="p-fond">${fonds.map(f => `<option value="${esc(f.src)}" ${pl.fond.media === f.src ? 'selected' : ''}>${esc(f.nom)} (${esc(f.usage)})</option>`).join('')}</select></label>
-          <div class="ligne" style="margin-top:8px"><label class="btn petit">Importer un fond<input type="file" id="imp-fond-plan" accept="video/*" hidden></label><button class="btn petit ia" id="fond-ia" title="S'ouvre dans la Bibliothèque">✨ Créer avec l'IA (Bibliothèque)</button><button class="btn petit" id="fond-couper">✂ Couper${MoteurInfo.plage(pl.fond) ? ' (' + MoteurInfo.plage(pl.fond).map(x => x.toFixed(1)).join(' → ') + ' s)' : ''}</button></div>
-          <label class="champ" style="margin-top:8px">Vitesse de la vidéo<select id="p-vitesse">${optsVitesse(pl.fond.vitesse)}</select></label>
-          <div class="deux" style="margin-top:8px">
+          <div class="ligne" style="margin-top:8px"><label class="btn petit">Importer un fond<input type="file" id="imp-fond-plan" accept="video/*" hidden></label><button class="btn petit ia" id="fond-ia" title="S'ouvre dans la Bibliothèque">✨ Créer avec l'IA (Bibliothèque)</button><button class="btn petit" id="fond-couper">✂ Couper${MoteurInfo.plage(pl.fond) ? ' (' + MoteurInfo.plage(pl.fond).map(x => x.toFixed(1)).join(' → ') + ' s)' : ''}</button><button class="btn petit" id="fond-rogner">⬚ Rogner${pl.fond.recadrage ? ' ✓' : ''}</button></div>
+          <label class="champ" style="margin-top:8px">Vitesse de la vidéo<select id="p-vitesse">${optsVitesse(pl.fond.vitesse)}</select></label>` : ''}
+          ${typeF === 'image' ? `
+          <div class="fond-actuel"><img src="${esc(vignettePlan(pl))}" alt=""><div style="min-width:0"><b>${esc(nomMedia(pl.fond.media) || 'Photo')}</b><div class="muet">Photo en fond d'écran (remplit tout l'écran)</div></div></div>
+          <label class="champ">Choisir une photo<select id="p-fond-img"><option value="">—</option>${photosFond.map(m => `<option value="${esc(m.src)}" ${pl.fond.media === m.src ? 'selected' : ''}>${esc(m.nom)}${m.equipe ? ' — équipe' : ''}</option>`).join('')}</select></label>
+          <div class="ligne" style="margin-top:8px"><label class="btn petit plein">Importer une photo<input type="file" id="imp-fond-img" accept="image/*" hidden></label><button class="btn petit" id="fond-rogner">⬚ Rogner${pl.fond.recadrage ? ' ✓' : ''}</button></div>
+          <label class="champ" style="margin-top:8px">Flou<input type="range" id="p-flou" min="0" max="20" step="1" value="${pl.fond.flou || 0}"></label>` : ''}
+          ${typeF === 'couleur' ? `
+          <div class="pastilles">${PALETTE_FONDS.map(([c1, c2]) => `<button class="pastille" data-c1="${c1}" data-c2="${c2 || ''}" title="${c2 ? 'Dégradé' : 'Couleur unie'}" style="background:${c2 ? `linear-gradient(${c1},${c2})` : c1}"></button>`).join('')}</div>
+          <div class="deux" style="margin-top:8px"><label class="champ">Couleur<input type="color" id="p-c1" value="${pl.fond.couleur || '#f4ede2'}"></label>
+            <label class="champ"><span><input type="checkbox" id="p-degrade" ${pl.fond.couleur2 ? 'checked' : ''}> Dégradé vers</span><input type="color" id="p-c2" value="${pl.fond.couleur2 || '#e8d6bd'}" ${pl.fond.couleur2 ? '' : 'disabled'}></label></div>
+          ${pl.fond.couleur2 ? `<div class="deux"><label class="champ">Forme<select id="p-deg-type">${opts([['lineaire', 'Linéaire'], ['radial', 'Rond (depuis le centre)']], pl.fond.degrade === 'radial' ? 'radial' : 'lineaire')}</select></label>${pl.fond.degrade === 'radial' ? '' : `<label class="champ">Direction<input type="range" id="p-angle" min="0" max="360" step="15" value="${Number(pl.fond.angle) || 180}"></label>`}</div>` : ''}` : ''}
+          ${typeF === 'aucun' ? `<div class="alerte-boite" style="background:#f3f6fb;border-color:#c9d6ea;color:#33445c">Plan sans fond (transparent, en damier dans l'aperçu). Sur la page de l'invitation, la couleur crème apparaît derrière. Pour une vidéo transparente, à poser par-dessus une autre vidéo (CapCut, Premiere…) : onglet <b>Film et publication → Vidéo sans fond</b>. Le film MP4 met un fond crème.</div>` : ''}
+          ${typeF !== 'aucun' ? `<div class="deux" style="margin-top:8px">
             <label class="champ">Éclaircir<input type="range" id="p-ecl" min="0" max="0.7" step="0.05" value="${pl.fond.eclaircir || 0}"></label>
             <label class="champ">Assombrir<input type="range" id="p-asb" min="0" max="0.7" step="0.05" value="${pl.fond.assombrir || 0}"></label>
-          </div>
+          </div>` : ''}
+          <button class="btn petit" id="fond-tous" style="margin-top:8px" title="Mettre ce fond sur tous les plans">Appliquer ce fond à tous les plans</button>
         </details>
         <details class="bloc" open><summary>Durée et transition</summary>
           <div class="deux">
@@ -950,22 +1292,44 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <button class="btn petit" id="empiler" style="margin-top:8px">Éviter les chevauchements de textes</button>
         </details>
         <details class="bloc" open><summary>Calques <span class="muet">${(pl.calques || []).length}</span></summary>
-          <div class="ligne" style="gap:4px;margin-bottom:8px"><button class="btn petit" data-ajout="texte">+ Texte</button><button class="btn petit" data-ajout="bouton">+ Bouton</button><button class="btn petit" data-ajout="compteur">+ Compteur</button><label class="btn petit">+ Photo / vidéo<input type="file" id="imp-calque" accept="image/*,video/*" hidden></label></div>
+          <div class="ligne" style="gap:4px;margin-bottom:8px"><button class="btn petit" data-ajout="texte">+ Texte</button><button class="btn petit" data-ajout="bouton">+ Bouton</button><button class="btn petit" data-ajout="compteur">+ Compteur</button><label class="btn petit">+ Photo / vidéo<input type="file" id="imp-calque" accept="image/*,video/*" hidden></label><button class="btn petit" id="ajout-illu">+ Illustration</button><button class="btn petit" id="ajout-emoji">+ Emoji</button></div>
           <div id="liste-calques">${(pl.calques || []).map(x => `
-            <div class="calque-ligne ${x.id === E.sel ? 'actif' : ''}" data-id="${x.id}">
-              <span class="type">${NOMS_TYPE[x.type] || x.type}</span><span class="t">${esc(x.texte || nomMedia(x.media) || '(vide)')}</span>
+            <div class="calque-ligne ${x.id === E.sel || (E.multi.size > 1 && E.multi.has(x.id)) ? 'actif' : ''}" data-id="${x.id}" title="Maj+clic : choisir plusieurs">
+              <span class="type">${NOMS_TYPE[x.type] || x.type}</span><span class="t">${esc(x.texte || (x.illu && window.Illustrations ? '✿ ' + Illustrations.nom(x.illu.id) : '') || nomMedia(x.media) || '(vide)')}</span>
               <button data-a="vis" title="Afficher / masquer">${x.masque ? '○' : '●'}</button><button data-a="haut" title="Monter">▲</button><button data-a="bas" title="Descendre">▼</button><button data-a="suppr" title="Supprimer">✕</button>
             </div>`).join('') || '<p class="muet">Aucun calque.</p>'}</div>
         </details>
-        <div id="props">${c ? formulaireCalque(c) : '<p class="muet" style="margin-top:12px">Cliquez un calque dans la liste ou sur l\'aperçu pour le modifier. Glissez-le sur l\'aperçu pour le déplacer.</p>'}</div>`;
-      $('#p-fond').onchange = e => { E.modif(true); pl.fond.media = e.target.value; eng.precharger().then(() => { eng._entrerPlan(); afficher(); }); };
-      $('#imp-fond-plan').onchange = async e => {
+        <div id="props">${E.multi.size > 1 ? formulaireMulti() : c ? formulaireCalque(c) : '<p class="muet" style="margin-top:12px">Cliquez un calque dans la liste ou sur l\'aperçu pour le modifier. Glissez-le sur l\'aperçu pour le déplacer.</p>'}</div>`;
+      const surFond = (id, ev, fn) => { const el = $('#' + id, col); if (el) el[ev] = fn; };
+      const majFond = (fort) => { E.modif(fort); eng.precharger().then(() => { eng._entrerPlan(); afficher(); }); };
+      $$('[data-ftype]', col).forEach(b => b.onclick = () => {
+        const t = b.dataset.ftype; E.modif(true);
+        if (t === 'video') { delete pl.fond.type; if (!pl.fond.media || MoteurInfo.typeFond({ media: pl.fond.media }) !== 'video') { const f = fonds[0]; pl.fond.media = f ? f.src : ''; } delete pl.fond.recadrage; }
+        if (t === 'image') { pl.fond.type = 'image'; if (MoteurInfo.typeFond({ media: pl.fond.media }) !== 'image') { pl.fond.media = photosFond[0] ? photosFond[0].src : ''; delete pl.fond.recadrage; } }
+        if (t === 'couleur') { pl.fond.type = 'couleur'; pl.fond.couleur = pl.fond.couleur || '#f4ede2'; }
+        if (t === 'aucun') pl.fond.type = 'aucun';
+        majFond(true);
+      });
+      surFond('p-fond-img', 'onchange', e => { pl.fond.type = 'image'; pl.fond.media = e.target.value; delete pl.fond.recadrage; majFond(true); });
+      surFond('imp-fond-img', 'onchange', async e => { const f = e.target.files[0]; if (!f) return; const m = await importerFichier(f, 'image', p.id); sauverMedias(); pl.fond.type = 'image'; pl.fond.media = m.src; delete pl.fond.recadrage; majFond(true); toast('Photo mise en fond'); });
+      surFond('p-flou', 'oninput', e => { E.modif(); pl.fond.flou = Number(e.target.value) || 0; });
+      surFond('fond-rogner', 'onclick', () => modaleRecadrer(pl.fond, pl.fond.media, 9 / 16, () => majFond(true), { fond: true }));
+      $$('.pastille', col).forEach(b => b.onclick = () => { E.modif(true); pl.fond.type = 'couleur'; pl.fond.couleur = b.dataset.c1; if (b.dataset.c2) pl.fond.couleur2 = b.dataset.c2; else delete pl.fond.couleur2; afficher(); });
+      surFond('p-c1', 'oninput', e => { E.modif(); pl.fond.couleur = e.target.value; });
+      surFond('p-c1', 'onchange', () => rendrePlans());
+      surFond('p-degrade', 'onchange', e => { E.modif(true); if (e.target.checked) pl.fond.couleur2 = $('#p-c2').value || '#e8d6bd'; else delete pl.fond.couleur2; afficher(); });
+      surFond('p-c2', 'oninput', e => { E.modif(); pl.fond.couleur2 = e.target.value; });
+      surFond('p-deg-type', 'onchange', e => { E.modif(true); if (e.target.value === 'radial') pl.fond.degrade = 'radial'; else delete pl.fond.degrade; afficher(); });
+      surFond('p-angle', 'oninput', e => { E.modif(); pl.fond.angle = Number(e.target.value); });
+      surFond('fond-tous', 'onclick', () => { if (!confirm('Mettre ce fond (et ses réglages) sur tous les plans de l\'invitation ?')) return; E.modif(true); const modele = JSON.stringify(pl.fond); p.plans.forEach(x => { x.fond = JSON.parse(modele); }); majFond(true); toast('Fond appliqué à tous les plans (↶ pour annuler)'); });
+      surFond('p-fond', 'onchange', e => { E.modif(true); pl.fond.media = e.target.value; eng.precharger().then(() => { eng._entrerPlan(); afficher(); }); });
+      if ($('#imp-fond-plan', col)) $('#imp-fond-plan').onchange = async e => {
         const f = e.target.files[0]; if (!f) return;
         const m = await importerFichier(f, 'fond', p.id); sauverMedias(); Equipe.apresAjout(m, p);
         E.modif(true); pl.fond.media = m.src; eng.precharger().then(() => { eng._entrerPlan(); afficher(); }); toast('Fond importé et appliqué à ce plan');
       };
-      $('#fond-ia').onclick = () => allerCreateur(p, E.i, {});
-      $('#fond-couper').onclick = () => modaleCouper(pl.fond, pl.fond.media, () => { E.modif(true); eng.precharger().then(() => { eng._entrerPlan(); afficher(); }); });
+      surFond('fond-ia', 'onclick', () => allerCreateur(p, E.i, {}));
+      if ($('#fond-couper', col)) $('#fond-couper').onclick = () => modaleCouper(pl.fond, pl.fond.media, () => { E.modif(true); eng.precharger().then(() => { eng._entrerPlan(); afficher(); }); });
       $('#empiler').onclick = () => { E.modif(true); if (eng.empilerTextes(pl)) { E.rafraichir(); rendreReglages(); toast('Textes réorganisés (↶ pour annuler)'); } else toast('Rien à réorganiser'); };
       $('#p-duree').oninput = e => { E.modif(); pl.duree = Math.max(0, Number(e.target.value) || 0); $('#t-curseur').max = Number(pl.duree) || 6; rendrePlans(); };
       $('#p-trans').onchange = e => { E.modif(true); pl.transition = pl.transition || {}; pl.transition.type = e.target.value; pl.transition.duree = pl.transition.duree || 0.8; voirTransition(); };
@@ -973,9 +1337,9 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       // montre la fin du plan précédent puis l'arrivée de ce plan
       const voirTransition = () => { if (E.i < 1) return toast('Le premier plan n\'a pas de transition d\'arrivée'); const av = p.plans[E.i - 1]; eng.mode = 'invitation'; $('#cadre').classList.add('en-lecture'); eng.jouer([E.i - 1, E.i], 0); eng.t = Math.max(0, (Number(av.duree) || 4) - 1); };
       $('#p-trans-voir').onclick = voirTransition;
-      $('#p-vitesse').onchange = e => { E.modif(true); const v = Number(e.target.value) || 1; if (v === 1) delete pl.fond.vitesse; else pl.fond.vitesse = v; const el = eng.medias[pl.fond.media]; if (el && el.tagName === 'VIDEO') el.playbackRate = v; eng._entrerPlan(); afficher(); toast(v === 1 ? 'Vitesse normale' : 'Vitesse ×' + String(v).replace('.', ',') + (v < 1 ? ' (ralenti)' : ' (accéléré)')); };
-      $('#p-ecl').oninput = e => { E.modif(); pl.fond.eclaircir = Number(e.target.value); };
-      $('#p-asb').oninput = e => { E.modif(); pl.fond.assombrir = Number(e.target.value); };
+      if ($('#p-vitesse', col)) $('#p-vitesse').onchange = e => { E.modif(true); const v = Number(e.target.value) || 1; if (v === 1) delete pl.fond.vitesse; else pl.fond.vitesse = v; const el = eng.medias[pl.fond.media]; if (el && el.tagName === 'VIDEO') el.playbackRate = v; eng._entrerPlan(); afficher(); toast(v === 1 ? 'Vitesse normale' : 'Vitesse ×' + String(v).replace('.', ',') + (v < 1 ? ' (ralenti)' : ' (accéléré)')); };
+      surFond('p-ecl', 'oninput', e => { E.modif(); pl.fond.eclaircir = Number(e.target.value); });
+      surFond('p-asb', 'oninput', e => { E.modif(); pl.fond.assombrir = Number(e.target.value); });
       $$('[data-ajout]', col).forEach(b => b.onclick = () => ajouterCalque(b.dataset.ajout));
       $('#imp-calque').onchange = async e => {
         const f = e.target.files[0]; if (!f) return;
@@ -988,13 +1352,80 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         if (a === 'haut' && k > 0) { E.modif(true); [pl.calques[k - 1], pl.calques[k]] = [pl.calques[k], pl.calques[k - 1]]; E.rafraichir(); rendreReglages(); return; }
         if (a === 'bas' && k < pl.calques.length - 1) { E.modif(true); [pl.calques[k + 1], pl.calques[k]] = [pl.calques[k], pl.calques[k + 1]]; E.rafraichir(); rendreReglages(); return; }
         if (a === 'suppr') { E.modif(true); pl.calques.splice(k, 1); if (E.sel === id) E.sel = null; E.rafraichir(); rendreReglages(); rendrePlans(); return; }
-        E.sel = id; rendreReglages();
+        if (e.shiftKey || e.ctrlKey || e.metaKey) { E.choisir(id, true); return; }
+        E.choisir(id);
       });
-      if (c) lierFormulaire(c);
+      const ai = $('#ajout-illu', col); if (ai) ai.onclick = () => ouvrirIllustrations();
+      const ae = $('#ajout-emoji', col); if (ae) ae.onclick = () => ouvrirEmojis(ae, em => { E.modif(true); const n = { id: uid(), type: 'texte', texte: em, x: 50, y: 40, largeur: 30, police: 'Cormorant Garamond', taille: 9, align: 'center', couleur: '#000000', debut: 0.4, animation: 'rebond', sortie: 'aucune' }; plan().calques.push(n); fermerPop(); E.choisir(n.id); E.rafraichir(); rendreReglages(); rendrePlans(); toast('Emoji ajouté : agrandissez-le par les coins'); });
+      if (E.multi.size > 1) lierMulti();
+      else if (c) lierFormulaire(c);
       if (E.rendreBarre) E.rendreBarre();
     }
     E.rendreReglages = rendreReglages;
 
+    // Police choisie : on la charge puis on redessine (le canvas a besoin de la vraie police)
+    function appliquerPolice(nom) {
+      MoteurInfo.chargerPolices([nom]).then(() => document.fonts.load(`40px "${nom}"`)).catch(() => {}).then(() => { E.rafraichir(); rendreReglages(); });
+    }
+    function recadrerCalque(c) {
+      if (!c || !c.media) return toast('Choisissez d\'abord une photo ou une vidéo');
+      const ratioCadre = ((Number(c.largeur) || 46) / 100 * 720) / ((Number(c.hauteur) || 22) / 100 * 1280);
+      modaleRecadrer(c, c.media, ratioCadre, (rec, info) => {
+        E.modif(true);
+        if (rec && info && info.adapter) { const px = rec.w * info.iw, py = rec.h * info.ih; c.hauteur = Math.round(Math.min(100, (Number(c.largeur) || 46) * 720 / 1280 * py / px) * 10) / 10; }
+        E.rafraichir(); rendreReglages(); toast(rec ? 'Rognage appliqué' : 'Rognage annulé : tout est gardé');
+      }, { adapter: true });
+    }
+    E.recadrerCalque = recadrerCalque;
+    function ouvrirIllustrations() {
+      const c1 = p.style.couleur || '#7a1f2b', c2 = '#b08a4f';
+      let cat = Stock.lire('studio.illu.cat', Illustrations.CATEGORIES[0]);
+      modale(`<h2>Illustrations</h2><p class="muet">Dessins à poser sur le plan, aux couleurs de l'invitation (modifiables ensuite).</p>
+        <div class="deux" style="max-width:420px"><label class="champ">Couleur principale<input type="color" id="il-c" value="${c1}"></label><label class="champ">Couleur d'accent<input type="color" id="il-a" value="${c2}"></label></div>
+        <div class="seg il-cats" style="margin:10px 0">${Illustrations.CATEGORIES.map(k => `<button data-cat="${esc(k)}">${esc(k)}</button>`).join('')}</div>
+        <div class="il-grille"></div>`, (racine, fermer) => {
+        const grille = $('.il-grille', racine);
+        const montrer = () => {
+          $$('[data-cat]', racine).forEach(b => b.classList.toggle('on', b.dataset.cat === cat));
+          const cc = $('#il-c', racine).value, ca = $('#il-a', racine).value;
+          grille.innerHTML = Illustrations.LISTE.filter(x => x.cat === cat).map(x => `<button class="il-item" data-il="${x.id}"><img src="${Illustrations.dataUrl(x.id, cc, ca)}" alt=""><span>${esc(x.nom)}</span></button>`).join('');
+        };
+        $$('[data-cat]', racine).forEach(b => b.onclick = () => { cat = b.dataset.cat; Stock.ecrire('studio.illu.cat', cat); montrer(); });
+        ['#il-c', '#il-a'].forEach(id => $(id, racine).oninput = montrer);
+        grille.onclick = e => {
+          const b = e.target.closest('[data-il]'); if (!b) return;
+          const id = b.dataset.il, cc = $('#il-c', racine).value, ca = $('#il-a', racine).value, ratio = Illustrations.ratio(id);
+          const cadre = /^cadre|^coins/.test(id);
+          const largeur = cadre ? 92 : /^sep|bandeau|etiquette|fanions|branche/.test(id) ? 70 : 34;
+          E.modif(true);
+          const n = { id: uid(), type: 'image', media: Illustrations.dataUrl(id, cc, ca), illu: { id, c: cc, a: ca }, x: 50, y: cadre ? 50 : 30, largeur, hauteur: Math.round(Math.min(96, largeur * 720 / 1280 * ratio) * 10) / 10, forme: '', animation: 'fondu', sortie: 'aucune', debut: 0.2 };
+          if (cadre) plan().calques.unshift(n); else plan().calques.push(n);
+          fermer(); eng.precharger().then(() => { E.choisir(n.id); E.rafraichir(); rendreReglages(); rendrePlans(); });
+          toast('Illustration ajoutée : déplacez-la, agrandissez-la par les coins, changez ses couleurs à droite');
+        };
+        montrer();
+      });
+    }
+    // Panneau quand plusieurs éléments sont choisis
+    function formulaireMulti() {
+      const cs = selection(), ecrits = cs.filter(x => x.type === 'texte' || x.type === 'bouton' || x.type === 'compteur');
+      const nb = {}; cs.forEach(x => { nb[NOMS_TYPE[x.type] || x.type] = (nb[NOMS_TYPE[x.type] || x.type] || 0) + 1; });
+      return `<div class="section-titre">${cs.length} éléments choisis</div><div class="bloc pile" style="padding:10px">
+        <p class="muet" style="margin:0">${Object.entries(nb).map(([k, n]) => n + ' × ' + k.toLowerCase()).join(' · ')}. Glissez l'un d'eux sur l'aperçu : tout le groupe bouge. Flèches du clavier pour ajuster, Suppr pour tout effacer.</p>
+        <b style="font-size:12.5px">Aligner</b>
+        <div class="ligne grille-align">${[['gauche', '⫷ Gauche'], ['centre-h', '⇔ Centre'], ['droite', '⫸ Droite'], ['haut', '⤒ Haut'], ['centre-v', '⇕ Milieu'], ['bas', '⤓ Bas']].map(([k, n]) => `<button class="btn petit" data-mal="${k}">${n}</button>`).join('')}</div>
+        <div class="ligne grille-align"><button class="btn petit" data-mal="repartir-v" ${cs.length > 2 ? '' : 'disabled'}>☰ Répartir en hauteur</button><button class="btn petit" data-mal="repartir-h" ${cs.length > 2 ? '' : 'disabled'}>⫼ Répartir en largeur</button><button class="btn petit" data-mal="page">◎ Centrer sur la page</button></div>
+        ${ecrits.length ? `<b style="font-size:12.5px">Textes et boutons choisis</b><div class="ligne" style="gap:6px"><label class="champ" style="flex:0 0 auto">Couleur<input type="color" data-mk="couleur" value="${ecrits[0].couleur || '#7a1f2b'}"></label><label class="champ" style="flex:1">Police<button class="btn police-btn" data-mpolice>${esc(ecrits[0].police || 'Cormorant Garamond')} ▾</button></label></div>` : ''}
+        <div class="ligne" style="gap:6px"><button class="btn petit" data-mact="dupliquer">⊕ Dupliquer</button><button class="btn petit" data-mact="copier">⧉ Copier</button><button class="btn petit danger" data-mact="suppr">🗑 Supprimer</button><button class="btn petit" data-mact="aucun">Ne plus rien choisir</button></div>
+      </div>`;
+    }
+    function lierMulti() {
+      const cs = selection();
+      $$('#props [data-mal]').forEach(b => b.onclick = () => aligner(b.dataset.mal));
+      const mk = $('#props [data-mk="couleur"]'); if (mk) mk.oninput = () => { E.modif(); cs.filter(x => x.type !== 'image' && x.type !== 'video').forEach(x => { x.couleur = mk.value; }); if (cs.some(x => I.TYPES_HTML.includes(x.type))) E.rafraichir(); };
+      const mp = $('#props [data-mpolice]'); if (mp) mp.onclick = () => ouvrirPolices(mp, null, nom => { E.modif(true); cs.filter(x => x.type === 'texte' || x.type === 'bouton' || x.type === 'compteur').forEach(x => { x.police = nom; }); appliquerPolice(nom); });
+      $$('#props [data-mact]').forEach(b => b.onclick = () => { const a = b.dataset.mact, c = calqueSel() || cs[0]; if (a === 'dupliquer') dupliquerCalque(c); if (a === 'copier') copierCalque(c); if (a === 'suppr') supprimerCalque(c); if (a === 'aucun') E.choisir(null); });
+    }
     E.ajouterMedia = m => ajouterCalque(m.type === 'video' ? 'video' : 'image', m);
     function ajouterCalque(type, media) {
       const pl = plan();
@@ -1065,10 +1496,11 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       const position = `<details class="bloc" open><summary>Position</summary>
         <div class="trois"><label class="champ">X (%)<input type="number" id="cx" data-k="x" step="0.5" value="${c.x}"></label><label class="champ">Y (%)<input type="number" id="cy" data-k="y" step="0.5" value="${c.y}"></label><label class="champ">Largeur (%)<input type="number" data-k="largeur" step="1" value="${c.largeur || 60}"></label></div>
         <label class="champ" style="margin-top:8px">Visible pour<select data-k="condition">${opts([['', 'Tous'], ['famille', 'Lien personnel'], ['general', 'Lien général']], c.condition || '')}</select></label></details>`;
-      let s = `<div class="section-titre">${NOMS_TYPE[c.type]} choisi</div>`;
+      let s = `<div class="section-titre">${nomType(c)} choisi${c.illu ? 'e' : ''}</div>`;
       if (c.type === 'texte') s += `<details class="bloc" open><summary>Texte</summary><div class="pile">
         <label class="champ">Texte <span class="muet">— variables : {famille} {places} {date} {heure} {date_limite} {compte_a_rebours}</span><textarea data-k="texte" rows="3">${esc(c.texte)}</textarea></label>
-        <div class="deux"><label class="champ">Police<select data-k="police">${opts(I.POLICES, c.police)}</select></label><label class="champ">Taille<input type="range" data-k="taille" min="1.5" max="12" step="0.1" value="${c.taille || 4}"></label></div>
+        <div class="ligne" style="gap:6px"><button class="btn petit" data-emoji-texte>😊 Ajouter un emoji</button></div>
+        <div class="deux"><label class="champ">Police<button class="btn police-btn" data-police style="font-family:'${esc(c.police || 'Cormorant Garamond')}',serif">${esc(c.police || 'Cormorant Garamond')} ▾</button></label><label class="champ">Taille<input type="range" data-k="taille" min="1.5" max="12" step="0.1" value="${c.taille || 4}"></label></div>
         <div class="trois"><label class="champ">Couleur<input type="color" data-k="couleur" value="${c.couleur || '#7a1f2b'}"></label><label class="champ">Alignement<select data-k="align">${opts([['center', 'Centré'], ['left', 'Gauche'], ['right', 'Droite']], c.align || 'center')}</select></label><label class="champ">Interligne<input type="number" data-k="interligne" step="0.05" min="0.8" max="2" value="${c.interligne || 1.25}"></label></div>
         <div class="cases"><label><input type="checkbox" data-k="gras" ${c.gras ? 'checked' : ''}> Gras</label><label><input type="checkbox" data-k="italique" ${c.italique ? 'checked' : ''}> Italique</label><label><input type="checkbox" data-k="majuscules" ${c.majuscules ? 'checked' : ''}> Majuscules</label></div>
         <label class="champ">Superposition (mode de fusion)<select data-k="fusion">${opts(I.FUSIONS, c.fusion || 'normal')}</select></label>
@@ -1078,6 +1510,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <div class="deux"><label class="champ">Action<select data-k="action">${opts(I.ACTIONS, c.action)}</select></label><label class="champ">N° du lieu / contact<input type="number" data-k="cible" min="0" value="${c.cible || 0}"></label></div>
         ${c.action === 'lien' || c.action === 'messenger' ? `<label class="champ">Adresse du lien<input type="url" data-k="lien" value="${esc(c.lien || '')}"></label>` : ''}
         <div class="trois"><label class="champ">Style<select data-k="style">${opts([['plein', 'Plein'], ['contour', 'Contour'], ['lien', 'Lien']], c.style || 'plein')}</select></label><label class="champ">Taille<input type="number" data-k="taille" step="0.1" min="1" max="6" value="${c.taille || 2.4}"></label><label class="champ">Couleur<input type="color" data-k="couleur" value="${c.couleur || '#7a1f2b'}"></label></div>
+        <label class="champ">Police<button class="btn police-btn" data-police style="font-family:'${esc(c.police || 'Cormorant Garamond')}',serif">${esc(c.police || 'Cormorant Garamond')} ▾</button></label>
         <label class="champ">Apparaît à (s)<input type="number" data-k="debut" step="0.1" min="0" value="${c.debut || 0}"></label></div></details>` + blocTraductions(c);
       if (c.type === 'compteur') s += `<details class="bloc" open><summary>Compteur</summary><div class="pile">
         <label class="champ">Libellé<input type="text" data-k="texte" value="${esc(c.texte)}"></label>
@@ -1088,7 +1521,9 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         ${c.media ? '' : '<div class="alerte-boite">Ce calque est vide : importez une photo ou une vidéo.</div>'}
         <div class="ligne"><label class="btn petit plein">${c.media ? 'Remplacer le fichier' : 'Importer une photo ou une vidéo'}<input type="file" data-remplacer accept="image/*,video/*" hidden></label></div>
         <label class="champ">Ou choisir dans la bibliothèque<select data-k="media">${opts([['', '—']].concat(medias.filter(m => (m.type === 'image' || m.type === 'video') && (pourEvt(m, p.id) || m.src === c.media)).concat(Equipe.medias().filter(m => m.type === 'video' || m.type === 'image')).map(m => [m.src, m.nom + (m.anime ? ' (animée)' : '') + (m.equipe ? ' — équipe' : '')])), c.media)}</select></label>
-        ${c.type === 'image' && c.media ? '<button class="btn petit ia" data-animer>✨ Animer cette photo (Wan 2.2)</button>' : ''}
+        ${c.illu ? `<div class="deux"><label class="champ">Couleur principale<input type="color" data-illu="c" value="${esc(c.illu.c)}"></label><label class="champ">Couleur d'accent<input type="color" data-illu="a" value="${esc(c.illu.a)}"></label></div>` : ''}
+        ${c.type === 'image' && c.media && !c.illu ? '<button class="btn petit ia" data-animer>✨ Animer cette photo (Wan 2.2)</button>' : ''}
+        ${c.media && !c.illu ? `<button class="btn petit" data-rogner>⬚ Rogner${c.recadrage ? ' ✓ (modifier)' : ''}</button>` : ''}
         <div class="trois"><label class="champ">Hauteur (%)<input type="number" data-k="hauteur" value="${c.hauteur || 22}"></label><label class="champ">Forme<select data-k="forme">${opts([['', 'Normale'], ['arrondi', 'Arrondie'], ['rond', 'Ronde']], c.forme || '')}</select></label><label class="champ">Opacité<input type="number" data-k="opacite" min="0" max="1" step="0.05" value="${c.opacite != null ? c.opacite : 1}"></label></div>
         <label class="champ">Superposition (mode de fusion avec le fond)<select data-k="fusion">${opts(I.FUSIONS, c.fusion || 'normal')}</select></label>
         ${c.type === 'video' && c.media ? `<label class="champ">Vitesse de la vidéo<select data-vitesse>${optsVitesse(c.vitesse)}</select></label>` : ''}
@@ -1102,6 +1537,10 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       const rp = $('#props [data-remplacer]');
       if (rp) rp.onchange = async e => { const f = e.target.files[0]; if (!f) return; const m = await importerFichier(f, null, p.id); sauverMedias(); E.modif(true); c.media = m.src; c.type = m.type === 'video' ? 'video' : 'image'; eng.precharger().then(() => { E.rafraichir(); rendreReglages(); }); };
       const vi = $('#props [data-vitesse]'); if (vi) vi.onchange = () => { E.modif(true); const v = Number(vi.value) || 1; if (v === 1) delete c.vitesse; else c.vitesse = v; const el = eng.medias[c.media]; if (el && el.tagName === 'VIDEO') el.playbackRate = v; E.rafraichir(); };
+      const pb = $('#props [data-police]'); if (pb) pb.onclick = () => ouvrirPolices(pb, c.police, nom => { E.modif(true); c.police = nom; appliquerPolice(nom); });
+      const et = $('#props [data-emoji-texte]'); if (et) et.onclick = () => ouvrirEmojis(et, em => { const ta = $('#props [data-k="texte"]'); E.modif(true); if (ta && document.activeElement === ta) { const a = ta.selectionStart, b = ta.selectionEnd; ta.value = ta.value.slice(0, a) + em + ta.value.slice(b); ta.selectionStart = ta.selectionEnd = a + em.length; c.texte = ta.value; } else { c.texte = (c.texte || '') + (c.texte && !/\s$/.test(c.texte) ? ' ' : '') + em; if (ta) ta.value = c.texte; } E.rafraichir(); const l = $(`.calque-ligne[data-id="${c.id}"] .t`); if (l) l.textContent = c.texte; });
+      const rg = $('#props [data-rogner]'); if (rg) rg.onclick = () => recadrerCalque(c);
+      $$('#props [data-illu]').forEach(inp => inp.addEventListener('input', () => { c.illu[inp.dataset.illu] = inp.value; clearTimeout(inp._t); inp._t = setTimeout(() => { E.modif(); c.media = Illustrations.dataUrl(c.illu.id, c.illu.c, c.illu.a); eng.precharger().then(E.rafraichir); }, 120); }));
       const cp = $('#props [data-couper]'); if (cp) cp.onclick = () => modaleCouper(c, c.media, () => { E.modif(true); eng.precharger().then(() => { E.rafraichir(); rendreReglages(); }); });
       const an = $('#props [data-animer]'); if (an) an.onclick = () => allerCreateur(p, E.i, { methode: 'animer', calque: c.id });
       // Fond / ombre / contour du texte
@@ -1965,8 +2404,9 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     const demo = anonymiser(pub, garderNoms);
     await GitHub.envoyer('projets/demo-' + p.slug + '.json', JSON.stringify(demo, null, 1), 'Démo ' + p.fiche.titre);
     await GitHub.envoyer('projets/demo-' + p.slug + '.js', enJS('demo-' + p.slug, demo), 'Démo ' + p.fiche.titre + ' (js)');
-    const fondV = (p.plans.find(x => x.role !== 'ouverture') || p.plans[0]).fond.media;
-    let vignette = /^idb:/.test(fondV) ? 'medias/' + fondV.slice(4).replace(/\.\w+$/, '.jpg') : fondV.replace(/\.mp4$/, '.jpg');
+    const plV = p.plans.find(x => x.role !== 'ouverture' && MoteurInfo.fondMedia(x)) || p.plans.find(x => MoteurInfo.fondMedia(x));
+    const fondV = (plV && MoteurInfo.fondMedia(plV)) || 'fonds/fond_2.jpg';
+    let vignette = /^idb:/.test(fondV) ? 'medias/' + fondV.slice(4).replace(/\.\w+$/, '.jpg') : /^data:/.test(fondV) ? 'fonds/fond_2.jpg' : fondV.replace(/\.mp4$/, '.jpg');
     if (Equipe.estUrl(fondV)) { const it = Equipe.medias().find(x => x.src === fondV); vignette = 'medias/eq-' + fondV.split('/').pop().replace(/\.\w+$/, '.jpg'); if (it && /^data:/.test(it.vignette || '')) await GitHub.envoyer(vignette, dataURLversBlob(it.vignette), 'Vignette ' + p.fiche.titre); else vignette = 'fonds/fond_2.jpg'; }
     else if (/^idb:/.test(fondV)) { const mv = medias.find(x => x.src === fondV); if (mv && /^data:/.test(mv.vignette || '')) await GitHub.envoyer(vignette, dataURLversBlob(mv.vignette), 'Vignette ' + p.fiche.titre); else vignette = 'fonds/fond_2.jpg'; }
     let index = (await lireVitrine()).filter(x => x.slug !== 'demo-' + p.slug);
@@ -1998,7 +2438,9 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <p class="muet">Fabrique le film MP4 (ouverture, plans intermédiaires, remerciement) avec la chanson, image par image : le fichier est complet, avec les transitions et les boutons, et se lit partout (téléphone, WhatsApp, Facebook, QuickTime). Comptez environ 1 à 2 minutes ; vous pouvez changer d'onglet pendant ce temps. Tous les plans y sont, confirmation comprise (7 s).</p>
           <div class="apercu-cadre" style="height:340px;margin:0 auto" id="cadre-film"><div id="scene-film"></div></div>
           <div class="progres"><div id="barre"></div></div>
-          <div class="ligne"><button class="btn plein" id="film">Enregistrer le film</button><span class="muet" id="film-etat"></span></div></div>
+          <label class="champ">Film pour<select id="film-pour"><option value="">Tout le monde (comme le lien général)</option>${(p.familles || []).filter(f => f.nom).map(f => `<option value="${esc(f.code)}">${esc(f.nom)} (film personnalisé)</option>`).join('')}</select></label>
+          ${(() => { const n = p.plans.reduce((k, pl) => k + (pl.calques || []).filter(c => c.condition === 'famille' && c.type === 'texte' && !c.masque).length, 0); return n ? `<p class="muet" id="film-note" style="margin:0">ℹ️ ${n} texte(s) sont réservés au lien personnel (ex. « ${esc(((p.plans.flatMap(pl => pl.calques || []).find(c => c.condition === 'famille' && c.type === 'texte') || {}).texte || '').slice(0, 40))} ») : ils ne sont pas dans le film pour tout le monde. Choisissez une famille ci-dessus pour un film à son nom, où ils apparaissent.</p>` : ''; })()}
+          <div class="ligne"><button class="btn plein" id="film">Enregistrer le film</button><button class="btn" id="film-transparent" title="Vidéo WebM avec transparence : les plans « Sans fond » restent transparents, pour la poser sur une autre vidéo">▦ Vidéo sans fond (WebM)</button><span class="muet" id="film-etat"></span></div></div>
       </div>
       <div class="pile">
         <div class="carte pile carte-client"><h3>🔗 Les 2 liens à donner au client</h3>
@@ -2058,13 +2500,30 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     const vol = $('#volume'); if (vol) vol.oninput = e => { p.musique.volume = Number(e.target.value); enregistrer(p); };
     const eng = new Moteur($('#scene-film'), { mode: 'rendu', resolveur: resoudre });
     moteurCourant = eng;
-    eng.setProjet(reglages.supabase ? Fabrique.confirmationPourTous(p) : p).then(() => eng.afficherPlan(0, 0.5));
+    // Le film est une vidéo : les boutons de réponse y sont toujours montrés (comme sur le lien général avec réponses en ligne)
+    const projetFilm = () => Fabrique.confirmationPourTous(p);
+    eng.setProjet(projetFilm()).then(() => eng.afficherPlan(0, 0.5));
+    const fp = $('#film-pour');
+    if (fp) fp.onchange = () => { const f = (p.familles || []).find(x => x.code === fp.value) || null; eng.famille = f ? Object.assign({}, f) : null; eng.form = Object.assign(eng.form, { adultes: f ? Number(f.adultes) || Number(f.places) || 1 : null, enfants: f ? Number(f.enfants) || 0 : null }); eng.setProjet(f ? p : projetFilm()).then(() => eng.afficherPlan(Math.max(0, p.plans.findIndex(x => x.role !== 'ouverture')), 0.8)); };
+    const ft = $('#film-transparent');
+    if (ft) ft.onclick = async () => {
+      if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) return toast('Ce navigateur ne sait pas enregistrer : utilisez Chrome sur ordinateur');
+      if (!p.plans.some(x => MoteurInfo.typeFond(x.fond) === 'aucun') && !confirm('Aucun plan n\'est « Sans fond » : la vidéo ne sera pas transparente. Continuer quand même ?')) return;
+      ft.disabled = true; $('#film').disabled = true; $('#film-etat').textContent = 'Enregistrement en direct (laissez cet onglet ouvert)…';
+      try {
+        const mus = p.musique ? await resoudre(p.musique.src) : null;
+        const r = await eng.exporterFilm({ transparent: true, musique: mus, debut: p.musique ? Number(p.musique.debut) || 0 : 0, volume: p.musique ? p.musique.volume : 0.8, progres: v => { $('#barre').style.width = Math.round(v * 100) + '%'; $('#film-etat').textContent = 'Vidéo sans fond… ' + Math.round(v * 100) + ' %'; } });
+        telecharger(`${p.slug}-sans-fond.webm`, r.blob);
+        $('#film-etat').textContent = `Vidéo sans fond prête (${Math.round(r.duree)} s, ${(r.blob.size / 1e6).toFixed(1)} Mo, WebM transparent)`;
+      } catch (e) { console.error(e); $('#film-etat').textContent = 'Erreur : ' + e.message; }
+      ft.disabled = false; $('#film').disabled = false;
+    };
     $('#film').onclick = async () => {
       if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) return toast('Ce navigateur ne sait pas enregistrer : utilisez Chrome sur ordinateur');
       const b = $('#film'); b.disabled = true; $('#film-etat').textContent = 'Fabrication du film…'; const t0 = Date.now();
       try {
         const mus = p.musique ? await resoudre(p.musique.src) : null;
-        const r = await eng.exporterFilm({ musique: mus, debut: p.musique ? Number(p.musique.debut) || 0 : 0, volume: p.musique ? p.musique.volume : 0.8, progres: v => { $('#barre').style.width = Math.round(v * 100) + '%'; $('#film-etat').textContent = 'Fabrication du film… ' + Math.round(v * 100) + ' %'; } });
+        const r = await eng.exporterFilm({ musique: mus, debut: p.musique ? Number(p.musique.debut) || 0 : 0, volume: p.musique ? p.musique.volume : 0.8, etape: t => { $('#film-etat').textContent = t; }, progres: v => { $('#barre').style.width = Math.round(v * 100) + '%'; $('#film-etat').textContent = 'Fabrication du film… ' + Math.round(v * 100) + ' %'; } });
         telecharger(`${p.slug}-film.${r.extension}`, r.blob);
         const sec = (Date.now() - t0) / 1000;
         $('#film-etat').textContent = `Film prêt en ${dureeTexte(sec)} (film de ${Math.round(r.duree)} s, ${(r.blob.size / 1e6).toFixed(1)} Mo, ${r.extension.toUpperCase()})`;
@@ -2626,6 +3085,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <li><b>Animer une image</b> : dans « ✨ Créer avec l'IA », choix <b>Animer une image</b>, ou bouton « ✨ Animer cette photo » dans le panneau d'une photo. Choisissez la photo du plan (ou ＋ une autre image) et le mouvement (naturel, zoom lent, léger vent, pétales, lumière). Wan 2.2 en fait une vidéo de 5 s en gardant les visages identiques ; elle remplace la photo sur le plan (ou s'y ajoute), au-dessus du fond.</li>
         <li><b>🌐 Plusieurs langues</b> : onglet Fiche → « Langues de l'invitation », cochez les langues à proposer (English, Français…). Sous l'aperçu, <b>🌐 Traduire</b> : copiez le prompt, collez-le dans Claude ou ChatGPT, collez la réponse, « Appliquer ». Chaque texte a aussi ses traductions modifiables à la main (panneau du calque → Traductions). « Voir en : … » montre l'aperçu dans une autre langue. Dans l'invitation, l'invité choisit sa langue à l'ouverture ou avec le bouton 🌐 : tout bascule d'un clic.</li>
         <li><b>♪ Chanson</b> : bouton « ♪ Ajouter une chanson » sous l'aperçu. Choisissez le fichier (tous les formats : MP3, M4A, WAV, FLAC, OGG, AIFF… et même une vidéo, dont on garde le son ; les formats moins courants sont convertis en MP3 tout seuls), réglez le volume et le moment où elle commence (« Position actuelle » pour sauter l'introduction). Elle joue avec « ▶ Toute l'invitation », chez l'invité et dans le film exporté.</li>
+        <li><b>📏 Règles et repères</b> : bouton « Règles » sous l'aperçu, puis tirez depuis une règle. Les éléments s'aimantent au centre, aux repères et aux autres éléments (Maj = sans aimant). <b>Plusieurs éléments</b> : Maj+clic, cadre de sélection ou Ctrl+A, puis glisser, flèches ou boutons d'alignement. <b>⏸ Pause</b> : bouton ou barre d'espace pendant la lecture.</li>
+        <li><b>Polices, emojis, illustrations</b> : bouton de police (aperçu de chaque police), 😊 pour un emoji, « + Illustration » pour un dessin recolorable. <b>Fond</b> : Vidéo, Photo, Couleur (dégradé possible) ou Sans fond. <b>⬚ Rogner</b> : garder une partie d'une vidéo ou d'une photo.</li>
         <li><b>✂ Couper</b> : sur le fond d'un plan (panneau Fond vidéo) ou sur une vidéo posée, « ✂ Couper » : réglez Début et Fin (ou « Position actuelle » pendant la lecture), « ▶ Voir le passage », puis Appliquer. <b>Superposition</b> : dans le panneau d'une photo, d'une vidéo ou d'un texte, choisissez comment il se mélange au fond (Produit pour garder les ombres, Écran pour les lumières, Superposition…).</li>
         <li><b>👥 Équipe</b> : l'admin crée l'équipe dans Réglages et envoie <b>le lien d'équipe</b> (un seul pour tous). Chaque membre l'ouvre et entre son nom. Les nouveaux fonds et images animées sont partagés tout seuls dans la <b>bibliothèque de l'équipe</b> (Bibliothèque, en bas), que tout le monde peut utiliser dans ses plans. L'admin voit dans <a href="#/equipe">Équipe</a> le travail de chacun, toutes les invitations, et le temps de fabrication de chaque vidéo.</li>
         <li><b>Bibliothèque par événement</b> : tout ce que vous créez ou importez dans un événement (fonds IA, images animées, photos) est rangé dans sa bibliothèque, et seuls ses fichiers sont proposés dans ses plans (avec les fonds de base et les fichiers communs). Dans <a href="#/bibliotheque">Bibliothèque</a>, choisissez l'événement en haut ; « Réglages » d'un fichier permet de le déplacer vers un autre événement.</li>

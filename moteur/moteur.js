@@ -7,7 +7,37 @@
   'use strict';
 
   const W = 720, H = 1280;
-  const POLICES = ['Cormorant Garamond', 'Great Vibes', 'Playfair Display', 'Dancing Script', 'Montserrat', 'Parisienne', 'Cinzel'];
+  // Polices (Google Fonts) : [nom, catégorie, graisses]
+  const CATALOGUE_POLICES = [
+    ['Cormorant Garamond', 'Élégantes', 'ital,wght@0,400;0,600;0,700;1,400'], ['Playfair Display', 'Élégantes', 'ital,wght@0,400;0,700;1,400'], ['Cinzel', 'Élégantes', 'wght@400;600;700'], ['Cinzel Decorative', 'Élégantes', 'wght@400;700'],
+    ['EB Garamond', 'Élégantes', 'ital,wght@0,400;0,600;1,400'], ['Libre Baskerville', 'Élégantes', 'ital,wght@0,400;0,700;1,400'], ['Lora', 'Élégantes', 'ital,wght@0,400;0,700;1,400'], ['Bodoni Moda', 'Élégantes', 'ital,wght@0,400;0,700;1,400'],
+    ['DM Serif Display', 'Élégantes', 'ital@0;1'], ['Marcellus', 'Élégantes', ''], ['Prata', 'Élégantes', ''], ['Yeseva One', 'Élégantes', ''], ['Abril Fatface', 'Élégantes', ''], ['Merriweather', 'Élégantes', 'ital,wght@0,400;0,700;1,400'], ['Cormorant Upright', 'Élégantes', 'wght@400;600'],
+    ['Great Vibes', 'Manuscrites', ''], ['Parisienne', 'Manuscrites', ''], ['Dancing Script', 'Manuscrites', 'wght@400;700'], ['Alex Brush', 'Manuscrites', ''], ['Allura', 'Manuscrites', ''], ['Pinyon Script', 'Manuscrites', ''],
+    ['Sacramento', 'Manuscrites', ''], ['Tangerine', 'Manuscrites', 'wght@400;700'], ['Italianno', 'Manuscrites', ''], ['Satisfy', 'Manuscrites', ''], ['Rouge Script', 'Manuscrites', ''], ['Monsieur La Doulaise', 'Manuscrites', ''],
+    ['Mrs Saint Delafield', 'Manuscrites', ''], ['Petit Formal Script', 'Manuscrites', ''], ['Herr Von Muellerhoff', 'Manuscrites', ''], ['Imperial Script', 'Manuscrites', ''], ['Lavishly Yours', 'Manuscrites', ''], ['Ballet', 'Manuscrites', ''],
+    ['WindSong', 'Manuscrites', 'wght@400;500'], ['Mea Culpa', 'Manuscrites', ''], ['Corinthia', 'Manuscrites', 'wght@400;700'], ['Kaushan Script', 'Manuscrites', ''], ['Pacifico', 'Manuscrites', ''], ['Caveat', 'Manuscrites', 'wght@400;700'],
+    ['Montserrat', 'Modernes', 'ital,wght@0,400;0,600;0,700;1,400'], ['Poppins', 'Modernes', 'ital,wght@0,400;0,600;0,700;1,400'], ['Raleway', 'Modernes', 'ital,wght@0,400;0,600;0,700;1,400'], ['Josefin Sans', 'Modernes', 'ital,wght@0,400;0,600;0,700;1,400'],
+    ['Lato', 'Modernes', 'ital,wght@0,400;0,700;1,400'], ['Open Sans', 'Modernes', 'ital,wght@0,400;0,700;1,400'], ['Roboto', 'Modernes', 'ital,wght@0,400;0,700;1,400'], ['Nunito', 'Modernes', 'ital,wght@0,400;0,700;1,400'], ['Quicksand', 'Modernes', 'wght@400;600;700'],
+    ['Oswald', 'Modernes', 'wght@400;600;700'], ['Bebas Neue', 'Modernes', ''], ['Tenor Sans', 'Modernes', ''], ['Questrial', 'Modernes', ''],
+    ['Lobster', 'Fantaisie', ''], ['Comfortaa', 'Fantaisie', 'wght@400;700'], ['Amatic SC', 'Fantaisie', 'wght@400;700'], ['Fredoka', 'Fantaisie', 'wght@400;600;700'], ['Baloo 2', 'Fantaisie', 'wght@400;600;700'], ['Righteous', 'Fantaisie', ''],
+    ['Bungee', 'Fantaisie', ''], ['Chewy', 'Fantaisie', ''], ['Luckiest Guy', 'Fantaisie', ''], ['Indie Flower', 'Fantaisie', ''], ['Shadows Into Light', 'Fantaisie', ''], ['Permanent Marker', 'Fantaisie', ''], ['Cookie', 'Fantaisie', ''], ['Yellowtail', 'Fantaisie', '']
+  ];
+  const POLICES = CATALOGUE_POLICES.map(x => x[0]);
+  const POLICE_EMOJI = '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji"';
+  // Charge les polices demandées depuis Google Fonts (une seule fois chacune)
+  const policesChargees = new Set();
+  function chargerPolices(noms) {
+    const nouveaux = [...new Set(noms || [])].filter(n => n && !policesChargees.has(n) && CATALOGUE_POLICES.some(x => x[0] === n));
+    if (!nouveaux.length || typeof document === 'undefined') return Promise.resolve();
+    nouveaux.forEach(n => policesChargees.add(n));
+    const morceaux = [];
+    for (let i = 0; i < nouveaux.length; i += 20) morceaux.push(nouveaux.slice(i, i + 20));
+    return Promise.all(morceaux.map(m => new Promise(ok => {
+      const l = document.createElement('link'); l.rel = 'stylesheet';
+      l.href = 'https://fonts.googleapis.com/css2?' + m.map(n => { const ax = (CATALOGUE_POLICES.find(x => x[0] === n) || [])[2]; return 'family=' + n.replace(/ /g, '+') + (ax ? ':' + ax : ''); }).join('&') + '&display=swap';
+      l.onload = ok; l.onerror = ok; setTimeout(ok, 6000); document.head.appendChild(l);
+    })));
+  }
   const ANIMATIONS = ['aucune', 'fondu', 'fondu-montee', 'fondu-descente', 'ecriture', 'mot-par-mot', 'zoom', 'zoom-arriere', 'rebond', 'flou', 'glissement-gauche', 'glissement-droite'];
   const SORTIES = ['aucune', 'fondu', 'fondu-montee', 'fondu-descente', 'zoom', 'zoom-arriere', 'flou', 'glissement-gauche', 'glissement-droite'];
   const NOMS_EFFETS = { aucune: 'Aucun', fondu: 'Fondu', 'fondu-montee': 'Fondu en montant', 'fondu-descente': 'Fondu en descendant', ecriture: 'Lettre par lettre', 'mot-par-mot': 'Mot par mot', zoom: 'Zoom avant', 'zoom-arriere': 'Zoom arrière', rebond: 'Rebond', flou: 'Flou', 'glissement-gauche': 'Glisse depuis la gauche', 'glissement-droite': 'Glisse depuis la droite' };
@@ -39,6 +69,9 @@
   const JOURS_FR = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
   const JOURS_MG = ['Alahady', 'Alatsinainy', 'Talata', 'Alarobia', 'Alakamisy', 'Zoma', 'Sabotsy'];
   // Vidéo coupée (début / fin en secondes) : position dans le fichier pour un temps t de lecture
+  // Fond d'un plan : vidéo (par défaut), photo, couleur unie / dégradé, ou aucun (transparent)
+  function typeFond(f) { f = f || {}; if (f.type === 'couleur' || f.type === 'aucun') return f.type; if (!f.media) return 'defaut'; if (f.type === 'image' || /\.(png|jpe?g|webp|gif|svg)(\?|$)/i.test(f.media) || /^data:image/.test(f.media)) return 'image'; return 'video'; }
+  function fondMedia(p) { const t = typeFond(p && p.fond); return (t === 'video' || t === 'image') ? p.fond.media : null; }
   function rgba(hex, a) { const h = String(hex).replace('#', ''); const n = parseInt(h.length === 3 ? h.split('').map(x => x + x).join('') : h.slice(0, 6), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; }
   function plage(conf) { const c = conf && conf.coupe; return c && Number(c.fin) > (Number(c.debut) || 0) ? [Number(c.debut) || 0, Number(c.fin)] : null; }
   function positionVideo(conf, t, duree) {
@@ -169,7 +202,9 @@
       if (!u) return null;
       let el;
       if (type === 'image' || /\.(png|jpe?g|webp|gif|svg)(\?|$)/i.test(src)) {
-        el = new Image(); el.decoding = 'async'; el.src = u;
+        el = new Image(); el.decoding = 'async';
+        if (location.protocol !== 'file:' && /^https?:/.test(new URL(u, location.href).href) && new URL(u, location.href).origin !== location.origin) el.crossOrigin = 'anonymous';
+        el.src = u;
       } else {
         el = document.createElement('video');
         el.muted = true; el.playsInline = true; el.loop = true; el.preload = 'auto';
@@ -186,13 +221,16 @@
       const polices = new Set();
       const promesses = [];
       (this.projet.plans || []).forEach(p => {
-        if (p.fond && p.fond.media) promesses.push(this.media(p.fond.media, 'video'));
+        if (p.fond && p.fond.media && p.fond.type !== 'couleur' && p.fond.type !== 'aucun') promesses.push(this.media(p.fond.media, p.fond.type === 'image' ? 'image' : 'video'));
         (p.calques || []).forEach(c => {
           if (c.police) polices.add(c.police);
           if ((c.type === 'image' || c.type === 'video') && c.media) promesses.push(this.media(c.media, c.type));
         });
       });
-      await Promise.all(promesses);
+      const els = await Promise.all(promesses);
+      // les photos doivent être vraiment chargées (sinon elles manquent dans le film)
+      await Promise.all(els.filter(e => e && e.tagName === 'IMG' && !e.complete).map(e => new Promise(ok => { e.addEventListener('load', ok, { once: true }); e.addEventListener('error', ok, { once: true }); setTimeout(ok, 15000); })));
+      await chargerPolices([...polices]);
       if (document.fonts && document.fonts.load) {
         await Promise.all([...polices].map(p => document.fonts.load(`40px "${p}"`).catch(() => null)));
       }
@@ -255,14 +293,14 @@
       const p = this.planCourant();
       if (!p) return;
       const avant = this.projet.plans[this.seq[this.pos - 1]];
-      const memeFond = avant && avant.fond && p.fond && avant.fond.media === p.fond.media;
+      const memeFond = avant && fondMedia(avant) && fondMedia(p) && avant.fond.media === p.fond.media;
       this._lancerVideos(p, !memeFond);
       this._construireHTML();
     }
 
     _lancerVideos(p, reset) {
       const els = [];
-      if (p.fond && p.fond.media) els.push([this.medias[p.fond.media], p.fond]);
+      if (fondMedia(p)) els.push([this.medias[p.fond.media], p.fond]);
       (p.calques || []).forEach(c => { if (c.type === 'video' && c.media) els.push([this.medias[c.media], c]); });
       els.forEach(([v, conf]) => {
         if (!v || v.tagName !== 'VIDEO') return;
@@ -282,7 +320,7 @@
         const go = () => { try { v.currentTime = positionVideo(conf, t, v.duration || 1); } catch (e) {} };
         if (v.readyState >= 1) go(); else v.addEventListener('loadedmetadata', go, { once: true });
       };
-      if (p.fond && p.fond.media) caler(this.medias[p.fond.media], p.fond);
+      if (fondMedia(p)) caler(this.medias[p.fond.media], p.fond);
       (p.calques || []).forEach(c => { if (c.type === 'video' && c.media) caler(this.medias[c.media], c); });
     }
 
@@ -295,7 +333,7 @@
           this.t += dt;
           // vidéos coupées : on revient au début de la coupe (ou on s'arrête) à la fin de la coupe
           Object.values(this.medias).forEach(v => { if (v && v._plage && !v.paused && v.currentTime >= v._plage[1] - 0.03) { if (v._boucle) { try { v.currentTime = v._plage[0]; } catch (e) {} } else v.pause(); } });
-          const duree = Number(p.duree) || 0;
+          const duree = Number(p.duree) || (this.enFilm ? (p.role === 'confirmation' ? 7 : 4) : 0);
           if (duree > 0 && this.t >= duree) {
             if (this.pos < this.seq.length - 1) { this.pos++; this.t = 0; this._entrerPlan(); }
             else if (this.planFixe != null) { this.t = 0; this._entrerPlan(); }
@@ -314,8 +352,8 @@
       const ctx = this.ctx;
       const p = this.planCourant();
       ctx.save();
-      ctx.fillStyle = '#f4ede2'; ctx.fillRect(0, 0, W, H);
-      if (!p) { ctx.restore(); return; }
+      ctx.clearRect(0, 0, W, H);
+      if (!p) { ctx.fillStyle = '#f4ede2'; ctx.fillRect(0, 0, W, H); ctx.restore(); return; }
       const tr = p.transition || {};
       const dTr = Number(tr.duree) || (tr.type && tr.type !== 'aucune' ? 0.8 : 0);
       const avant = this.projet.plans[this.seq[this.pos - 1]];
@@ -360,15 +398,42 @@
       ctx.restore();
     }
 
-    _dessinerImage(el, x, y, w, h, cover) {
+    _dessinerImage(el, x, y, w, h, cover, rec) {
       const ctx = this.ctx;
-      const iw = el.videoWidth || el.naturalWidth, ih = el.videoHeight || el.naturalHeight;
-      if (!iw || !ih) return false;
-      if (el.tagName === 'VIDEO' && el.readyState < 2) return false;
-      if (el.tagName === 'IMG' && !el.complete) return false;
-      const r = cover ? Math.max(w / iw, h / ih) : Math.min(w / iw, h / ih);
-      const dw = iw * r, dh = ih * r;
-      ctx.drawImage(el, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+      let src = el;
+      const iw0 = el.videoWidth || el.naturalWidth, ih0 = el.videoHeight || el.naturalHeight;
+      const pret = iw0 && ih0 && !(el.tagName === 'VIDEO' && el.readyState < 2) && !(el.tagName === 'IMG' && !el.complete);
+      if (!pret) {
+        // vidéo pas encore prête (chargement, saut, boucle) : on garde sa dernière image au lieu d'un trou
+        if (!el._cache) return false;
+        src = el._cache;
+      } else if (el.tagName === 'VIDEO') {
+        el._nCache = (el._nCache || 0) + 1;
+        if (!el._cache || el._nCache % 6 === 0) {
+          try {
+            const k = Math.min(1, 720 / Math.max(iw0, ih0));
+            if (!el._cache) { el._cache = document.createElement('canvas'); }
+            if (el._cache.width !== Math.round(iw0 * k)) { el._cache.width = Math.round(iw0 * k); el._cache.height = Math.round(ih0 * k); }
+            el._cache.getContext('2d').drawImage(el, 0, 0, el._cache.width, el._cache.height);
+          } catch (e) {}
+        }
+      }
+      const iw = src === el ? iw0 : src.width, ih = src === el ? ih0 : src.height;
+      // recadrage (rogner) : partie de l'image gardée, en fractions de la largeur et de la hauteur
+      let sx = 0, sy = 0, sw = iw, sh = ih;
+      if (rec && Number(rec.w) > 0 && Number(rec.h) > 0) {
+        sx = clamp(Number(rec.x) || 0, 0, 0.99) * iw; sy = clamp(Number(rec.y) || 0, 0, 0.99) * ih;
+        sw = Math.max(1, Math.min(iw - sx, Number(rec.w) * iw)); sh = Math.max(1, Math.min(ih - sy, Number(rec.h) * ih));
+      }
+      const r = cover ? Math.max(w / sw, h / sh) : Math.min(w / sw, h / sh);
+      if (cover) {
+        // remplir le cadre : on prend le centre de la partie gardée
+        const cw = w / r, ch = h / r;
+        ctx.drawImage(src, sx + (sw - cw) / 2, sy + (sh - ch) / 2, cw, ch, x, y, w, h);
+      } else {
+        const dw = sw * r, dh = sh * r;
+        ctx.drawImage(src, sx, sy, sw, sh, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+      }
       return true;
     }
 
@@ -377,10 +442,23 @@
       ctx.save();
       ctx.globalAlpha = alpha;
       const f = p.fond || {};
-      const v = f.media ? this.medias[f.media] : null;
-      if (v) {
+      const typeF = typeFond(f);
+      const v = typeF === 'video' || typeF === 'image' ? this.medias[f.media] : null;
+      if (typeF === 'aucun') {
+        // sans fond : transparent (aperçu en damier, vidéo WebM transparente) ; dans un MP4 on met une couleur unie
+        if (this.fondOpaque) { ctx.fillStyle = this.fondOpaque; ctx.fillRect(0, 0, W, H); }
+      } else if (typeF === 'couleur') {
+        const c1 = f.couleur || '#f4ede2';
+        if (f.couleur2) {
+          const a = (Number(f.angle) || 180) * Math.PI / 180, dx = Math.sin(a) * H / 2, dy = -Math.cos(a) * H / 2;
+          const g = f.degrade === 'radial' ? ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.hypot(W, H) / 2) : ctx.createLinearGradient(W / 2 - dx, H / 2 - dy, W / 2 + dx, H / 2 + dy);
+          g.addColorStop(0, c1); g.addColorStop(1, f.couleur2); ctx.fillStyle = g;
+        } else ctx.fillStyle = c1;
+        ctx.fillRect(0, 0, W, H);
+      } else if (v) {
+        ctx.fillStyle = '#f4ede2'; ctx.fillRect(0, 0, W, H);
         if (f.flou) ctx.filter = `blur(${f.flou}px)`;
-        this._dessinerImage(v, 0, 0, W, H, true);
+        this._dessinerImage(v, 0, 0, W, H, true, f.recadrage);
         ctx.filter = 'none';
       } else { ctx.fillStyle = '#f4ede2'; ctx.fillRect(0, 0, W, H); }
       if (f.assombrir) { ctx.fillStyle = `rgba(0,0,0,${clamp(f.assombrir, 0, 0.9)})`; ctx.fillRect(0, 0, W, H); }
@@ -388,7 +466,7 @@
       const vars = variablesDe(this.projet, this.famille, this.form, this.langue);
       (p.calques || []).forEach(c => {
         if (c.masque || (c.condition === 'famille' && !this.famille) || (c.condition === 'general' && this.famille)) { if (mesurer) delete this.bbox[c.id]; return; }
-        if (c._edition && c.type === 'texte') return;   // en cours d'écriture dans l'éditeur : garder le cadre, ne pas dessiner
+        if (c._edition && c.type === 'texte' && this.mode === 'edition' && !this.boutonsDessines) return;   // en cours d'écriture dans l'éditeur : garder le cadre, ne pas dessiner
         if (TYPES_HTML.includes(c.type)) { if (mesurer) this._bboxHTML(c); if (this.boutonsDessines) this._dessinerBouton(c, t, p, vars, alpha); return; }
         this._dessinerCalque(c, t, p, vars, alpha, mesurer);
       });
@@ -398,6 +476,7 @@
     // Film : les boutons (HTML dans l'invitation) sont dessinés comme des images, sauf ceux de navigation
     _dessinerBouton(c, t, p, vars, alphaPlan) {
       if (c.type === 'compteur') return this._dessinerCompteur(c, t, vars, alphaPlan);
+      if (c.type === 'champ') return this._dessinerChamp(c, t, vars, alphaPlan);
       if (c.type !== 'bouton') return;
       const deb = Number(c.debut) || 0; if (t < deb) return;
       const ctx = this.ctx, fs = (Number(c.taille) || 2.4) / 100 * H, larg = (Number(c.largeur) || 60) / 100 * W, haut = fs * 2.3;
@@ -406,8 +485,19 @@
       ctx.save(); ctx.globalAlpha = alphaPlan * clamp((t - deb) / 0.6, 0, 1);
       if (style !== 'lien') { arrondi(ctx, x, y, larg, haut, haut / 2); ctx.fillStyle = style === 'plein' ? coul : 'rgba(255,255,255,.85)'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = coul; ctx.stroke(); }
       ctx.fillStyle = style === 'plein' ? '#fff' : coul; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.font = `600 ${fs.toFixed(1)}px "Cormorant Garamond", Georgia, serif`;
+      ctx.font = `600 ${fs.toFixed(1)}px "${c.police || 'Cormorant Garamond'}", Georgia, serif, ${POLICE_EMOJI}`;
       ctx.fillText(remplacer(texteDe(c, this.langue), vars), x + larg / 2, y + haut / 2, larg - fs);
+      ctx.restore();
+    }
+
+    _dessinerChamp(c, t, vars, alphaPlan) {
+      const deb = Number(c.debut) || 0; if (t < deb) return;
+      const ctx = this.ctx, fs = (Number(c.taille) || 2.3) / 100 * H, larg = (Number(c.largeur) || 66) / 100 * W, haut = fs * 2.3;
+      const x = (Number(c.x) || 50) / 100 * W - larg / 2, y = (Number(c.y) || 50) / 100 * H - haut / 2, coul = c.couleur || '#7a1f2b';
+      ctx.save(); ctx.globalAlpha = alphaPlan * clamp((t - deb) / 0.6, 0, 1);
+      arrondi(ctx, x, y, larg, haut, fs * 0.7); ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = coul; ctx.globalAlpha *= 0.8; ctx.stroke();
+      ctx.fillStyle = '#8a7a7a'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.font = `400 ${fs.toFixed(1)}px "Cormorant Garamond", Georgia, serif`;
+      ctx.fillText(remplacer(texteDe(c, this.langue), vars) || 'Écrire ici', x + fs * 0.7, y + haut / 2, larg - fs * 1.4);
       ctx.restore();
     }
 
@@ -486,7 +576,7 @@
       if (c.type === 'texte') {
         const taille = (Number(c.taille) || 4) / 100 * H;
         const police = c.police || 'Cormorant Garamond';
-        ctx.font = `${c.italique ? 'italic ' : ''}${c.gras ? '700 ' : '400 '}${taille}px "${police}", serif`;
+        ctx.font = `${c.italique ? 'italic ' : ''}${c.gras ? '700 ' : '400 '}${taille}px "${police}", serif, ${POLICE_EMOJI}`;
         ctx.textBaseline = 'middle';
         const align = c.align || 'center';
         ctx.textAlign = align;
@@ -535,9 +625,9 @@
             if (c.forme === 'rond') { ctx.beginPath(); ctx.ellipse(0, 0, larg / 2, haut / 2, 0, 0, Math.PI * 2); }
             else arrondi(ctx, -larg / 2, -haut / 2, larg, haut, Math.min(larg, haut) * 0.08);
             ctx.clip();
-            this._dessinerImage(el, -larg / 2, -haut / 2, larg, haut, true);
+            this._dessinerImage(el, -larg / 2, -haut / 2, larg, haut, true, c.recadrage);
             ctx.restore();
-          } else this._dessinerImage(el, -larg / 2, -haut / 2, larg, haut, c.remplir === true);
+          } else this._dessinerImage(el, -larg / 2, -haut / 2, larg, haut, c.remplir === true, c.recadrage);
           if (c.bordure) { ctx.strokeStyle = c.bordure; ctx.lineWidth = 3; if (c.forme === 'rond') { ctx.beginPath(); ctx.ellipse(0, 0, larg / 2, haut / 2, 0, 0, Math.PI * 2); ctx.stroke(); } else { arrondi(ctx, -larg / 2, -haut / 2, larg, haut, c.forme === 'arrondi' ? Math.min(larg, haut) * 0.08 : 0); ctx.stroke(); } }
         } else {
           ctx.strokeStyle = 'rgba(122,31,43,.5)'; ctx.setLineDash([8, 6]); ctx.strokeRect(-larg / 2, -haut / 2, larg, haut);
@@ -709,12 +799,25 @@
         }
         for (let essai = 0; v.readyState < 2 && essai < 40; essai++) await attendre(v, ['loadeddata', 'canplay', 'seeked'], 250);
       };
-      const mediasDe = p => { const l = []; if (p.fond && p.fond.media) l.push([p.fond.media, p.fond]); (p.calques || []).forEach(c => { if (c.type === 'video' && c.media) l.push([c.media, c]); }); return l; };
+      const mediasDe = p => { const l = []; if (fondMedia(p)) l.push([p.fond.media, p.fond]); (p.calques || []).forEach(c => { if (c.type === 'video' && c.media) l.push([c.media, c]); }); return l; };
+      const remplaces = {};
+      this.fondOpaque = '#f4ede2';   // un MP4 ne peut pas être transparent
       try {
         if (opts.progres) opts.progres(0);
+        // vidéos en ligne (bibliothèque d'équipe…) : téléchargées d'abord, pour que chaque image du film ait bien son fond
+        const enLigne = [...new Set(seq.flatMap(i => mediasDe(pl[i]).map(x => x[0])))].filter(src => { const v = this.medias[src]; return v && v.tagName === 'VIDEO' && /^https?:/.test(v.currentSrc || v.src || '') && new URL(v.currentSrc || v.src).origin !== location.origin; });
+        for (let k = 0; k < enLigne.length; k++) {
+          const src = enLigne[k], v = this.medias[src];
+          try {
+            if (opts.etape) opts.etape('Préparation des vidéos ' + (k + 1) + '/' + enLigne.length + '…');
+            const b = await (await fetch(v.currentSrc || v.src)).blob();
+            const nv = document.createElement('video'); nv.muted = true; nv.playsInline = true; nv.preload = 'auto'; nv.src = URL.createObjectURL(b);
+            remplaces[src] = v; this.medias[src] = nv;
+          } catch (e) { console.warn('vidéo en ligne non téléchargée', src, e); }
+        }
         for (const i of seq) for (const [src] of mediasDe(pl[i])) { const v = this.medias[src]; if (v && v.tagName === 'VIDEO' && v.readyState < 2) { v.preload = 'auto'; try { v.load(); } catch (e) {} await attendre(v, ['loadeddata', 'error'], 20000); } }
         let pos = 0, debPlan = 0;
-        const entrer = k => { const p = pl[seq[k]], av = k > 0 ? pl[seq[k - 1]] : null; mediasDe(p).forEach(([src]) => { const garde = av && av.fond && p.fond && av.fond.media === p.fond.media && src === p.fond.media && departMedia[src] != null; if (!garde) departMedia[src] = debPlan; }); };
+        const entrer = k => { const p = pl[seq[k]], av = k > 0 ? pl[seq[k - 1]] : null; mediasDe(p).forEach(([src]) => { const garde = av && fondMedia(av) && fondMedia(p) === fondMedia(av) && src === fondMedia(p) && departMedia[src] != null; if (!garde) departMedia[src] = debPlan; }); };
         entrer(0);
         for (let f = 0; f < N; f++) {
           if (erreur) throw erreur;
@@ -751,7 +854,8 @@
         if (opts.progres) opts.progres(1);
         return { blob: new Blob([muxer.target.buffer], { type: 'video/mp4' }), extension: 'mp4', duree: total };
       } finally {
-        this.boutonsDessines = false; this.masquerHTML = false;
+        this.boutonsDessines = false; this.masquerHTML = false; this.fondOpaque = null;
+        Object.entries(remplaces).forEach(([src, v]) => { const nv = this.medias[src]; try { nv.pause(); URL.revokeObjectURL(nv.src); } catch (e) {} this.medias[src] = v; });
         Object.assign(this, avantEtat);
         this._construireHTML();
       }
@@ -759,14 +863,14 @@
 
     async exporterFilm(opts) {
       opts = opts || {};
-      if (window.VideoEncoder && window.AudioEncoder && window.VideoFrame && opts.tempsReel !== true) {
+      if (window.VideoEncoder && window.AudioEncoder && window.VideoFrame && opts.tempsReel !== true && !opts.transparent) {
         try { return await this.exporterFilmImages(opts); }
         catch (e) { console.warn('Film image par image impossible, enregistrement en temps réel', e); }
       }
-      const seq = opts.seq || this.plansFilm();
+      const seq = opts.seq || (opts.transparent ? this.plansFilmComplet() : this.plansFilm());
       if (!seq.length) throw new Error('Aucun plan à filmer');
       if (location.protocol === 'file:') throw new Error('L\'enregistrement du film fonctionne quand le studio est ouvert depuis son adresse en ligne (GitHub Pages), pas depuis un dossier de l\'ordinateur.');
-      const total = seq.reduce((s, i) => s + (Number(this.projet.plans[i].duree) || 4), 0);
+      const total = seq.reduce((s, i) => s + (Number(this.projet.plans[i].duree) || (this.projet.plans[i].role === 'confirmation' ? 7 : 4)), 0);
       const stream = this.canvas.captureStream(30);
       let audioCtx = null, musique = null;
       if (opts.musique) {
@@ -780,13 +884,13 @@
           dest.stream.getAudioTracks().forEach(tk => stream.addTrack(tk));
         } catch (e) { console.warn('musique', e); }
       }
-      const types = ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+      const types = opts.transparent ? ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9', 'video/webm'] : ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
       const mime = types.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || '';
       const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 3.5e6 });
       const morceaux = [];
       rec.ondataavailable = e => { if (e.data && e.data.size) morceaux.push(e.data); };
       const fini = new Promise(res => { rec.onstop = res; });
-      this.masquerHTML = true; this.boutonsDessines = true;
+      this.enFilm = true; this.masquerHTML = true; this.boutonsDessines = true; this.fondOpaque = opts.transparent ? null : (/mp4/.test(mime) ? '#f4ede2' : null);
       const ancienFin = this.onFin, ancienTemps = this.onTemps;
       let ecoule = 0;
       const debut = performance.now();
@@ -801,7 +905,7 @@
       if (musique) musique.pause();
       await fini;
       this.onFin = ancienFin; this.onTemps = ancienTemps;
-      this.masquerHTML = false; this.boutonsDessines = false;
+      this.enFilm = false; this.masquerHTML = false; this.boutonsDessines = false; this.fondOpaque = null;
       if (audioCtx) audioCtx.close();
       const blob = new Blob(morceaux, { type: mime || 'video/webm' });
       return { blob, extension: /mp4/.test(mime) ? 'mp4' : 'webm', duree: total };
@@ -844,5 +948,5 @@
   // Langues proposées pour les invitations
   const LANGUES = { mg: 'Malagasy', fr: 'Français', en: 'English', de: 'Deutsch', it: 'Italiano', es: 'Español', pt: 'Português', zh: '中文', ar: 'العربية', ru: 'Русский', ja: '日本語' };
   const FUSIONS = [['normal', 'Normale'], ['multiply', 'Produit (assombrit, garde les ombres)'], ['screen', 'Écran (éclaircit, garde les lumières)'], ['overlay', 'Superposition'], ['soft-light', 'Lumière douce'], ['hard-light', 'Lumière crue'], ['color-dodge', 'Densité couleur −'], ['color-burn', 'Densité couleur +'], ['darken', 'Obscurcir'], ['lighten', 'Éclaircir'], ['difference', 'Différence'], ['luminosity', 'Luminosité'], ['color', 'Couleur']];
-  global.MoteurInfo = { FUSIONS, plage, positionVideo, LANGUES, texteDe, W, H, POLICES, ANIMATIONS, SORTIES, NOMS_EFFETS, ACTIONS, TYPES_HTML, uid, variablesDe, dateLisible, remplacer, MOIS_MG, MOIS_FR };
+  global.MoteurInfo = { CATALOGUE_POLICES, chargerPolices, typeFond, fondMedia, FUSIONS, plage, positionVideo, LANGUES, texteDe, W, H, POLICES, ANIMATIONS, SORTIES, NOMS_EFFETS, ACTIONS, TYPES_HTML, uid, variablesDe, dateLisible, remplacer, MOIS_MG, MOIS_FR };
 })(window);
