@@ -371,3 +371,5 @@ textarea.edition-directe { position: absolute; z-index: 8; resize: none; overflo
 .e3-x { border: 0; background: none; color: #a88; cursor: pointer; font-size: 14px; }
 .e3-biblio { padding: 12px; }
 .couleur-choix .couleur-apercu { width: 100%; aspect-ratio: 9/16; border-radius: 8px; border: 1px solid var(--ligne); }
+#nouvelle-version { position: fixed; z-index: 2000; left: 50%; top: 12px; transform: translateX(-50%); background: #2b1d1d; color: #fff; border-radius: 14px; padding: 10px 14px; display: flex; gap: 10px; align-items: center; box-shadow: 0 10px 30px rgba(0,0,0,.3); font-size: 14px; flex-wrap: wrap; max-width: calc(100vw - 24px); }
+#nouvelle-version span { opacity: .75; }

@@ -373,6 +373,11 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-03-4', date: '3 novembre 2026', titre: 'Avertissement de nouvelle version, aperçu jusqu\'au remerciement', points: [
+      'Quand une nouvelle version du studio est en ligne, un bandeau « Recharger maintenant » apparaît (un onglet resté ouvert longtemps gardait l\'ancienne version).',
+      'Aperçu « ▶ Toute l\'invitation » : après 8 s sur la confirmation, l\'aperçu continue tout seul vers le remerciement (sur la vraie invitation, il vient après la réponse de l\'invité).',
+      'Polices : League Spartan est dans « Modernes » (tapez « league » dans la recherche). Intro et Accidental Presidency ne sont pas chez Google : importez leur fichier avec « + Importer une police ». En attendant, polices proches ajoutées : League Gothic (proche d\'Accidental Presidency) et Urbanist (proche d\'Intro).'
+    ] },
     { id: '2026-11-03-3', date: '3 novembre 2026', titre: 'Le remerciement final s\'affiche toujours', points: [
       'Après « Je confirme » ou « Je ne pourrai pas venir », le message de réponse se met en haut de l\'écran et se ferme tout seul : le plan de remerciement n\'est plus caché.',
       'Réponse à envoyer par WhatsApp : le remerciement vient juste après l\'envoi (ou après « Fermer »).',
@@ -447,6 +452,22 @@
       '« ✨ Créer avec l\'IA » dans la Bibliothèque : Recolorer, Fond Wan 2.2, Animer une image.',
       'Chanson : tous les formats, début réglable.', 'Chaque événement a sa propre bibliothèque.'] },
   ];
+  // Nouvelle version du studio en ligne : on le signale (un onglet resté ouvert garde l'ancienne)
+  const VERSION_CHARGEE = ((document.querySelector('script[src*="studio.js"]') || {}).src || '').split('v=')[1] || '';
+  async function verifierVersion() {
+    try {
+      const h = await (await fetch('index.html?t=' + Date.now(), { cache: 'no-store' })).text();
+      const v = (h.match(/studio\.js\?v=(\d+)/) || [])[1];
+      if (v && VERSION_CHARGEE && v !== VERSION_CHARGEE && !$('#nouvelle-version')) {
+        const d = document.createElement('div'); d.id = 'nouvelle-version';
+        d.innerHTML = '<b>Nouvelle version du studio disponible.</b> <span>Votre travail est enregistré.</span> <button class="btn petit plein">Recharger maintenant</button>';
+        d.querySelector('button').onclick = () => { try { sauverProjets(); } catch (e) {} location.reload(); };
+        document.body.appendChild(d);
+      }
+    } catch (e) {}
+  }
+  setInterval(verifierVersion, 4 * 60 * 1000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) verifierVersion(); });
   function panneauNouveautes() {
     const vu = Stock.lire('studio.nouveautes.vu', '');
     const nouvelles = NOUVEAUTES.filter(n => n.id > vu).slice(0, vu ? 10 : 1);
@@ -820,7 +841,12 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     $('#voir-langue').onchange = e => { eng.changerLangue(e.target.value); E.rafraichir(); };
     $('#traduire').onclick = () => modaleTraduction(p, () => { majVoirLangue(); E.afficher(); });
     $('#musique-btn').onclick = () => modaleMusique(p, () => { $('#musique-btn').textContent = '♪ ' + (p.musique ? (p.musique.nom || 'Chanson').replace(/\.\w+$/, '').slice(0, 18) : 'Ajouter une chanson'); });
-    eng.onTemps = (t) => { $('#t-aff').textContent = t.toFixed(1).replace('.', ',') + ' s'; if (eng.planFixe != null) $('#t-curseur').value = t; };
+    eng.onTemps = (t) => {
+      $('#t-aff').textContent = t.toFixed(1).replace('.', ',') + ' s'; if (eng.planFixe != null) $('#t-curseur').value = t;
+      // aperçu de toute l'invitation : la confirmation attend l'invité ; ici on continue vers le remerciement après 8 s
+      const pc = eng.planCourant();
+      if (eng.planFixe == null && pc && pc.role === 'confirmation' && !Number(pc.duree) && t > 8 && !E._versMerci) { E._versMerci = true; toast('Aperçu : suite vers le remerciement (sur l\'invitation, il vient après la réponse de l\'invité)'); eng.allerRemerciement(); setTimeout(() => { E._versMerci = false; }, 1000); }
+    };
     eng.onFin = () => { eng.mode = 'edition'; E.enPause = false; majPause(); afficher(); };
     eng.onAction = (a) => {
       if (a === 'whatsapp' && eng.planCourant() && eng.planCourant().role === 'confirmation') { toast('Réponse par WhatsApp (simulée) : suite du film'); return eng.allerRemerciement(); }
