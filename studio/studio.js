@@ -42,6 +42,17 @@
       if (!b) return null;
       return (urlsIdb[src] = URL.createObjectURL(b));
     }
+    // vidéos et photos de l'équipe : gardées sur cet ordinateur après le premier téléchargement
+    // (sinon chaque ouverture du studio les retélécharge depuis Supabase, et le forfait gratuit est vite dépassé)
+    if (typeof Equipe !== 'undefined' && Equipe.estUrl(src)) {
+      if (urlsIdb[src]) return urlsIdb[src];
+      const cle = 'cache:' + src.split('/object/public/')[1];
+      try {
+        let b = await IDB.lire(cle);
+        if (!b) { const r = await fetch(src); if (!r.ok) return src; b = await r.blob(); if (b.size < 80e6) IDB.mettre(cle, b).catch(() => {}); }
+        return (urlsIdb[src] = URL.createObjectURL(b));
+      } catch (e) { return src; }
+    }
     if (/^(https?:|blob:|data:)/.test(src)) return src;
     return BASE + src;
   }
@@ -476,7 +487,8 @@
       '<b>Vitrine</b> : chaque modèle a un bouton « Commander ce modèle ». Le visiteur lit et accepte les conditions (formules, prix, délai, paiement, licence), puis envoie toutes les informations : événement, noms, lieux, texte, couleurs, musique, photos.',
       '<b>Menu « Commandes »</b> (admin) : les commandes arrivent avec un numéro et un badge rouge. « Créer l\'invitation depuis le modèle » : le modèle est copié avec les noms, lieux, date et contacts du client, ses couleurs et ses photos ; vous ajustez ensuite.',
       '<b>Livraison</b> (onglet Film et publication) : 1. Démo marquée « DÉMO », réponses désactivées (+ film démo filigrané) → envoyée au client sur WhatsApp ; 2. après paiement, version finale avec un <b>code licence</b> personnel : l\'invitation ne marche que pour cet événement, et vous pouvez désactiver la licence (Commandes → Licences).',
-      '<b>Commandes → Conditions de la vitrine</b> : vos formules, prix, délai, paiement et conditions, publiés sur le site.'
+      '<b>Commandes → Conditions de la vitrine</b> : vos formules, prix, délai, paiement et conditions, publiés sur le site.',
+      'Les vidéos et photos de l\'équipe sont maintenant gardées sur l\'ordinateur après le premier téléchargement : le studio s\'ouvre plus vite et consomme beaucoup moins le forfait Supabase.'
     ] },
     { id: '2026-11-04-2', date: '4 novembre 2026', titre: 'Forme du cadre des photos', points: [
       'Choisissez une photo (ou une vidéo) : bouton <b>◇ Forme</b> dans la barre au-dessus de l\'aperçu, ou bloc « Forme du cadre » à droite.',
