@@ -279,22 +279,26 @@
     const recentes2 = Stock.lire('studio.polices.recentes', []).filter(n => cat.some(x => x[0] === n) || perso.includes(n)).slice(0, 6);
     recentes.splice(0, recentes.length, ...recentes2);
     const site = policesSite.map(x => x.nom);
-    const groupes = [['Récentes', recentes], ['Polices du studio', site], ['Mes polices', perso.filter(n => !site.includes(n))]].concat([...new Set(cat.map(x => x[1]))].map(g => [g, cat.filter(x => x[1] === g).map(x => x[0])]));
+    const DEMANDEES = ['League Spartan', 'Accidental Presidency', 'Intro', 'Urbanist', 'Archivo', 'Archivo Black', 'Outfit', 'Cabin', 'League Gothic'];
+    const demandees = DEMANDEES.filter(n => n === 'Intro' || cat.some(x => x[0] === n) || site.includes(n) || perso.includes(n));
+    if (perso.some(n => /^intro/i.test(n))) demandees.splice(demandees.indexOf('Intro'), 1, ...perso.filter(n => /^intro/i.test(n)));
+    const groupes = [['★ Demandées', demandees], ['Récentes', recentes], ['Polices du studio', site], ['Mes polices', perso.filter(n => !site.includes(n))]].concat([...new Set(cat.map(x => x[1]))].map(g => [g, cat.filter(x => x[1] === g).map(x => x[0])]));
     const d = pop(ancre, `<input type="search" class="pop-cherche" placeholder="Chercher une police…">
-      <div class="pop-onglets">${groupes.filter(g => g[1].length).map(([g]) => `<button data-g="${esc(g)}" class="${g === (recentes.length ? 'Récentes' : groupes[3][0]) ? 'on' : ''}">${esc(g)}</button>`).join('')}<button data-g="*">Toutes</button></div>
+      <div class="pop-onglets">${groupes.filter(g => g[1].length).map(([g]) => `<button data-g="${esc(g)}" class="${g === '★ Demandées' ? 'on' : ''}">${esc(g)}</button>`).join('')}<button data-g="*">Toutes</button></div>
       <div class="pop-liste polices"></div>
       <label class="btn petit" style="margin-top:6px;width:100%;justify-content:center">+ Importer une police (.ttf, .otf, .woff)<input type="file" class="pop-import" accept=".ttf,.otf,.woff,.woff2,font/*" hidden></label>`, 'pop-polices');
     const liste = $('.polices', d);
-    const montrer = (noms) => { liste.innerHTML = noms.map(n => `<button class="police-choix ${n === actuelle ? 'on' : ''}" data-n="${esc(n)}"><span style="font-family:'${esc(n)}',serif">${esc(n)}${site.includes(n) ? ' <em class="pc-tag">studio</em>' : perso.includes(n) ? ' <em class="pc-tag">importée</em>' : ''}</span><small style="font-family:'${esc(n)}',serif">Mariage · Ho tonga 2026</small>${perso.includes(n) && !site.includes(n) && mesPolices.some(m => m.nom === n) ? `<i class="pc-partager" data-partager="${esc(n)}" title="Mettre cette police dans le studio : toute l'équipe l'aura">⇪ pour toute l'équipe</i>` : ''}</button>`).join('') || '<p class="muet">Aucune police.</p>'; };
+    const montrer = (noms) => { liste.innerHTML = noms.map(n => `<button class="police-choix ${n === actuelle ? 'on' : ''}" data-n="${esc(n)}"><span style="font-family:'${esc(n)}',serif">${esc(n)}${site.includes(n) ? ' <em class="pc-tag">studio</em>' : perso.includes(n) ? ' <em class="pc-tag">importée</em>' : ''}</span><small style="font-family:'${esc(n)}',serif">${n === 'Intro' && !perso.includes('Intro') ? 'Police payante : à importer (fichier .ttf / .otf)' : 'Mariage · Ho tonga 2026'}</small>${perso.includes(n) && !site.includes(n) && mesPolices.some(m => m.nom === n) ? `<i class="pc-partager" data-partager="${esc(n)}" title="Mettre cette police dans le studio : toute l'équipe l'aura">⇪ pour toute l'équipe</i>` : ''}</button>`).join('') || '<p class="muet">Aucune police.</p>'; };
     const groupe = g => g === '*' ? [...new Set(site.concat(perso, cat.map(x => x[0])))] : (groupes.find(x => x[0] === g) || [0, []])[1];
     $('.pop-import', d).onchange = async e => { const f = e.target.files[0]; if (!f) return; try { const nom = await importerPolice(f); if (!nom) return; toast('Police « ' + nom + ' » importée'); Stock.ecrire('studio.polices.recentes', [nom].concat(recentes.filter(x => x !== nom)).slice(0, 6)); fermerPop(); choisir(nom); } catch (err) { toast(err.message); } };
-    montrer(groupe(recentes.length ? 'Récentes' : groupes[3][0]));
+    montrer(groupe('★ Demandées'));
     $$('[data-g]', d).forEach(b => b.onclick = () => { $$('[data-g]', d).forEach(x => x.classList.toggle('on', x === b)); $('.pop-cherche', d).value = ''; montrer(groupe(b.dataset.g)); });
     $('.pop-cherche', d).oninput = e => { const q = e.target.value.trim().toLowerCase(); montrer(q ? groupe('*').filter(n => n.toLowerCase().includes(q)) : groupe('*')); };
     liste.onclick = async e => {
       const pt = e.target.closest('[data-partager]');
       if (pt) { e.stopPropagation(); const n = pt.dataset.partager; pt.textContent = 'Envoi…'; try { await partagerPolice(n); toast('« ' + n + ' » est maintenant dans le studio pour toute l\'équipe'); fermerPop(); } catch (err) { toast(err.message); pt.textContent = '⇪ pour toute l\'équipe'; } return; }
-      const b = e.target.closest('[data-n]'); if (!b) return; const n = b.dataset.n; Stock.ecrire('studio.polices.recentes', [n].concat(recentes.filter(x => x !== n)).slice(0, 6)); fermerPop(); choisir(n); };
+      const b = e.target.closest('[data-n]'); if (!b) return;
+      if (b.dataset.n === 'Intro' && !perso.includes('Intro')) { toast('Intro est une police payante (Fontfabric) : achetez-la, puis « + Importer une police » ci-dessous et « ⇪ pour toute l\'équipe ». En attendant, Urbanist lui ressemble.'); return; } const n = b.dataset.n; Stock.ecrire('studio.polices.recentes', [n].concat(recentes.filter(x => x !== n)).slice(0, 6)); fermerPop(); choisir(n); };
     setTimeout(() => $('.pop-cherche', d).focus(), 30);
   }
   // Emojis rangés par thème (les derniers utilisés en premier)
@@ -397,6 +401,10 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-04-1', date: '4 novembre 2026', titre: 'Télécharger un fond · polices demandées en premier', points: [
+      '<b>⬇ Télécharger</b> sur chaque fond, photo et vidéo de la Bibliothèque (les vôtres, ceux de l\'équipe et les fonds de base) : le fichier est enregistré sur l\'ordinateur.',
+      'Liste des polices : nouvel onglet <b>★ Demandées</b>, ouvert en premier : League Spartan, Accidental Presidency, Intro (à importer, police payante), Urbanist, Archivo, Outfit, Cabin, League Gothic.'
+    ] },
     { id: '2026-11-03-5', date: '3 novembre 2026', titre: 'Accidental Presidency, polices du studio pour toute l\'équipe', points: [
       '<b>Accidental Presidency</b> est maintenant dans le studio pour tout le monde (onglet « Polices du studio » de la liste des polices), dans les invitations et dans le film.',
       '<b>Intro</b> est une police payante (Fontfabric) : une fois achetée, importez son fichier (« + Importer une police »), puis « ⇪ pour toute l\'équipe » : elle est mise dans le studio et toute l\'équipe l\'a, sans rien refaire.'
@@ -2826,6 +2834,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     const carteFond = f => `
         <div class="carte pile" data-id="${f.id}" style="padding:12px">
           <video src="" data-src="${esc(f.src)}" muted loop playsinline style="width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:8px;background:#eee" poster="${esc(/^data:/.test(f.vignette) ? f.vignette : BASE + f.vignette)}"></video>
+          <button class="btn petit" data-dl="${esc(f.src)}" data-dl-nom="${esc(f.nom)}" title="Enregistrer le fichier sur cet ordinateur">⬇ Télécharger</button>
           ${f.src.startsWith('idb:') ? `
             <input type="text" data-k="nom" value="${esc(f.nom)}">
             ${f.brouillon ? `<div class="ligne"><span class="badge alerte">Brouillon</span><button class="btn petit plein" data-garder="${f.id}">Garder</button></div>` : ''}
@@ -2851,7 +2860,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       <h3 style="margin-top:24px">Photos et vidéos ${evt === '*' ? '' : evt ? 'de cet événement' : 'communes'} <span class="muet" style="font-weight:400">(${autres.length})</span></h3>
       ${autres.length ? `<div class="grille" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))">${autres.map(m => `<div class="carte pile" data-id="${m.id}" style="padding:10px">
         ${m.type === 'video' ? `<video src="" data-src="${esc(m.src)}" muted loop playsinline poster="${esc(m.vignette)}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:#eee"></video>` : `<img src="${esc(m.vignette)}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px">`}
-        <b style="font-size:13px">${esc(m.nom)}</b>${m.anime ? '<span class="badge">image animée</span>' : ''}${m.secondes_creation ? `<span class="badge">⏱ ${dureeTexte(m.secondes_creation)}</span>` : ''}${Equipe.actif() && m.anime && !m.brouillon ? (m.equipe_id ? '<span class="badge ok">👥 partagé</span>' : `<button class="btn petit" data-partager="${m.id}">Partager avec l'équipe</button>`) : ''}${m.brouillon ? `<div class="ligne"><span class="badge alerte">Brouillon</span><button class="btn petit plein" data-garder="${m.id}">Garder</button></div>` : ''}${evt === '*' ? `<span class="badge">${esc(titre(m.evt))}</span>` : ''}
+        <b style="font-size:13px">${esc(m.nom)}</b><button class="btn petit" data-dl="${esc(m.src)}" data-dl-nom="${esc(m.nom)}" title="Enregistrer le fichier sur cet ordinateur">⬇ Télécharger</button>${m.anime ? '<span class="badge">image animée</span>' : ''}${m.secondes_creation ? `<span class="badge">⏱ ${dureeTexte(m.secondes_creation)}</span>` : ''}${Equipe.actif() && m.anime && !m.brouillon ? (m.equipe_id ? '<span class="badge ok">👥 partagé</span>' : `<button class="btn petit" data-partager="${m.id}">Partager avec l'équipe</button>`) : ''}${m.brouillon ? `<div class="ligne"><span class="badge alerte">Brouillon</span><button class="btn petit plein" data-garder="${m.id}">Garder</button></div>` : ''}${evt === '*' ? `<span class="badge">${esc(titre(m.evt))}</span>` : ''}
         <details><summary class="muet" style="cursor:pointer">Réglages</summary><div class="pile" style="margin-top:6px">${choixEvt(m)}<button class="btn petit danger" data-suppr="${m.id}">Supprimer</button></div></details></div>`).join('')}</div>` : '<p class="muet">Aucune photo ou vidéo ici.</p>'}
       ${Equipe.actif() ? `<h3 style="margin-top:24px">👥 Bibliothèque de l'équipe « ${esc(reglages.equipe.nom)} » <span class="muet" style="font-weight:400">(${Equipe.items.length} · visible et utilisable par tous)</span> <button class="btn petit" id="eq-actualiser">Actualiser</button></h3>
         ${Equipe.items.filter(x => x.type !== 'film').length ? `<div class="grille" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr))">${Equipe.items.filter(x => x.type !== 'film').map(x => `<div class="carte pile" style="padding:10px">
@@ -2859,10 +2868,23 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <b style="font-size:13px">${esc(x.nom)}</b><div class="muet" style="font-size:12px">par <b>${esc(x.auteur || '—')}</b>${x.evenement ? ' · ' + esc(x.evenement) : ''}</div>
           ${x.secondes_creation ? `<span class="badge">⏱ créé en ${dureeTexte(x.secondes_creation)}</span>` : ''}
           ${x.type === 'fond' ? '' : '<span class="badge">' + (x.type === 'video' ? 'image animée' : x.type) + '</span>'}
+          <button class="btn petit" data-dl="${esc(Equipe.url(x.chemin))}" data-dl-nom="${esc(x.nom)}" title="Enregistrer le fichier sur cet ordinateur">⬇ Télécharger</button>
           ${Equipe.admin() || x.auteur === Equipe.membre() ? `<button class="btn petit danger" data-eq-suppr="${esc(x.id)}">Retirer de l'équipe</button>` : ''}</div>`).join('')}</div>` : '<p class="muet">Encore rien de partagé. Vos nouveaux fonds le seront automatiquement ; « Partager » sur un fond existant, ou Réglages → « Partager tous mes fonds existants ».</p>'}` : ''}
       <h3 style="margin-top:24px">Fonds de base <span class="muet" style="font-weight:400">(pour tous les événements)</span></h3>
       <div class="grille" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">${Fabrique.FONDS.map(carteFond).join('')}</div>
       <p class="muet" style="margin-top:20px">Les fichiers importés restent dans ce navigateur jusqu'à la publication, qui les envoie sur GitHub.</p>`;
+    // Télécharger un fond / une photo / une vidéo de la bibliothèque
+    $$('[data-dl]').forEach(b => b.onclick = async () => {
+      const src = b.dataset.dl, nom = (b.dataset.dlNom || 'fond').replace(/[\\/:*?"<>|]+/g, '-').trim() || 'fond';
+      const t = b.textContent; b.disabled = true; b.textContent = 'Téléchargement…';
+      try {
+        const u = await resoudre(src); const r = await fetch(u); if (!r.ok) throw new Error('fichier introuvable (' + r.status + ')');
+        const blob = await r.blob();
+        const ext = (src.split('?')[0].match(/\.(\w{2,4})$/) || [])[1] || (/webm/.test(blob.type) ? 'webm' : /quicktime/.test(blob.type) ? 'mov' : /png/.test(blob.type) ? 'png' : /jpe?g/.test(blob.type) ? 'jpg' : /webp/.test(blob.type) ? 'webp' : 'mp4');
+        telecharger(nom + '.' + ext.toLowerCase(), blob); toast('« ' + nom + ' » téléchargé');
+      } catch (err) { toast('Téléchargement impossible : ' + err.message); }
+      b.disabled = false; b.textContent = t;
+    });
     $$('[data-garder]').forEach(b => b.onclick = () => { const m = medias.find(x => x.id === b.dataset.garder); if (m) { delete m.brouillon; sauverMedias(); toast('Gardé dans la bibliothèque'); Equipe.apresAjout(m, projets[m.evt]); vueBibliotheque(); } });
     const eqa2 = $('#eq-actualiser'); if (eqa2) eqa2.onclick = async () => { try { await Equipe.charger(); vueBibliotheque(); } catch (e) { toast(e.message); } };
     $$('[data-eq-suppr]').forEach(b => b.onclick = async () => { if (!confirm('Retirer ce fichier de la bibliothèque de l\'équipe ? (Les invitations déjà publiées ne changent pas.)')) return; try { await Equipe.rpc('equipe_biblio_supprimer', { p_id: b.dataset.eqSuppr }); medias.forEach(m => { if (m.equipe_id === b.dataset.eqSuppr) delete m.equipe_id; }); sauverMedias(); await Equipe.charger(); vueBibliotheque(); } catch (e) { toast(e.message); } });
