@@ -375,3 +375,13 @@ textarea.edition-directe { position: absolute; z-index: 8; resize: none; overflo
 #nouvelle-version span { opacity: .75; }
 .pc-tag { font: 600 10px Inter, sans-serif; font-style: normal; background: #efe4d6; color: #6b5a50; border-radius: 999px; padding: 1px 6px; vertical-align: middle; }
 .pc-partager { font: 600 11px Inter, sans-serif; font-style: normal; color: var(--vin); margin-top: 3px; cursor: pointer; text-decoration: underline; }
+/* Forme du cadre */
+.formes-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap: 5px; }
+.forme-btn { display: flex; flex-direction: column; align-items: center; gap: 2px; border: 1px solid var(--ligne); background: #fff; border-radius: 10px; padding: 5px 3px; cursor: pointer; font: 500 10.5px Inter, sans-serif; color: #5b4a44; line-height: 1.15; text-align: center; }
+.forme-btn svg { width: 34px; height: 34px; }
+.forme-btn:hover { border-color: var(--vin); }
+.forme-btn.on { border-color: var(--vin); background: #fbf1ee; box-shadow: 0 0 0 1px var(--vin) inset; }
+.pop.pop-formes { width: 380px; }
+.pop.pop-formes .formes-grille { max-height: 340px; overflow: auto; }
+.fl-boite { max-height: 62vh; max-width: 100%; margin: 0 auto; background: #f4ede2; border-radius: 10px; overflow: hidden; touch-action: none; }
+.fl-boite svg { width: 100%; height: 100%; display: block; }

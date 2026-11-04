@@ -78,6 +78,60 @@
   const JOURS_FR = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
   const JOURS_MG = ['Alahady', 'Alatsinainy', 'Talata', 'Alarobia', 'Alakamisy', 'Zoma', 'Sabotsy'];
   // Vidéo coupée (début / fin en secondes) : position dans le fichier pour un temps t de lecture
+  /* ---------- Formes du cadre des photos et vidéos ----------
+   * Chaque forme rend un tracé SVG dans un rectangle 0..w × 0..h (utilisé pour découper la photo, tracer la bordure
+   * et dessiner les icônes du studio). « libre » : points posés à la main (c.forme_points, de 0 à 1). */
+  const f2 = n => (Math.round(n * 100) / 100).toString();
+  function polygone(pts) { return pts.map((p, i) => (i ? 'L' : 'M') + f2(p[0]) + ' ' + f2(p[1])).join('') + 'Z'; }
+  function regulier(n, w, h, depart, rayons) {
+    const pts = [];
+    for (let i = 0; i < n; i++) { const a = (depart || -90) * Math.PI / 180 + i * 2 * Math.PI / n, r = rayons ? rayons[i % rayons.length] : 1; pts.push([w / 2 + Math.cos(a) * w / 2 * r, h / 2 + Math.sin(a) * h / 2 * r]); }
+    return pts;
+  }
+  // courbe douce fermée qui passe par tous les points (Catmull-Rom → Bézier)
+  function lisser(pts) {
+    const n = pts.length; if (n < 3) return polygone(pts);
+    let d = 'M' + f2(pts[0][0]) + ' ' + f2(pts[0][1]);
+    for (let i = 0; i < n; i++) {
+      const p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
+      d += 'C' + f2(p1[0] + (p2[0] - p0[0]) / 6) + ' ' + f2(p1[1] + (p2[1] - p0[1]) / 6) + ' ' + f2(p2[0] - (p3[0] - p1[0]) / 6) + ' ' + f2(p2[1] - (p3[1] - p1[1]) / 6) + ' ' + f2(p2[0]) + ' ' + f2(p2[1]);
+    }
+    return d + 'Z';
+  }
+  // tracé en coordonnées 0..1 → mis à l'échelle w × h
+  const unite = (d, w, h) => d.replace(/(-?\d*\.?\d+) (-?\d*\.?\d+)/g, (m, x, y) => f2(Number(x) * w) + ' ' + f2(Number(y) * h));
+  const FORMES = [
+    ['', 'Normale (photo entière)', () => null],
+    ['rect', 'Rectangle', (w, h) => `M0 0H${f2(w)}V${f2(h)}H0Z`],
+    ['arrondi', 'Coins arrondis', (w, h, c) => { const r = Math.min(w, h) / 2 * clamp(c.arrondi != null && c.arrondi !== '' ? Number(c.arrondi) : 16, 0, 100) / 100; return `M${f2(r)} 0H${f2(w - r)}A${f2(r)} ${f2(r)} 0 0 1 ${f2(w)} ${f2(r)}V${f2(h - r)}A${f2(r)} ${f2(r)} 0 0 1 ${f2(w - r)} ${f2(h)}H${f2(r)}A${f2(r)} ${f2(r)} 0 0 1 0 ${f2(h - r)}V${f2(r)}A${f2(r)} ${f2(r)} 0 0 1 ${f2(r)} 0Z`; }],
+    ['rond', 'Rond / ovale', (w, h) => `M0 ${f2(h / 2)}A${f2(w / 2)} ${f2(h / 2)} 0 1 0 ${f2(w)} ${f2(h / 2)}A${f2(w / 2)} ${f2(h / 2)} 0 1 0 0 ${f2(h / 2)}Z`],
+    ['pilule', 'Pilule', (w, h) => { const r = Math.min(w, h) / 2; return w >= h ? `M${f2(r)} 0H${f2(w - r)}A${f2(r)} ${f2(r)} 0 0 1 ${f2(w - r)} ${f2(h)}H${f2(r)}A${f2(r)} ${f2(r)} 0 0 1 ${f2(r)} 0Z` : `M0 ${f2(r)}A${f2(r)} ${f2(r)} 0 0 1 ${f2(w)} ${f2(r)}V${f2(h - r)}A${f2(r)} ${f2(r)} 0 0 1 0 ${f2(h - r)}Z`; }],
+    ['arche', 'Arche', (w, h) => { const ry = Math.min(w / 2, h / 2); return `M0 ${f2(h)}V${f2(ry)}A${f2(w / 2)} ${f2(ry)} 0 0 1 ${f2(w)} ${f2(ry)}V${f2(h)}Z`; }],
+    ['arche-double', 'Double arche', (w, h) => { const ry = Math.min(w / 2, h / 2); return `M0 ${f2(h - ry)}V${f2(ry)}A${f2(w / 2)} ${f2(ry)} 0 0 1 ${f2(w)} ${f2(ry)}V${f2(h - ry)}A${f2(w / 2)} ${f2(ry)} 0 0 1 0 ${f2(h - ry)}Z`; }],
+    ['coeur', 'Cœur', (w, h) => unite('M0.5 0.97C0.18 0.74 0 0.54 0 0.31C0 0.13 0.14 0.02 0.29 0.02C0.39 0.02 0.46 0.08 0.5 0.15C0.54 0.08 0.61 0.02 0.71 0.02C0.86 0.02 1 0.13 1 0.31C1 0.54 0.82 0.74 0.5 0.97Z', w, h)],
+    ['etoile', 'Étoile', (w, h) => polygone(regulier(10, w, h, -90, [1, 0.46]))],
+    ['etoile-douce', 'Étoile douce', (w, h) => lisser(regulier(10, w, h, -90, [1, 0.62]))],
+    ['fleur', 'Fleur (festonné)', (w, h) => { const n = 10; let d = ''; const pts = regulier(n, w, h, -90, [0.86]); pts.forEach((p, i) => { const q = pts[(i + 1) % n], a = (-90 + (i + 0.5) * 360 / n) * Math.PI / 180; d += (i ? '' : 'M' + f2(p[0]) + ' ' + f2(p[1])) + 'Q' + f2(w / 2 + Math.cos(a) * w / 2 * 1.12) + ' ' + f2(h / 2 + Math.sin(a) * h / 2 * 1.12) + ' ' + f2(q[0]) + ' ' + f2(q[1]); }); return d + 'Z'; }],
+    ['nuage', 'Nuage', (w, h) => lisser([[0.12, 0.62], [0.08, 0.42], [0.22, 0.26], [0.38, 0.12], [0.58, 0.1], [0.74, 0.22], [0.9, 0.3], [0.95, 0.52], [0.88, 0.76], [0.66, 0.88], [0.4, 0.9], [0.2, 0.82]].map(p => [p[0] * w, p[1] * h]))],
+    ['goutte', 'Goutte', (w, h) => unite('M0.5 0C0.62 0.2 1 0.45 1 0.68C1 0.86 0.78 1 0.5 1C0.22 1 0 0.86 0 0.68C0 0.45 0.38 0.2 0.5 0Z', w, h)],
+    ['feuille', 'Feuille', (w, h) => unite('M0.5 0C0.97 0.24 0.97 0.76 0.5 1C0.03 0.76 0.03 0.24 0.5 0Z', w, h)],
+    ['tache', 'Forme organique', (w, h) => lisser([[0.5, 0.02], [0.82, 0.12], [0.98, 0.42], [0.88, 0.78], [0.6, 0.98], [0.26, 0.92], [0.04, 0.66], [0.1, 0.24]].map(p => [p[0] * w, p[1] * h]))],
+    ['losange', 'Losange', (w, h) => polygone([[w / 2, 0], [w, h / 2], [w / 2, h], [0, h / 2]])],
+    ['triangle', 'Triangle', (w, h) => polygone([[w / 2, 0], [w, h], [0, h]])],
+    ['pentagone', 'Pentagone', (w, h) => polygone(regulier(5, w, h))],
+    ['hexagone', 'Hexagone', (w, h) => polygone(regulier(6, w, h, 0))],
+    ['octogone', 'Octogone', (w, h) => polygone(regulier(8, w, h, -22.5))],
+    ['coins-coupes', 'Coins coupés', (w, h) => { const k = Math.min(w, h) * 0.16; return polygone([[k, 0], [w - k, 0], [w, k], [w, h - k], [w - k, h], [k, h], [0, h - k], [0, k]]); }],
+    ['parallelogramme', 'Parallélogramme', (w, h) => { const k = w * 0.18; return polygone([[k, 0], [w, 0], [w - k, h], [0, h]]); }],
+    ['vague', 'Bas en vague', (w, h) => { const a = h * 0.06; return `M0 0H${f2(w)}V${f2(h - a)}C${f2(w * 0.75)} ${f2(h - 3 * a)} ${f2(w * 0.75)} ${f2(h + a)} ${f2(w / 2)} ${f2(h - a)}C${f2(w * 0.25)} ${f2(h - 3 * a)} ${f2(w * 0.25)} ${f2(h + a)} 0 ${f2(h - a)}Z`; }],
+    ['libre', 'Forme libre (à dessiner)', (w, h, c) => { const pts = (Array.isArray(c.forme_points) && c.forme_points.length >= 3 ? c.forme_points : [[0.5, 0], [1, 0.35], [0.82, 1], [0.18, 1], [0, 0.35]]).map(p => [clamp(Number(p[0]), 0, 1) * w, clamp(Number(p[1]), 0, 1) * h]); return c.forme_lisse ? lisser(pts) : polygone(pts); }]
+  ];
+  // tracé SVG de la forme d'un calque (null = pas de découpe)
+  function cheminForme(c, w, h) {
+    if (!c || !c.forme) return null;
+    const f = FORMES.find(x => x[0] === c.forme) || FORMES.find(x => x[0] === 'arrondi');
+    return f[2](w, h, c);
+  }
   function graisse(c) { return Number(c.graisse) || (c.gras ? 700 : 400); }
   function tourner(ctx, c) { const r = Number(c.rotation); if (!r) return; const cx = (Number(c.x) || 50) / 100 * W, cy = (Number(c.y) || 50) / 100 * H; ctx.translate(cx, cy); ctx.rotate(r * Math.PI / 180); ctx.translate(-cx, -cy); }
   // Fond d'un plan : vidéo (par défaut), photo, couleur unie / dégradé, ou aucun (transparent)
@@ -643,15 +697,20 @@
         const el = this.medias[c.media];
         const haut = c.hauteur ? Number(c.hauteur) / 100 * H : larg * 1.0;
         if (el) {
-          if (c.forme === 'rond' || c.forme === 'arrondi') {
-            ctx.save();
-            if (c.forme === 'rond') { ctx.beginPath(); ctx.ellipse(0, 0, larg / 2, haut / 2, 0, 0, Math.PI * 2); }
-            else arrondi(ctx, -larg / 2, -haut / 2, larg, haut, Math.min(larg, haut) * 0.08);
-            ctx.clip();
+          // forme du cadre : la photo est découpée dans la forme (et remplit la forme)
+          const d = cheminForme(c, larg, haut);
+          const chemin = d ? new Path2D() : null;
+          if (chemin) chemin.addPath(new Path2D(d), new DOMMatrix().translate(-larg / 2, -haut / 2));
+          if (chemin) {
+            if (c.ombre_cadre) { ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 18; ctx.shadowOffsetY = 6; ctx.fillStyle = '#fff'; ctx.fill(chemin); ctx.restore(); }
+            ctx.save(); ctx.clip(chemin);
             this._dessinerImage(el, -larg / 2, -haut / 2, larg, haut, true, c.recadrage);
             ctx.restore();
           } else this._dessinerImage(el, -larg / 2, -haut / 2, larg, haut, c.remplir === true, c.recadrage);
-          if (c.bordure) { ctx.strokeStyle = c.bordure; ctx.lineWidth = 3; if (c.forme === 'rond') { ctx.beginPath(); ctx.ellipse(0, 0, larg / 2, haut / 2, 0, 0, Math.PI * 2); ctx.stroke(); } else { arrondi(ctx, -larg / 2, -haut / 2, larg, haut, c.forme === 'arrondi' ? Math.min(larg, haut) * 0.08 : 0); ctx.stroke(); } }
+          if (c.bordure) {
+            ctx.strokeStyle = c.bordure; ctx.lineWidth = Number(c.bordure_epaisseur) || 3; ctx.lineJoin = 'round';
+            if (chemin) ctx.stroke(chemin); else ctx.strokeRect(-larg / 2, -haut / 2, larg, haut);
+          }
         } else {
           ctx.strokeStyle = 'rgba(122,31,43,.5)'; ctx.setLineDash([8, 6]); ctx.strokeRect(-larg / 2, -haut / 2, larg, haut);
         }
@@ -972,5 +1031,5 @@
   // Langues proposées pour les invitations
   const LANGUES = { mg: 'Malagasy', fr: 'Français', en: 'English', de: 'Deutsch', it: 'Italiano', es: 'Español', pt: 'Português', zh: '中文', ar: 'العربية', ru: 'Русский', ja: '日本語' };
   const FUSIONS = [['normal', 'Normale'], ['multiply', 'Produit (assombrit, garde les ombres)'], ['screen', 'Écran (éclaircit, garde les lumières)'], ['overlay', 'Superposition'], ['soft-light', 'Lumière douce'], ['hard-light', 'Lumière crue'], ['color-dodge', 'Densité couleur −'], ['color-burn', 'Densité couleur +'], ['darken', 'Obscurcir'], ['lighten', 'Éclaircir'], ['difference', 'Différence'], ['luminosity', 'Luminosité'], ['color', 'Couleur']];
-  global.MoteurInfo = { CATALOGUE_POLICES, chargerPolices, chargerPolicePerso, typeFond, fondMedia, FUSIONS, plage, positionVideo, LANGUES, texteDe, W, H, POLICES, ANIMATIONS, SORTIES, NOMS_EFFETS, ACTIONS, TYPES_HTML, uid, variablesDe, dateLisible, remplacer, MOIS_MG, MOIS_FR };
+  global.MoteurInfo = { FORMES: FORMES.map(x => [x[0], x[1]]), cheminForme, CATALOGUE_POLICES, chargerPolices, chargerPolicePerso, typeFond, fondMedia, FUSIONS, plage, positionVideo, LANGUES, texteDe, W, H, POLICES, ANIMATIONS, SORTIES, NOMS_EFFETS, ACTIONS, TYPES_HTML, uid, variablesDe, dateLisible, remplacer, MOIS_MG, MOIS_FR };
 })(window);

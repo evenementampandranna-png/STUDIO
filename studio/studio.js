@@ -265,7 +265,7 @@
     setTimeout(() => {
       const dehors = e => { if (!d.isConnected) return document.removeEventListener('pointerdown', dehors, true); if (!d.contains(e.target) && e.target !== ancre) { fermerPop(); document.removeEventListener('pointerdown', dehors, true); } };
       document.addEventListener('pointerdown', dehors, true);
-      const echap = e => { if (e.key === 'Escape') { fermerPop(); document.removeEventListener('keydown', echap, true); } };
+      const echap = e => { if (!d.isConnected) return document.removeEventListener('keydown', echap, true); if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); fermerPop(); document.removeEventListener('keydown', echap, true); } };
       document.addEventListener('keydown', echap, true);
     }, 0);
     return d;
@@ -320,6 +320,76 @@
     montrer(0);
     $$('[data-c]', d).forEach(b => b.onclick = () => { $$('[data-c]', d).forEach(x => x.classList.toggle('on', x === b)); montrer(Number(b.dataset.c)); });
     liste.onclick = e => { const b = e.target.closest('[data-e]'); if (!b) return; const em = b.dataset.e; Stock.ecrire('studio.emojis.recents', [em].concat(recents.filter(x => x !== em)).slice(0, 24)); choisir(em); };
+  }
+
+  /* ---------- Forme du cadre d'une photo ou d'une vidéo ---------- */
+  function iconeForme(id, c, ratio) {
+    const w = ratio >= 1 ? 40 : Math.round(40 * ratio), h = ratio >= 1 ? Math.round(40 / ratio) : 40;
+    if (!id) return `<svg viewBox="-3 -3 46 46"><rect x="4" y="8" width="32" height="24" fill="#d9cbbb"/><path d="M8 28l8-9 6 6 4-4 8 7z" fill="#a98f78"/></svg>`;
+    const d = MoteurInfo.cheminForme(Object.assign({}, c, { forme: id }), w, h);
+    return `<svg viewBox="-3 -3 ${w + 6} ${h + 6}"><path d="${d}" fill="#d9cbbb" stroke="#7a1f2b" stroke-width="1.6" stroke-linejoin="round"/></svg>`;
+  }
+  function grilleFormes(c, ratio) {
+    return `<div class="formes-grille">${MoteurInfo.FORMES.map(([id, nom]) => `<button class="forme-btn ${(c.forme || '') === id ? 'on' : ''}" data-forme="${id}" title="${esc(nom)}">${iconeForme(id, c, ratio)}<span>${esc(nom.replace(/ \(.*\)$/, ''))}</span></button>`).join('')}</div>`;
+  }
+  // points d'une forme quelconque (pour la modifier librement)
+  function pointsDeForme(c, n) {
+    const d = MoteurInfo.cheminForme(c.forme ? c : Object.assign({}, c, { forme: 'rect' }), 1000, 1000);
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.style.position = 'absolute'; svg.style.visibility = 'hidden';
+    const pa = document.createElementNS('http://www.w3.org/2000/svg', 'path'); pa.setAttribute('d', d); svg.appendChild(pa); document.body.appendChild(svg);
+    const L = pa.getTotalLength(), pts = [];
+    for (let i = 0; i < n; i++) { const q = pa.getPointAtLength(L * i / n); pts.push([Math.round(q.x) / 1000, Math.round(q.y) / 1000]); }
+    svg.remove(); return pts;
+  }
+  // Éditeur de forme libre : on déplace les points sur la photo
+  async function modaleFormeLibre(c, ratio, fini) {
+    let pts = Array.isArray(c.forme_points) && c.forme_points.length >= 3 ? c.forme_points.map(p => p.slice()) : pointsDeForme(c, (c.forme && c.forme !== 'rect' && c.forme !== 'arrondi') ? 12 : 8);
+    let lisse = c.forme === 'libre' ? !!c.forme_lisse : !['rect', 'losange', 'triangle', 'pentagone', 'hexagone', 'octogone', 'coins-coupes', 'parallelogramme', 'etoile', ''].includes(c.forme || '');
+    // image de la photo (ou de la vidéo)
+    let img = '';
+    try { const u = await resoudre(c.media); if (/\.(png|jpe?g|webp|gif|svg)(\?|$)/i.test(c.media) || /^data:image/.test(c.media)) img = u; else { const v = document.createElement('video'); v.muted = true; v.crossOrigin = 'anonymous'; v.src = u; await new Promise(ok => { v.onloadeddata = ok; setTimeout(ok, 5000); }); v.currentTime = Math.min(1, (v.duration || 2) / 3); await new Promise(ok => { v.onseeked = ok; setTimeout(ok, 3000); }); const cv = document.createElement('canvas'); cv.width = v.videoWidth || 320; cv.height = v.videoHeight || 320; cv.getContext('2d').drawImage(v, 0, 0); img = cv.toDataURL('image/jpeg', 0.85); } } catch (e) {}
+    const W0 = 1000, H0 = Math.round(1000 / ratio);
+    modale(`<h2>✎ Forme libre du cadre</h2>
+      <p class="muet">Glissez les points ronds. <b>Double-clic sur un trait</b> : ajouter un point · <b>double-clic sur un point</b> : le retirer (3 points au moins).</p>
+      <div class="ligne" style="gap:10px;margin-bottom:8px;flex-wrap:wrap"><label class="cases"><input type="checkbox" id="fl-lisse" ${lisse ? 'checked' : ''}> Courbes douces</label>
+        <span class="muet">Partir de :</span>${['rond', 'coeur', 'etoile', 'hexagone', 'arche', 'tache'].map(id => `<button class="btn petit" data-depart="${id}">${esc((MoteurInfo.FORMES.find(x => x[0] === id) || [0, id])[1])}</button>`).join('')}</div>
+      <div class="fl-boite" style="aspect-ratio:${W0 + 120} / ${H0 + 120};width:min(100%, calc(62vh * ${((W0 + 120) / (H0 + 120)).toFixed(3)}))"><svg id="fl-svg" viewBox="-60 -60 ${W0 + 120} ${H0 + 120}" preserveAspectRatio="xMidYMid meet">
+        <defs><clipPath id="fl-clip"><path id="fl-clip-p"/></clipPath></defs>
+        ${img ? `<image href="${esc(img)}" x="0" y="0" width="${W0}" height="${H0}" preserveAspectRatio="xMidYMid slice" opacity=".28"/><image href="${esc(img)}" x="0" y="0" width="${W0}" height="${H0}" preserveAspectRatio="xMidYMid slice" clip-path="url(#fl-clip)"/>` : `<rect width="${W0}" height="${H0}" fill="#eee"/>`}
+        <rect width="${W0}" height="${H0}" fill="none" stroke="#999" stroke-dasharray="8 8"/>
+        <path id="fl-trait" fill="none" stroke="#c33a4c" stroke-width="5" stroke-linejoin="round" style="cursor:copy"/>
+        <g id="fl-points"></g></svg></div>
+      <div class="ligne" style="margin-top:12px;justify-content:space-between"><button class="btn" id="fl-annuler">Annuler</button><button class="btn plein" id="fl-ok">Appliquer cette forme</button></div>`, (racine, fermer) => {
+      const svg = $('#fl-svg', racine);
+      const chemin = () => { const P = pts.map(p => [p[0] * W0, p[1] * H0]); return MoteurInfo.cheminForme({ forme: 'libre', forme_points: pts, forme_lisse: lisse }, W0, H0); };
+      const rendre = () => {
+        const d = chemin(); $('#fl-trait', racine).setAttribute('d', d); $('#fl-clip-p', racine).setAttribute('d', d);
+        $('#fl-points', racine).innerHTML = pts.map((p, i) => `<circle cx="${p[0] * W0}" cy="${p[1] * H0}" r="16" data-i="${i}" fill="#fff" stroke="#c33a4c" stroke-width="5" style="cursor:grab"/>`).join('');
+      };
+      const versSvg = e => { const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const q = pt.matrixTransform(svg.getScreenCTM().inverse()); return [Math.max(0, Math.min(1, q.x / W0)), Math.max(0, Math.min(1, q.y / H0))]; };
+      let tire = null;
+      svg.addEventListener('pointerdown', e => { const i = e.target.dataset && e.target.dataset.i; if (i == null) return; tire = Number(i); svg.setPointerCapture(e.pointerId); e.preventDefault(); });
+      svg.addEventListener('pointermove', e => { if (tire == null) return; pts[tire] = versSvg(e).map(v => Math.round(v * 1000) / 1000); rendre(); });
+      svg.addEventListener('pointerup', () => { tire = null; });
+      svg.addEventListener('dblclick', e => {
+        const i = e.target.dataset && e.target.dataset.i;
+        if (i != null) { if (pts.length > 3) { pts.splice(Number(i), 1); rendre(); } else toast('Il faut au moins 3 points'); return; }
+        // ajouter un point sur le trait le plus proche
+        const q = versSvg(e); let best = 0, dmin = 1e9;
+        pts.forEach((a, k) => { const b = pts[(k + 1) % pts.length]; const ax = a[0] * W0, ay = a[1] * H0, bx = b[0] * W0, by = b[1] * H0, px = q[0] * W0, py = q[1] * H0; const t = Math.max(0, Math.min(1, ((px - ax) * (bx - ax) + (py - ay) * (by - ay)) / ((bx - ax) ** 2 + (by - ay) ** 2 || 1))); const d = Math.hypot(px - (ax + t * (bx - ax)), py - (ay + t * (by - ay))); if (d < dmin) { dmin = d; best = k; } });
+        pts.splice(best + 1, 0, q.map(v => Math.round(v * 1000) / 1000)); rendre();
+      });
+      $('#fl-lisse', racine).onchange = e => { lisse = e.target.checked; rendre(); };
+      $$('[data-depart]', racine).forEach(b => b.onclick = () => { pts = pointsDeForme(Object.assign({}, c, { forme: b.dataset.depart }), b.dataset.depart === 'etoile' || b.dataset.depart === 'hexagone' ? (b.dataset.depart === 'etoile' ? 10 : 6) : 12); if (b.dataset.depart === 'etoile' || b.dataset.depart === 'hexagone') { pts = MoteurInfo.cheminForme(Object.assign({}, c, { forme: b.dataset.depart }), 1, 1) ? pointsSommets(b.dataset.depart) : pts; lisse = false; } else lisse = true; $('#fl-lisse', racine).checked = lisse; rendre(); });
+      $('#fl-annuler', racine).onclick = fermer;
+      $('#fl-ok', racine).onclick = () => { fermer(); fini(pts, lisse); };
+      rendre();
+    });
+  }
+  // sommets exacts des formes à angles (étoile, hexagone)
+  function pointsSommets(id) {
+    const d = MoteurInfo.cheminForme({ forme: id }, 1000, 1000);
+    return (d.match(/[ML](-?[\d.]+) (-?[\d.]+)/g) || []).map(m => { const [x, y] = m.slice(1).split(' ').map(Number); return [Math.round(x) / 1000, Math.round(y) / 1000]; });
   }
 
   /* ---------- Rogner une photo ou une vidéo (garder une partie) ---------- */
@@ -401,6 +471,12 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-04-2', date: '4 novembre 2026', titre: 'Forme du cadre des photos', points: [
+      'Choisissez une photo (ou une vidéo) : bouton <b>◇ Forme</b> dans la barre au-dessus de l\'aperçu, ou bloc « Forme du cadre » à droite.',
+      '24 formes : rectangle, coins arrondis (arrondi réglable), rond / ovale, pilule, arche, arche double, cœur, étoile, étoile douce, fleur, nuage, goutte, feuille, forme organique, losange, triangle, pentagone, hexagone, octogone, coins coupés, parallélogramme, bas en vague…',
+      '<b>✎ Forme libre</b> : partez de n\'importe quelle forme et déplacez ses points sur la photo ; double-clic sur un trait pour ajouter un point, sur un point pour le retirer ; « Courbes douces » pour des bords arrondis.',
+      'Bordure qui suit la forme (couleur, épaisseur) et ombre. Marche aussi pour plusieurs photos choisies ensemble, dans l\'invitation et dans le film.'
+    ] },
     { id: '2026-11-04-1', date: '4 novembre 2026', titre: 'Télécharger un fond · polices demandées en premier', points: [
       '<b>⬇ Télécharger</b> sur chaque fond, photo et vidéo de la Bibliothèque (les vôtres, ceux de l\'équipe et les fonds de base) : le fichier est enregistré sur l\'ordinateur.',
       'Liste des polices : nouvel onglet <b>★ Demandées</b>, ouvert en premier : League Spartan, Accidental Presidency, Intro (à importer, police payante), Urbanist, Archivo, Outfit, Cabin, League Gothic.'
@@ -1225,7 +1301,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     // Mise en forme : copier / coller le style d'un calque sur un autre (pinceau)
     const STYLE_TEXTE = ['police', 'graisse', 'rotation', 'taille', 'couleur', 'gras', 'italique', 'majuscules', 'align', 'interligne', 'ombre', 'ombre_couleur', 'ombre_force', 'ombre_opacite', 'ombre_decalage', 'contour', 'contour_epaisseur', 'fond_couleur', 'fond_opacite', 'fond_marge', 'fond_arrondi', 'opacite', 'animation', 'duree_animation', 'sortie', 'duree_sortie'];
     const STYLE_BOUTON = ['police', 'graisse', 'taille', 'couleur', 'style'];
-    const STYLE_MEDIA = ['forme', 'bordure', 'opacite', 'remplir', 'animation', 'duree_animation', 'sortie', 'duree_sortie'];
+    const STYLE_MEDIA = ['forme', 'arrondi', 'forme_points', 'forme_lisse', 'bordure_epaisseur', 'ombre_cadre', 'bordure', 'opacite', 'remplir', 'animation', 'duree_animation', 'sortie', 'duree_sortie'];
     const clesStyle = t => t === 'texte' ? STYLE_TEXTE : (t === 'bouton' || t === 'compteur' || t === 'champ') ? STYLE_BOUTON : STYLE_MEDIA;
     let pinceau = false;
     function copierStyle(c) {
@@ -1346,7 +1422,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         ${c.type === 'texte' || c.type === 'bouton' || c.type === 'compteur' ? `<input type="color" data-b="couleur" value="${c.couleur || '#7a1f2b'}" title="Couleur">` : ''}
         ${c.type === 'texte' ? `<button class="btn petit icone ${c.gras ? 'on' : ''}" data-b="gras" title="Gras"><b>G</b></button><button class="btn petit icone ${c.italique ? 'on' : ''}" data-b="italique" title="Italique"><i>I</i></button><span class="groupe-align">${[['left', 'Aligner le texte à gauche', '<svg viewBox="0 0 16 16"><path d="M2 3h12M2 6.5h8M2 10h12M2 13.5h7"/></svg>'], ['center', 'Centrer le texte', '<svg viewBox="0 0 16 16"><path d="M2 3h12M4 6.5h8M2 10h12M4.5 13.5h7"/></svg>'], ['right', 'Aligner le texte à droite', '<svg viewBox="0 0 16 16"><path d="M2 3h12M6 6.5h8M2 10h12M7 13.5h7"/></svg>'], ['justify', 'Justifier le texte', '<svg viewBox="0 0 16 16"><path d="M2 3h12M2 6.5h12M2 10h12M2 13.5h7"/></svg>']].map(([k, t, ic]) => `<button class="btn petit icone ${(c.align || 'center') === k ? 'on' : ''}" data-talign="${k}" title="${t}">${ic}</button>`).join('')}</span>` : ''}
         ${ecr ? `<button class="btn petit police-btn" data-b="police" title="Choisir la police" style="font-family:'${esc(c.police || 'Cormorant Garamond')}'">${esc((c.police || 'Cormorant Garamond').slice(0, 16))} ▾</button>` : ''}${c.type === 'texte' ? '<button class="btn petit icone" data-b="emoji" title="Ajouter un emoji">😊</button>' : ''}
-        ${c.type === 'image' || c.type === 'video' ? '<button class="btn petit" data-b="recadrer" title="Rogner : garder une partie de la photo ou de la vidéo">⬚ Rogner</button>' : ''}
+        ${c.type === 'image' || c.type === 'video' ? `<button class="btn petit" data-b="forme" title="Forme du cadre : rond, cœur, arche, étoile… ou forme libre">◇ Forme${c.forme ? ' : ' + esc(((MoteurInfo.FORMES.find(x => x[0] === c.forme) || [0, ''])[1]).replace(/ \(.*\)$/, '')) : ''}</button><button class="btn petit" data-b="recadrer" title="Rogner : garder une partie de la photo ou de la vidéo">⬚ Rogner</button>` : ''}
         <span class="sep"></span><button class="btn petit icone" data-al="centre-h" title="Centrer sur la page (horizontal)">⇔</button><button class="btn petit icone" data-al="centre-v" title="Centrer sur la page (vertical)">⇕</button>
         <span class="sep"></span>
         <button class="btn petit icone ${pinceau ? 'on' : ''}" data-b="pinceau" title="Pinceau : copier la mise en forme puis cliquer les calques à mettre en forme">🖌</button><button class="btn petit icone" data-b="style-v" title="Coller la mise en forme (Ctrl+Alt+V)" ${Stock.lire('studio.style', null) ? '' : 'disabled'}>🎨</button>
@@ -1366,6 +1442,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         if (a === 'police') { el.onclick = () => ouvrirPolices(el, c.police, nom => { E.modif(true); groupe().filter(x => x.type === 'texte' || x.type === 'bouton' || x.type === 'compteur').forEach(x => { x.police = nom; }); appliquerPolice(nom); }); return; }
         if (a === 'emoji') { el.onclick = () => ouvrirEmojis(el, em => { E.modif(true); c.texte = (c.texte || '') + (c.texte && !/\s$/.test(c.texte) ? ' ' : '') + em; E.rafraichir(); rendreReglages(); }); return; }
         if (a === 'recadrer') { el.onclick = () => recadrerCalque(c); return; }
+        if (a === 'forme') { el.onclick = () => ouvrirFormes(el, c); return; }
         el.onclick = () => {
           if (a === 'coller') return collerCalque(null);
           if (a === 'pinceau' && !c) return basculerPinceau();
@@ -1564,6 +1641,22 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       }, { adapter: true });
     }
     E.recadrerCalque = recadrerCalque;
+    // Forme du cadre
+    const ratioCalque = c => ((Number(c.largeur) || 46) * 720) / ((Number(c.hauteur) || 22) * 1280);
+    function choisirForme(c, id) {
+      E.modif(true);
+      (E.multi.size > 1 ? selection() : [c]).filter(x => x.type === 'image' || x.type === 'video').forEach(x => { if (id) x.forme = id; else delete x.forme; });
+      if (id === 'libre' && !Array.isArray(c.forme_points)) { formeLibre(c); }
+      E.rafraichir(); rendreReglages();
+    }
+    function formeLibre(c) {
+      modaleFormeLibre(c, ratioCalque(c), (pts, lisse) => { E.modif(true); c.forme = 'libre'; c.forme_points = pts; if (lisse) c.forme_lisse = true; else delete c.forme_lisse; E.rafraichir(); rendreReglages(); toast('Forme appliquée'); });
+    }
+    function ouvrirFormes(ancre, c) {
+      const d = pop(ancre, `<b style="display:block;margin:2px 4px 8px">◇ Forme du cadre</b>${grilleFormes(c, ratioCalque(c))}<button class="btn petit" data-pf-libre style="margin-top:8px;width:100%">✎ Modifier librement la forme (points)</button>`, 'pop-formes');
+      $$('[data-forme]', d).forEach(b => b.onclick = () => { choisirForme(c, b.dataset.forme); $$('[data-forme]', d).forEach(x => x.classList.toggle('on', x === b)); });
+      $('[data-pf-libre]', d).onclick = () => { fermerPop(); formeLibre(c); };
+    }
     function ouvrirIllustrations() {
       const c1 = p.style.couleur || '#7a1f2b', c2 = '#b08a4f';
       let cat = Stock.lire('studio.illu.cat', Illustrations.CATEGORIES[0]);
@@ -1713,11 +1806,17 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         ${c.illu ? `<div class="deux"><label class="champ">Couleur principale<input type="color" data-illu="c" value="${esc(c.illu.c)}"></label><label class="champ">Couleur d'accent<input type="color" data-illu="a" value="${esc(c.illu.a)}"></label></div>` : ''}
         ${c.type === 'image' && c.media && !c.illu ? '<button class="btn petit ia" data-animer>✨ Animer cette photo (Wan 2.2)</button>' : ''}
         ${c.media && !c.illu ? `<button class="btn petit" data-rogner>⬚ Rogner${c.recadrage ? ' ✓ (modifier)' : ''}</button>` : ''}
-        <div class="trois"><label class="champ">Hauteur (%)<input type="number" data-k="hauteur" value="${c.hauteur || 22}"></label><label class="champ">Forme<select data-k="forme">${opts([['', 'Normale'], ['arrondi', 'Arrondie'], ['rond', 'Ronde']], c.forme || '')}</select></label><label class="champ">Opacité<input type="number" data-k="opacite" min="0" max="1" step="0.05" value="${c.opacite != null ? c.opacite : 1}"></label></div>
+        <div class="trois"><label class="champ">Hauteur (%)<input type="number" data-k="hauteur" value="${c.hauteur || 22}"></label><label class="champ">Forme<button class="btn" data-ouvrir-formes>${esc(((MoteurInfo.FORMES.find(x => x[0] === (c.forme || '')) || [0, 'Normale'])[1]).replace(/ \(.*\)$/, ''))} ▾</button></label><label class="champ">Opacité<input type="number" data-k="opacite" min="0" max="1" step="0.05" value="${c.opacite != null ? c.opacite : 1}"></label></div>
         <label class="champ">Superposition (mode de fusion avec le fond)<select data-k="fusion">${opts(I.FUSIONS, c.fusion || 'normal')}</select></label>
         ${c.type === 'video' && c.media ? `<label class="champ">Vitesse de la vidéo<select data-vitesse>${optsVitesse(c.vitesse)}</select></label>` : ''}
         ${c.type === 'video' && c.media ? `<button class="btn petit" data-couper>✂ Couper la vidéo${MoteurInfo.plage(c) ? ' (' + MoteurInfo.plage(c).map(x => x.toFixed(1)).join(' → ') + ' s)' : ''}</button>` : ''}
-        <div class="cases"><label><input type="checkbox" data-k="remplir" ${c.remplir ? 'checked' : ''}> Remplir le cadre (recadrer)</label><label>Bordure <input type="color" data-k="bordure" value="${c.bordure || '#b08a4f'}"></label></div>
+        <div class="cases">${c.forme ? '' : `<label><input type="checkbox" data-k="remplir" ${c.remplir ? 'checked' : ''}> Remplir le cadre (recadrer)</label>`}</div>
+        </div></details>
+        <details class="bloc" open><summary>◇ Forme du cadre</summary><div class="pile">
+        ${grilleFormes(c, ((Number(c.largeur) || 46) * 720) / ((Number(c.hauteur) || 22) * 1280))}
+        ${c.forme === 'arrondi' ? `<label class="champ">Arrondi des coins<input type="range" data-k="arrondi" min="0" max="100" step="1" value="${c.arrondi != null && c.arrondi !== '' ? c.arrondi : 16}"></label>` : ''}
+        <div class="ligne" style="gap:6px;flex-wrap:wrap"><button class="btn petit ${c.forme === 'libre' ? 'plein' : ''}" data-forme-libre>✎ ${c.forme === 'libre' ? 'Modifier les points de la forme' : 'Modifier librement cette forme'}</button></div>
+        <div class="ligne" style="gap:8px;flex-wrap:wrap;align-items:center"><label class="cases"><input type="checkbox" data-bordure-on ${c.bordure ? 'checked' : ''}> Bordure</label>${c.bordure ? `<input type="color" data-k="bordure" value="${esc(c.bordure)}"><label class="champ" style="flex:1;min-width:120px">Épaisseur<input type="range" data-k="bordure_epaisseur" min="1" max="30" step="1" value="${c.bordure_epaisseur || 3}"></label>` : ''}<label class="cases"><input type="checkbox" data-k="ombre_cadre" ${c.ombre_cadre ? 'checked' : ''}> Ombre</label></div>
         </div></details>` + blocAnimation(c);
       return s + position;
     }
@@ -1731,6 +1830,10 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       const pb = $('#props [data-police]'); if (pb) pb.onclick = () => ouvrirPolices(pb, c.police, nom => { E.modif(true); c.police = nom; appliquerPolice(nom); });
       const et = $('#props [data-emoji-texte]'); if (et) et.onclick = () => ouvrirEmojis(et, em => { const ta = $('#props [data-k="texte"]'); E.modif(true); if (ta && document.activeElement === ta) { const a = ta.selectionStart, b = ta.selectionEnd; ta.value = ta.value.slice(0, a) + em + ta.value.slice(b); ta.selectionStart = ta.selectionEnd = a + em.length; c.texte = ta.value; } else { c.texte = (c.texte || '') + (c.texte && !/\s$/.test(c.texte) ? ' ' : '') + em; if (ta) ta.value = c.texte; } E.rafraichir(); const l = $(`.calque-ligne[data-id="${c.id}"] .t`); if (l) l.textContent = c.texte; });
       const rg = $('#props [data-rogner]'); if (rg) rg.onclick = () => recadrerCalque(c);
+      $$('#props [data-forme]').forEach(b => b.onclick = () => choisirForme(c, b.dataset.forme));
+      const of = $('#props [data-ouvrir-formes]'); if (of) of.onclick = () => ouvrirFormes(of, c);
+      const fl = $('#props [data-forme-libre]'); if (fl) fl.onclick = () => formeLibre(c);
+      const bo = $('#props [data-bordure-on]'); if (bo) bo.onchange = () => { E.modif(true); if (bo.checked) { c.bordure = c.bordure || p.style.couleur || '#b08a4f'; c.bordure_epaisseur = c.bordure_epaisseur || 4; } else delete c.bordure; E.rafraichir(); rendreReglages(); };
       $$('#props [data-illu]').forEach(inp => inp.addEventListener('input', () => { c.illu[inp.dataset.illu] = inp.value; clearTimeout(inp._t); inp._t = setTimeout(() => { E.modif(); c.media = Illustrations.dataUrl(c.illu.id, c.illu.c, c.illu.a); eng.precharger().then(E.rafraichir); }, 120); }));
       const cp = $('#props [data-couper]'); if (cp) cp.onclick = () => modaleCouper(c, c.media, () => { E.modif(true); eng.precharger().then(() => { E.rafraichir(); rendreReglages(); }); });
       const an = $('#props [data-animer]'); if (an) an.onclick = () => allerCreateur(p, E.i, { methode: 'animer', calque: c.id });
