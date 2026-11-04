@@ -1,0 +1,37 @@
+{
+ "actif": true,
+ "studio": "Studio d'invitations",
+ "whatsapp": "",
+ "intro": "Choisissez un modèle, lisez les conditions, puis envoyez-nous toutes les informations : nous adaptons le modèle à votre événement et à vos couleurs.",
+ "formules": [
+  {
+   "nom": "Film",
+   "prix": "",
+   "contenu": "Film vertical avec musique\nFormat WhatsApp, Facebook, TikTok"
+  },
+  {
+   "nom": "Film + invitation",
+   "prix": "",
+   "contenu": "Tout le film\nPage interactive : confirmation, nombre de personnes, plan, appel\nLien personnel par famille"
+  },
+  {
+   "nom": "Complète",
+   "prix": "",
+   "contenu": "Tout le reste\nGestion des invités et des réponses\nPlan de tables, export Excel"
+  }
+ ],
+ "delai": "3 à 5 jours après réception de toutes les informations et des photos",
+ "paiement": "50 % à la commande, le solde avant la livraison de la version finale",
+ "conditions": [
+  "Vous recevez d'abord une version de démonstration (marquée « DÉMO ») pour la vérifier.",
+  "Deux séries de corrections sont comprises ; au-delà, sur devis.",
+  "La version finale est livrée après paiement du solde, avec un code licence personnel.",
+  "Licence personnelle : l'invitation est réservée à votre événement. Elle ne peut être ni revendue, ni réutilisée pour un autre événement, ni modifiée par un tiers. En cas d'abus, la licence est désactivée.",
+  "Vous garantissez avoir les droits sur les photos et la musique que vous nous envoyez."
+ ],
+ "supabase": {
+  "url": "https://cbbnfdzqkpttxtwrucrk.supabase.co",
+  "anon": "sb_publishable_lMpq36SYDbynUZ3d1sJrYg_RPsCe5jX"
+ },
+ "maj": "2026-11-04T11:56:42.818Z"
+}
