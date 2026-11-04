@@ -242,8 +242,9 @@
       this.projet = projet;
       this._miseEnPage = projet && projet.mise_en_page === false;
       if (this.famille && this.form.adultes == null) {
-        this.form.adultes = Number(this.famille.adultes) || Number(this.famille.places) || 1;
-        this.form.enfants = Number(this.famille.enfants) || 0;
+        const fa = this.famille, pa = fa.prevus_adultes != null && fa.prevus_adultes !== '' ? Number(fa.prevus_adultes) : null, pe = fa.prevus_enfants != null && fa.prevus_enfants !== '' ? Number(fa.prevus_enfants) : null;
+        this.form.adultes = Number(fa.adultes) || (pa != null ? pa : Number(fa.places) || 1);
+        this.form.enfants = Number(fa.enfants) || (pe != null ? pe : 0);
       }
       await this.precharger();
       if (this._miseEnPage) {   // première ouverture : textes empilés avec les vraies polices
@@ -771,15 +772,21 @@
           const min = c.min != null ? Number(c.min) : 0;
           const maxDe = () => {
             if (c.max != null && c.max !== '') return Number(c.max);
-            if (this.famille && Number(this.famille.places)) {
+            const fa = this.famille;
+            // adultes / enfants invités pour cette famille (prévus par l'organisateur), sinon le total des places
+            const prevu = fa ? (champ === 'adultes' ? fa.prevus_adultes : champ === 'enfants' ? fa.prevus_enfants : null) : null;
+            let max = prevu != null && prevu !== '' ? Number(prevu) : 20;
+            if (fa && Number(fa.places)) {
               const autre = champ === 'adultes' ? 'enfants' : champ === 'enfants' ? 'adultes' : null;
-              if (autre) return Number(this.famille.places) - (Number(this.form[autre]) || 0);
+              if (autre) max = Math.min(max, Number(fa.places) - (Number(this.form[autre]) || 0));
             }
-            return 20;
+            return Math.max(0, max);
           };
           // − / + : marchent partout (aussi dans l'aperçu du studio) ; au maximum, on montre pourquoi
           const signaler = () => { el.classList.remove('mt-max'); void el.offsetWidth; el.classList.add('mt-max'); const places = this.famille && Number(this.famille.places);
-            if (places) { const lib = el.querySelector('.mt-lib'); const ancien = lib.textContent; lib.textContent = (lang === 'mg' ? `Toerana ${places} ihany` : lang === 'fr' ? `${places} place(s) en tout` : `${places} seat(s) in total`); clearTimeout(el._t); el._t = setTimeout(() => { lib.textContent = ancien; }, 1600); } };
+            const prevu = this.famille ? (champ === 'adultes' ? this.famille.prevus_adultes : champ === 'enfants' ? this.famille.prevus_enfants : null) : null;
+            if (prevu != null && prevu !== '') { const lib = el.querySelector('.mt-lib'); const ancien = lib.textContent; lib.textContent = champ === 'enfants' ? (lang === 'mg' ? `Ankizy ${prevu} ihany no nasaina` : lang === 'fr' ? `${prevu} enfant(s) invité(s)` : `${prevu} child(ren) invited`) : (lang === 'mg' ? `Olon-dehibe ${prevu} ihany no nasaina` : lang === 'fr' ? `${prevu} adulte(s) invité(s)` : `${prevu} adult(s) invited`); clearTimeout(el._t); el._t = setTimeout(() => { lib.textContent = ancien; }, 1600); }
+            else if (places) { const lib = el.querySelector('.mt-lib'); const ancien = lib.textContent; lib.textContent = (lang === 'mg' ? `Toerana ${places} ihany` : lang === 'fr' ? `${places} place(s) en tout` : `${places} seat(s) in total`); clearTimeout(el._t); el._t = setTimeout(() => { lib.textContent = ancien; }, 1600); } };
           ['pointerdown', 'mousedown'].forEach(n => el.addEventListener(n, ev => ev.stopPropagation()));
           el.querySelector('.mt-moins').addEventListener('click', ev => { ev.stopPropagation(); ev.preventDefault(); this.form[champ] = Math.max(min, (Number(this.form[champ]) || 0) - 1); maj(); });
           el.querySelector('.mt-plus').addEventListener('click', ev => { ev.stopPropagation(); ev.preventDefault(); const v = (Number(this.form[champ]) || 0); if (v >= maxDe()) return signaler(); this.form[champ] = v + 1; maj(); });

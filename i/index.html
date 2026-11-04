@@ -22,6 +22,8 @@
   #ecran-ouvrir .bouton { font: 600 20px "Cormorant Garamond", serif; background: var(--vin); color: #fff; border: 0; border-radius: 999px; padding: 14px 30px; box-shadow: 0 6px 20px rgba(0,0,0,.35); animation: pulse 2s infinite; }
   @keyframes pulse { 50% { transform: scale(1.05); } }
   #bandeau-demo { position: fixed; z-index: 14; left: 50%; top: 10px; transform: translateX(-50%); background: rgba(122,31,43,.92); color: #fff; font: 600 13px Inter, system-ui, sans-serif; padding: 6px 14px; border-radius: 999px; pointer-events: none; white-space: nowrap; max-width: 92vw; overflow: hidden; text-overflow: ellipsis; }
+  #indic-pause { position: fixed; z-index: 16; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 86px; height: 86px; border-radius: 50%; background: rgba(0,0,0,.45); color: #fff; font-size: 38px; display: none; align-items: center; justify-content: center; padding-left: 6px; cursor: pointer; backdrop-filter: blur(3px); }
+  #indic-pause.vu { display: flex; }
   #pause { position: fixed; z-index: 15; left: 64px; bottom: 12px; width: 44px; height: 44px; border-radius: 50%; border: 0; background: rgba(255,255,255,.85); color: var(--vin); font-size: 17px; display: none; cursor: pointer; }
   #son { position: fixed; z-index: 15; left: 12px; bottom: 12px; width: 44px; height: 44px; border-radius: 50%; border: 0; background: rgba(255,255,255,.85); color: var(--vin); font-size: 20px; display: none; }
   #bandeau { position: fixed; z-index: 25; left: 50%; bottom: 18px; transform: translateX(-50%); width: min(92vw, 440px); background: #fffaf3; color: #3a2323; border-radius: 16px; padding: 16px 18px; box-shadow: 0 10px 40px rgba(0,0,0,.4); font-size: 18px; display: none; }
@@ -49,10 +51,10 @@
 <button id="son" aria-label="Son">♪</button><button id="pause" aria-label="Pause">❚❚</button>
 <div id="bandeau" role="dialog"></div>
 <div id="erreur"></div>
-<script src="../config.js?v=202611041455"></script>
-<script src="../moteur/moteur.js?v=202611041455"></script>
-<script src="../moteur/fabrique.js?v=202611041455"></script>
-<script src="../moteur/base.js?v=202611041455"></script>
+<script src="../config.js?v=202611041626"></script>
+<script src="../moteur/moteur.js?v=202611041626"></script>
+<script src="../moteur/fabrique.js?v=202611041626"></script>
+<script src="../moteur/base.js?v=202611041626"></script>
 <script>
 (async function () {
   const q = new URLSearchParams(location.search);
@@ -193,14 +195,22 @@
     moteur.jouer(moteur.plansInvitation(), 0);
     $('#pause').style.display = 'block'; if (!musique) $('#pause').style.left = '12px';
   });
-  // Pause / reprendre l'invitation (et la musique)
+  // Pause / reprendre l'invitation (et la musique) : bouton ❚❚, toucher la vidéo, ou barre d'espace
   let enPause = false;
-  $('#pause').onclick = () => {
-    if (!enPause && !moteur.lecture) return;
+  const indic = document.createElement('div'); indic.id = 'indic-pause'; indic.textContent = '▶'; document.body.appendChild(indic);
+  const basculerPause = () => {
+    if (!enPause && !moteur.lecture) return false;
     enPause = !enPause;
     if (enPause) { moteur.pause(); if (musique) musique.pause(); $('#pause').textContent = '▶'; $('#pause').setAttribute('aria-label', 'Reprendre'); }
     else { moteur.reprendre(); if (musique && $('#son').textContent !== '×') musique.play().catch(() => {}); $('#pause').textContent = '❚❚'; $('#pause').setAttribute('aria-label', 'Pause'); }
+    indic.classList.toggle('vu', enPause);
+    return true;
   };
+  $('#pause').onclick = e => { e.stopPropagation(); basculerPause(); };
+  indic.onclick = () => basculerPause();
+  // toucher l'image (pas un bouton, un compteur ou un champ) met en pause / relance
+  $('#scene').addEventListener('click', e => { if (e.target.closest('.mt-el, button, input, a')) return; if ($('#ecran-ouvrir').style.display !== 'none') return; basculerPause(); });
+  document.addEventListener('keydown', e => { if (e.code === 'Space' && !/INPUT|TEXTAREA/.test((document.activeElement || {}).tagName || '')) { e.preventDefault(); basculerPause(); } });
 
   /* ---- Actions des boutons ---- */
   const tel = n => String(n || '').replace(/\D/g, '').replace(/^0/, '261');

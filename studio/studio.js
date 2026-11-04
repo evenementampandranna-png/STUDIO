@@ -482,6 +482,13 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-04-4', date: '4 novembre 2026', titre: 'Adultes / enfants par famille, réponses en direct, pause sur l\'invitation', points: [
+      '<b>Jeton GitHub refusé</b> : une petite fenêtre demande maintenant le nouveau jeton, le vérifie, puis la publication reprend toute seule.',
+      '<b>Espace organisateur → Ajouter / Modifier une famille</b> : nombre d\'<b>adultes</b> et d\'<b>enfants</b> invités. L\'invité ne peut pas confirmer plus que ce nombre.',
+      '<b>Réponses en direct</b> : alerte « ✓ X vient : 2 adultes, 1 enfant » ou « ✗ X ne vient pas » dès qu\'un invité répond ; totaux des personnes qui viennent / ne viennent pas / sans réponse.',
+      '<b>Invitation</b> : l\'invité touche la vidéo pour la mettre en pause (▶ au centre pour reprendre).',
+      'À faire une fois : Réglages → <b>« Mise à jour adultes / enfants »</b>, coller dans Supabase → SQL Editor → Run.'
+    ] },
     { id: '2026-11-04-3', date: '4 novembre 2026', titre: 'Commandes depuis la vitrine, démo puis version finale avec licence', points: [
       '<b>Équipe → « Tout publier sur la vitrine »</b> : toutes les invitations et tous les films de l\'équipe qui n\'y sont pas encore, d\'un coup (noms remplacés par des exemples).',
       '<b>Vitrine</b> : chaque modèle a un bouton « Commander ce modèle ». Le visiteur lit et accepte les conditions (formules, prix, délai, paiement, licence), puis envoie toutes les informations : événement, noms, lieux, texte, couleurs, musique, photos.',
@@ -2668,7 +2675,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
   function publication(p, apercu) {
     const pub = JSON.parse(JSON.stringify(p));
     pub.liens = {};
-    (p.familles || []).forEach(f => { if (!f.code) f.code = codeFamille(); pub.liens[f.code] = { nom: f.nom, places: f.places, adultes: f.adultes, enfants: f.enfants }; });
+    (p.familles || []).forEach(f => { if (!f.code) f.code = codeFamille(); pub.liens[f.code] = { nom: f.nom, places: f.places, prevus_adultes: f.prevus_adultes, prevus_enfants: f.prevus_enfants, adultes: f.adultes, enfants: f.enfants }; });
     delete pub.familles; delete pub.historique_ia; delete pub.message_envoi;
     if (pub.fiche) delete pub.fiche.texte_source;
     pub.publication = { date: new Date().toISOString(), firebase: reglages.firebase || null, supabase: reglages.supabase || null };
@@ -3219,6 +3226,33 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     $$('[data-lic]').forEach(b => b.onclick = async () => { if (b.dataset.st !== 'active' && !confirm('Désactiver la licence ' + b.dataset.lic + ' ? L\'invitation ne s\'affichera plus.')) return; try { await Equipe.rpc('licence_changer', { p_code: b.dataset.lic, p_statut: b.dataset.st }); toast('Licence mise à jour'); vueLicences(tete); } catch (err) { toast(err.message); } });
   }
 
+  // Jeton GitHub expiré ou supprimé : petite fenêtre pour coller le nouveau, sans quitter ce qu'on fait
+  let demandeJeton = null;
+  function demanderJeton() {
+    if (demandeJeton) return demandeJeton;
+    demandeJeton = new Promise(fin => {
+      const b = document.createElement('div'); b.id = 'boite-jeton';
+      b.innerHTML = `<div class="bj-carte"><h3>Jeton GitHub refusé</h3><p class="muet">GitHub n'accepte plus le jeton enregistré (il a expiré ou a été supprimé). Créez-en un nouveau : <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">page de création du jeton ↗</a> (dépôt <b>${esc((reglages.github || {}).repo || 'STUDIO')}</b>, droit « Contents : Read and write », expiration longue), puis collez-le ici.</p>
+        <input type="password" id="bj-jeton" placeholder="github_pat_…" autocomplete="off"><div class="ligne" style="margin-top:10px;justify-content:space-between"><button class="btn" id="bj-non">Annuler</button><span class="muet" id="bj-etat"></span><button class="btn plein" id="bj-ok">Enregistrer et continuer</button></div></div>`;
+      document.body.appendChild(b); setTimeout(() => $('#bj-jeton').focus(), 50);
+      const finir = ok => { b.remove(); demandeJeton = null; fin(ok); };
+      $('#bj-non').onclick = () => finir(false);
+      $('#bj-ok').onclick = async () => {
+        const t = $('#bj-jeton').value.trim(); if (!t) return;
+        $('#bj-etat').textContent = 'Vérification…';
+        try {
+          const g = reglages.github || {};
+          const r = await fetch(`https://api.github.com/repos/${g.owner}/${g.repo}`, { headers: { Authorization: 'Bearer ' + t, Accept: 'application/vnd.github+json' } });
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok) { $('#bj-etat').textContent = 'Refusé : ' + (j.message || r.status); return; }
+          if (j.permissions && !j.permissions.push) { $('#bj-etat').textContent = 'Ce jeton ne peut pas écrire dans le dépôt'; return; }
+          reglages.github = Object.assign({}, g, { token: t }); sauverReglages(); toast('Nouveau jeton enregistré'); finir(true);
+        } catch (err) { $('#bj-etat').textContent = 'Échec : ' + err.message; }
+      };
+    });
+    return demandeJeton;
+  }
+
   /* ================= GitHub (publication sans serveur) ================= */
   const GitHub = {
     // Toujours relire le jeton enregistré (il a pu être changé dans un autre onglet)
@@ -3230,14 +3264,20 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     },
     api(chemin) { const g = this.frais(); return `https://api.github.com/repos/${g.owner}/${g.repo}/contents/${chemin.split('/').map(encodeURIComponent).join('/')}`; },
     entetes() { return { Authorization: 'Bearer ' + (this.frais().token || '').trim(), Accept: 'application/vnd.github+json' }; },
+    // appel à GitHub ; jeton refusé (401) → on demande le nouveau jeton sur place, puis on réessaie
+    async appel(url, opts) {
+      let r = await fetch(url, Object.assign({}, opts, { headers: Object.assign({}, (opts || {}).headers, this.entetes()) }));
+      if (r.status === 401 && await demanderJeton()) r = await fetch(url, Object.assign({}, opts, { headers: Object.assign({}, (opts || {}).headers, this.entetes()) }));
+      return r;
+    },
     async sha(chemin) {
-      const r = await fetch(this.api(chemin) + '?ref=' + encodeURIComponent(reglages.github.branche || 'main') + '&t=' + Date.now(), { headers: this.entetes(), cache: 'no-store' });
+      const r = await this.appel(this.api(chemin) + '?ref=' + encodeURIComponent(reglages.github.branche || 'main') + '&t=' + Date.now(), { cache: 'no-store' });
       if (r.status === 404) return null;
       if (!r.ok) throw this.erreur(r.status, await r.text());
       return (await r.json()).sha;
     },
     async lireTexte(chemin) {
-      const r = await fetch(this.api(chemin) + '?ref=' + encodeURIComponent(reglages.github.branche || 'main') + '&t=' + Date.now(), { headers: Object.assign(this.entetes(), { Accept: 'application/vnd.github.raw' }), cache: 'no-store' });
+      const r = await this.appel(this.api(chemin) + '?ref=' + encodeURIComponent(reglages.github.branche || 'main') + '&t=' + Date.now(), { headers: { Accept: 'application/vnd.github.raw' }, cache: 'no-store' });
       if (r.status === 404) throw new Error('absent');
       if (!r.ok) throw this.erreur(r.status, await r.text());
       return r.text();
@@ -3253,7 +3293,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         const sha = await this.sha(chemin);
         const corps = { message, content, branch: reglages.github.branche || 'main' };
         if (sha) corps.sha = sha;
-        const r = await fetch(this.api(chemin), { method: 'PUT', headers: Object.assign(this.entetes(), { 'Content-Type': 'application/json' }), body: JSON.stringify(corps) });
+        const r = await this.appel(this.api(chemin), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corps) });
         if (r.ok) return r.json();
         const texte = await r.text();
         if ((r.status === 409 || r.status === 422) && essai < 4) { await new Promise(ok => setTimeout(ok, 1500 * (essai + 1))); continue; }
@@ -3617,7 +3657,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
             <li>Dans le projet : <b>SQL Editor</b> → <b>New query</b> → collez le script (bouton ci-dessous) → <b>Run</b>.</li>
             <li><b>Project Settings → API</b> (ou <b>Connect</b>) : copiez la <b>Project URL</b> et la clé <b>anon public</b> (ou « publishable ») dans les deux champs ci-dessus, puis Enregistrer et Tester.</li>
             <li>Republiez vos invitations : le lien organisateur apparaît dans l'onglet Film et publication.</li></ol>
-            <button class="btn petit" id="sb-sql">Copier le script SQL</button>
+            <button class="btn petit" id="sb-sql">Copier le script SQL</button> <button class="btn petit" id="sb-sql2" title="Adultes et enfants invités séparément, par famille">Mise à jour adultes / enfants</button>
             <p class="muet">La formule gratuite se met en pause après 7 jours sans aucune visite ; une invitation en cours reçoit des visites, sinon réactivez-la d'un clic dans Supabase.</p></details>
         </div>
         <div class="carte pile"><h3>Réponses des invités (Firebase, facultatif)</h3>
@@ -3681,6 +3721,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         reglages.equipe = { id: r.id, nom: r.nom, cle: r.cle, cle_admin: r.cle_admin, membre: nom, auto: true }; sauverReglages(); toast('Équipe créée : envoyez le lien d\'équipe à vos membres'); location.hash = '#/equipe'; }
       catch (e) { toast(/function|schema cache|Could not find/i.test(e.message) ? 'Installez d\'abord le script SQL de l\'équipe dans Supabase' : e.message); }
     };
+    const sbs2 = $('#sb-sql2'); if (sbs2) sbs2.onclick = async () => { try { copier(await (await fetch('../outils/invites-2.sql?v=' + Date.now())).text()); toast('Script copié : Supabase → SQL Editor → coller → Run'); } catch (e) { toast('Script introuvable'); } };
     const eqs2 = $('#eq-sql2'); if (eqs2) eqs2.onclick = async () => { try { copier(await (await fetch('../outils/equipe-2.sql?v=' + Date.now())).text()); toast('Script copié : Supabase → SQL Editor → coller → Run'); } catch (e) { toast('Script introuvable'); } };
     const eqs = $('#eq-sql'); if (eqs) eqs.onclick = async () => { try { copier(await (await fetch('../outils/equipe.sql?v=' + Date.now())).text()); toast('Script copié : Supabase → SQL Editor → coller → Run'); } catch (e) { toast('Script introuvable'); } };
     const eqr = $('#eq-renom'); if (eqr) eqr.onclick = async () => { const n = await demanderNom('Votre nom dans l\'équipe', reglages.equipe.membre); if (n) { reglages.equipe.membre = n; sauverReglages(); vueReglages(); } };

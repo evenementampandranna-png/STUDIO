@@ -72,14 +72,14 @@
 <div id="erreur" hidden></div>
 <dialog id="dlg"><form method="dialog" id="dlg-form"></form></dialog>
 <div id="toast"></div>
-<script src="../config.js?v=202611041455"></script>
-<script src="../moteur/base.js?v=202611041455"></script>
+<script src="../config.js?v=202611041626"></script>
+<script src="../moteur/base.js?v=202611041626"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
 <script>
 (async function () {
   const $ = (s, r) => (r || document).querySelector(s), $$ = (s, r) => [...(r || document).querySelectorAll(s)];
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  let tt; const toast = t => { const e = $('#toast'); e.textContent = t; e.classList.add('vu'); clearTimeout(tt); tt = setTimeout(() => e.classList.remove('vu'), 2600); };
+  let tt; const toast = (t, ms) => { const e = $('#toast'); e.textContent = t; e.classList.add('vu'); clearTimeout(tt); tt = setTimeout(() => e.classList.remove('vu'), ms || 2600); };
   const erreur = t => { $('#app').hidden = true; const e = $('#erreur'); e.hidden = false; e.innerHTML = t; $('#titre').textContent = 'Espace organisateur'; };
   const q = new URLSearchParams(location.search);
   const slug = q.get('p'), cle = decodeURIComponent((location.hash || '').slice(1));
@@ -106,14 +106,30 @@
 
   /* ---- Données ---- */
   let D = { familles: [], reponses: [] }, filtre = 'tous', cherche = '', onglet = 'invites';
+  let vues = null;   // réponses déjà vues : les nouvelles sont annoncées
+  const annoncer = () => {
+    const rs = D.reponses || [];
+    if (vues) {
+      const nouv = rs.filter(r => !vues.has(r.id)).slice(0, 4);
+      nouv.forEach((r, k) => setTimeout(() => toast((r.presence === 'oui' ? '✓ ' : '✗ ') + (r.nom || 'Quelqu\'un') + (r.presence === 'oui' ? ' vient : ' + (r.adultes || 0) + ' adulte(s), ' + (r.enfants || 0) + ' enfant(s)' : ' ne vient pas'), 5000), k * 3200));
+      if (nouv.length) { document.title = '(' + nouv.length + ') ' + document.title.replace(/^\(\d+\) /, ''); try { navigator.vibrate && navigator.vibrate(120); } catch (e) {} }
+    }
+    vues = new Set(rs.map(r => r.id));
+  };
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) document.title = document.title.replace(/^\(\d+\) /, ''); });
   const lire = async (silencieux) => {
-    try { D = await Base.rpc(conf, 'inv_hote_lire', { p_evt: projet.id, p_cle: cle }); rendre(); $('.etat-sync') && ($('.etat-sync').textContent = 'À jour · ' + new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })); }
+    try { D = await Base.rpc(conf, 'inv_hote_lire', { p_evt: projet.id, p_cle: cle }); annoncer(); rendre(); $('.etat-sync') && ($('.etat-sync').textContent = 'À jour · ' + new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })); }
     catch (e) { if (/invalide/.test(e.message)) return erreur('<h2>Lien organisateur invalide</h2><p class="muet">Demandez au studio le lien organisateur à jour.</p>'); if (!silencieux) toast('Connexion impossible : ' + e.message); }
   };
   const envoyer = async liste => { await Base.rpc(conf, 'inv_hote_familles', { p_evt: projet.id, p_cle: cle, p_familles: liste }); await lire(true); };
 
   /* ---- Affichage ---- */
   const somme = (l, k) => l.reduce((s, f) => s + (Number(f[k]) || 0), 0);
+  // adultes / enfants invités : ce que l'organisateur a prévu (sinon : toutes les places comptent comme adultes)
+  const invA = f => f.prevus_adultes != null ? Number(f.prevus_adultes) || 0 : (f.prevus_enfants != null ? Math.max(0, (Number(f.places) || 0) - (Number(f.prevus_enfants) || 0)) : Number(f.places) || 0);
+  const invE = f => f.prevus_enfants != null ? Number(f.prevus_enfants) || 0 : 0;
+  const sommeF = (l, fn) => l.reduce((s, f) => s + fn(f), 0);
+  const baseAJour = () => !(D.familles || []).length || ('prevus_adultes' in D.familles[0]);
   const STAT = { vient: 'Vient', non: 'Ne vient pas', attente: 'En attente' };
   /* ---- Catégories : proposées d'office, modifiables, et celles déjà utilisées ---- */
   const PRESETS = mg
@@ -139,12 +155,12 @@
     const visibles = fs.filter(f => (!filtreCat || (filtreCat === '∅' ? !f.categorie : f.categorie === filtreCat))).filter(f => (filtre === 'tous' || (filtre === 'attente' ? (f.statut !== 'vient' && f.statut !== 'non') : f.statut === filtre)) && (!cherche || (f.nom + ' ' + (f.categorie || '') + ' ' + (f.table || '')).toLowerCase().includes(cherche)));
     $('#app').innerHTML = `
       <div class="stats">
-        <div class="stat"><b>${fs.length}</b><span>familles invitées · ${somme(fs, 'places')} places</span></div>
-        <div class="stat vient"><b>${persVient}</b><span>personnes viennent (${somme(vient, 'adultes') + somme(generaux, 'adultes')} adultes, ${somme(vient, 'enfants') + somme(generaux, 'enfants')} enfants)</span></div>
-        <div class="stat vient"><b>${vient.length}</b><span>familles ont confirmé</span></div>
-        <div class="stat non"><b>${non.length}</b><span>ne viennent pas</span></div>
-        <div class="stat attente"><b>${att.length}</b><span>en attente de réponse</span></div>
+        <div class="stat"><b>${sommeF(fs, invA) + sommeF(fs, invE)}</b><span>personnes invitées : ${sommeF(fs, invA)} adultes, ${sommeF(fs, invE)} enfants · ${fs.length} familles</span></div>
+        <div class="stat vient"><b>${persVient}</b><span>✓ viennent : ${somme(vient, 'adultes') + somme(generaux, 'adultes')} adultes, ${somme(vient, 'enfants') + somme(generaux, 'enfants')} enfants · ${vient.length + generaux.length} réponse(s)</span></div>
+        <div class="stat non"><b>${sommeF(non, invA) + sommeF(non, invE)}</b><span>✗ ne viennent pas · ${non.length} famille(s)${rs.filter(r => !r.code && r.presence !== 'oui').length ? ' + ' + rs.filter(r => !r.code && r.presence !== 'oui').length + ' par le lien général' : ''}</span></div>
+        <div class="stat attente"><b>${sommeF(att, invA) + sommeF(att, invE)}</b><span>… pas encore répondu · ${att.length} famille(s)</span></div>
       </div>
+      ${baseAJour() ? '' : '<div class="carte" style="margin:0 0 10px;padding:10px 14px;font-size:14px">ℹ️ Pour enregistrer séparément les <b>adultes</b> et les <b>enfants invités</b>, le studio doit installer une petite mise à jour de la base (Réglages du studio → Base des invités → « Mise à jour adultes / enfants »). En attendant, le total des places est utilisé.</div>'}
       <div class="onglets"><button data-o="invites" class="${onglet === 'invites' ? 'actif' : ''}">Invités (${fs.length})</button><button data-o="reponses" class="${onglet === 'reponses' ? 'actif' : ''}">Réponses (${rs.length})</button><button data-o="envoi" class="${onglet === 'envoi' ? 'actif' : ''}">Envoi</button><span class="etat-sync"></span></div>
       <div id="vue"></div>`;
     $$('[data-o]').forEach(b => b.onclick = () => { onglet = b.dataset.o; rendre(); });
@@ -155,11 +171,11 @@
         ${catsUtil.length > 1 || (catsUtil.length === 1 && catsUtil[0]) ? `<div class="puces" style="margin-bottom:8px"><button class="puce ${!filtreCat ? 'actif' : ''}" data-c="">Toutes les catégories</button>${catsUtil.map(c => { const l = parCat(c), v = l.filter(f => f.statut === 'vient'); return `<button class="puce ${filtreCat === (c || '∅') ? 'actif' : ''}" data-c="${esc(c || '∅')}">${esc(c || 'Sans catégorie')} · ${l.length}${v.length ? ' <span style="opacity:.75">(' + (somme(v, 'adultes') + somme(v, 'enfants')) + ' viennent)</span>' : ''}</button>`; }).join('')}</div>` : ''}
         <div class="puces" style="margin-bottom:10px">${[['tous', 'Tous'], ['vient', 'Viennent'], ['non', 'Ne viennent pas'], ['attente', 'En attente']].map(([k, t]) => `<button class="puce ${filtre === k ? 'actif' : ''}" data-f="${k}">${t}</button>`).join('')}</div>
         <div class="liste">${visibles.map(f => `<div class="fam" data-code="${esc(f.code)}">
-            <div><div class="nom">${esc(f.nom)}</div><div class="details">${[f.categorie, f.places + ' place' + (f.places > 1 ? 's' : ''), f.statut === 'vient' ? (f.adultes || 0) + ' adulte(s), ' + (f.enfants || 0) + ' enfant(s)' : '', f.table ? 'Table ' + f.table : '', f.telephone].filter(Boolean).map(esc).join(' · ')}</div>
+            <div><div class="nom">${esc(f.nom)}</div><div class="details">${[f.categorie, 'Invités : ' + invA(f) + ' adulte(s)' + (invE(f) ? ', ' + invE(f) + ' enfant(s)' : ''), f.statut === 'vient' ? '✓ Viennent : ' + (f.adultes || 0) + ' adulte(s), ' + (f.enfants || 0) + ' enfant(s)' : '', f.repondu ? 'répondu le ' + new Date(f.repondu).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '', f.table ? 'Table ' + f.table : '', f.telephone].filter(Boolean).map(esc).join(' · ')}</div>
               ${f.message ? `<div class="details">« ${esc(f.message)} »</div>` : ''}</div>
             <span class="badge ${f.statut === 'vient' || f.statut === 'non' ? f.statut : 'attente'}">${STAT[f.statut] || STAT.attente}</span>
             <div class="actions">${f.telephone ? '<button class="btn petit wa" data-a="wa">Envoyer sur WhatsApp</button>' : ''}<button class="btn petit" data-a="copier">Copier son lien</button><button class="btn petit" data-a="modifier">Modifier</button><button class="btn petit danger" data-a="suppr">Supprimer</button></div>
-          </div>`).join('') || `<div class="vide">${fs.length ? 'Aucune famille ne correspond.' : 'Aucun invité pour l\'instant. Ajoutez vos familles une par une, ou importez un fichier Excel (colonnes : Famille, Catégorie, Places, Téléphone, Table).'}</div>`}</div>`;
+          </div>`).join('') || `<div class="vide">${fs.length ? 'Aucune famille ne correspond.' : 'Aucun invité pour l\'instant. Ajoutez vos familles une par une (avec le nombre d\'adultes et d\'enfants invités), ou importez un fichier Excel (colonnes : Famille, Catégorie, Adultes, Enfants, Téléphone, Table).'}</div>`}</div>`;
       $('#ajouter').onclick = () => formulaire(null);
       $('#importer').onclick = importer;
       $('#exporter').onclick = exporter;
@@ -192,13 +208,13 @@
   async function copier(t) { try { await navigator.clipboard.writeText(t); } catch (e) { const a = document.createElement('textarea'); a.value = t; document.body.appendChild(a); a.select(); document.execCommand('copy'); a.remove(); } toast('Lien copié'); }
 
   function formulaire(f) {
-    const n = !f; f = f || { code: Base.code(), nom: '', categorie: '', places: 2, telephone: '', table: '', statut: 'attente', adultes: 0, enfants: 0 };
+    const n = !f; f = f || { code: Base.code(), nom: '', categorie: '', places: 2, prevus_adultes: 2, prevus_enfants: 0, telephone: '', table: '', statut: 'attente', adultes: 0, enfants: 0 };
     const d = $('#dlg'), fo = $('#dlg-form');
     fo.innerHTML = `<h3>${n ? 'Ajouter une famille' : 'Modifier'}</h3>
       <label>Nom de la famille<input name="nom" required value="${esc(f.nom)}" placeholder="Ex. Fianakaviana Rakoto"></label>
       <label>Catégorie<select name="categorie" id="f-cat"><option value="">— Sans catégorie —</option>${categories().map(c => `<option ${(f.categorie || (n && filtreCat !== '∅' ? filtreCat : '')) === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}<option value="__nouvelle">＋ Nouvelle catégorie…</option></select></label>
       <label id="f-cat-nouv" hidden>Nom de la nouvelle catégorie<input name="nouvelle_cat" placeholder="${mg ? 'Ohatra : Mpianatra niara-nianatra' : 'Ex. : Anciens camarades de classe'}"></label>
-      <label>Places (personnes invitées)<input name="places" type="number" min="1" value="${f.places || 1}"></label>
+      <div class="deux"><label>Adultes invités<input name="prevus_adultes" type="number" min="0" value="${invA(f)}"></label><label>Enfants invités<input name="prevus_enfants" type="number" min="0" value="${invE(f)}"></label></div>
       <div class="deux"><label>Téléphone (WhatsApp)<input name="telephone" inputmode="tel" value="${esc(f.telephone || '')}" placeholder="034 00 000 00"></label><label>Table<input name="table" value="${esc(f.table || '')}"></label></div>
       <label>Réponse<select name="statut">${Object.entries(STAT).map(([k, t]) => `<option value="${k}" ${(f.statut || 'attente') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
       <div class="deux"><label>Adultes qui viennent<input name="adultes" type="number" min="0" value="${f.adultes || 0}"></label><label>Enfants qui viennent<input name="enfants" type="number" min="0" value="${f.enfants || 0}"></label></div>
@@ -211,7 +227,8 @@
       if (!x.nom.trim()) return;
       if (x.categorie === '__nouvelle') { x.categorie = (x.nouvelle_cat || '').trim(); if (x.categorie) ecrireCat([...new Set(categories().concat(x.categorie))]); }
       delete x.nouvelle_cat;
-      try { await envoyer([Object.assign({}, f, x, { nom: x.nom.trim(), places: Number(x.places) || 1, adultes: Number(x.adultes) || 0, enfants: Number(x.enfants) || 0 })]); toast(n ? 'Famille ajoutée' : 'Enregistré'); }
+      const pa = Number(x.prevus_adultes) || 0, pe = Number(x.prevus_enfants) || 0;
+      try { await envoyer([Object.assign({}, f, x, { nom: x.nom.trim(), prevus_adultes: pa, prevus_enfants: pe, places: Math.max(1, pa + pe), adultes: Number(x.adultes) || 0, enfants: Number(x.enfants) || 0 })]); toast(n ? 'Famille ajoutée' : 'Enregistré'); }
       catch (e) { toast(e.message); }
     };
   }
@@ -251,7 +268,7 @@
       const lignes = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
       const cle = (o, ...ks) => { for (const k of Object.keys(o)) if (ks.some(x => k.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes(x))) return o[k]; return ''; };
       const exist = new Set((D.familles || []).map(f => f.nom.toLowerCase()));
-      const liste = lignes.map(o => ({ code: Base.code(), nom: String(cle(o, 'famille', 'nom', 'anarana')).trim(), categorie: String(cle(o, 'categ', 'groupe')).trim(), places: Number(cle(o, 'place', 'nombre', 'isa')) || (Number(cle(o, 'adulte')) || 0) + (Number(cle(o, 'enfant')) || 0) || 1, telephone: String(cle(o, 'tel', 'phone', 'whatsapp', 'finday')).trim(), table: String(cle(o, 'table', 'latabatra')).trim() })).filter(f => f.nom && !exist.has(f.nom.toLowerCase()));
+      const liste = lignes.map(o => ({ code: Base.code(), nom: String(cle(o, 'famille', 'nom', 'anarana')).trim(), categorie: String(cle(o, 'categ', 'groupe')).trim(), prevus_adultes: cle(o, 'adulte', 'olon-dehibe') === '' ? null : Number(cle(o, 'adulte', 'olon-dehibe')) || 0, prevus_enfants: cle(o, 'enfant', 'ankizy') === '' ? null : Number(cle(o, 'enfant', 'ankizy')) || 0, places: Number(cle(o, 'place', 'nombre', 'isa')) || (Number(cle(o, 'adulte', 'olon-dehibe')) || 0) + (Number(cle(o, 'enfant', 'ankizy')) || 0) || 1, telephone: String(cle(o, 'tel', 'phone', 'whatsapp', 'finday')).trim(), table: String(cle(o, 'table', 'latabatra')).trim() })).filter(f => f.nom && !exist.has(f.nom.toLowerCase()));
       if (!liste.length) return toast('Aucune nouvelle famille trouvée (colonne « Famille » ou « Nom »)');
       try { await envoyer(liste); toast(liste.length + ' famille(s) importée(s)'); } catch (e) { toast(e.message); }
     };
@@ -259,7 +276,7 @@
   }
   function exporter() {
     if (!window.XLSX) return toast('Excel en cours de chargement, réessayez');
-    const rows = (D.familles || []).map(f => ({ Famille: f.nom, 'Catégorie': f.categorie, Places: f.places, 'Téléphone': f.telephone, Table: f.table, 'Réponse': STAT[f.statut] || STAT.attente, Adultes: f.adultes, Enfants: f.enfants, Message: f.message || '', Lien: lienFamille(f) }));
+    const rows = (D.familles || []).map(f => ({ Famille: f.nom, 'Catégorie': f.categorie, 'Adultes invités': invA(f), 'Enfants invités': invE(f), 'Téléphone': f.telephone, Table: f.table, 'Réponse': STAT[f.statut] || STAT.attente, 'Adultes qui viennent': f.adultes, 'Enfants qui viennent': f.enfants, Message: f.message || '', Lien: lienFamille(f) }));
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Invités');
     const g = (D.reponses || []).filter(r => !r.code).map(r => ({ Nom: r.nom, 'Réponse': r.presence === 'oui' ? 'Vient' : 'Ne vient pas', Adultes: r.adultes, Enfants: r.enfants, Message: r.message, Date: new Date(r.date).toLocaleString('fr-FR') }));
     if (g.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(g), 'Lien général');
@@ -267,7 +284,7 @@
   }
 
   await lire();
-  setInterval(() => { if (!document.hidden && !$('#dlg').open) lire(true); }, 30000);
+  setInterval(() => { if (!document.hidden && !$('#dlg').open) lire(true); }, 15000);
 })();
 </script>
 </body>
