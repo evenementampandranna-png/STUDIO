@@ -471,6 +471,13 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-04-3', date: '4 novembre 2026', titre: 'Commandes depuis la vitrine, démo puis version finale avec licence', points: [
+      '<b>Équipe → « Tout publier sur la vitrine »</b> : toutes les invitations et tous les films de l\'équipe qui n\'y sont pas encore, d\'un coup (noms remplacés par des exemples).',
+      '<b>Vitrine</b> : chaque modèle a un bouton « Commander ce modèle ». Le visiteur lit et accepte les conditions (formules, prix, délai, paiement, licence), puis envoie toutes les informations : événement, noms, lieux, texte, couleurs, musique, photos.',
+      '<b>Menu « Commandes »</b> (admin) : les commandes arrivent avec un numéro et un badge rouge. « Créer l\'invitation depuis le modèle » : le modèle est copié avec les noms, lieux, date et contacts du client, ses couleurs et ses photos ; vous ajustez ensuite.',
+      '<b>Livraison</b> (onglet Film et publication) : 1. Démo marquée « DÉMO », réponses désactivées (+ film démo filigrané) → envoyée au client sur WhatsApp ; 2. après paiement, version finale avec un <b>code licence</b> personnel : l\'invitation ne marche que pour cet événement, et vous pouvez désactiver la licence (Commandes → Licences).',
+      '<b>Commandes → Conditions de la vitrine</b> : vos formules, prix, délai, paiement et conditions, publiés sur le site.'
+    ] },
     { id: '2026-11-04-2', date: '4 novembre 2026', titre: 'Forme du cadre des photos', points: [
       'Choisissez une photo (ou une vidéo) : bouton <b>◇ Forme</b> dans la barre au-dessus de l\'aperçu, ou bloc « Forme du cadre » à droite.',
       '24 formes : rectangle, coins arrondis (arrondi réglable), rond / ovale, pilule, arche, arche double, cœur, étoile, étoile douce, fleur, nuage, goutte, feuille, forme organique, losange, triangle, pentagone, hexagone, octogone, coins coupés, parallélogramme, bas en vague…',
@@ -611,6 +618,7 @@
     if (h[0] === 'nouveautes') return vueNouveautes();
     if (h[0] === 'rejoindre') return vueRejoindre(h[1], h[2]);
     if (h[0] === 'equipe') return vueEquipe();
+    if (h[0] === 'commandes') return vueCommandes(h[1]);
     if (h[0] === 'p' && projets[h[1]]) return vueProjet(projets[h[1]], h[2] || 'plans');
     return vueAccueil();
   }
@@ -2689,6 +2697,24 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     }
   }
   // Ne renvoie une liste vide que si le fichier n'existe pas encore (sinon on effacerait la vitrine)
+  // Met un film de l'équipe sur la vitrine du site
+  async function publierFilmVitrine(f) {
+    const r = await fetch(Equipe.url(f.chemin)); if (!r.ok) throw new Error('film introuvable (' + r.status + ')');
+    const ext = (f.chemin.split('.').pop() || 'mp4').toLowerCase(), chemin = 'medias/films/' + f.id + '.' + ext;
+    await GitHub.envoyer(chemin, await r.blob(), 'Film ' + f.nom);
+    let vignette = 'fonds/fond_2.jpg';
+    if (/^data:/.test(f.vignette || '')) { vignette = 'medias/films/' + f.id + '.jpg'; await GitHub.envoyer(vignette, dataURLversBlob(f.vignette), 'Vignette ' + f.nom); }
+    const index = (await lireVitrine()).filter(x => x.slug !== 'film-' + f.id);
+    index.unshift({ slug: 'film-' + f.id, film: true, video: chemin, titre: (f.evenement || f.nom.replace(/^Film — /, '')), type: 'Film vidéo', vignette, auteur: f.auteur || '', date: new Date().toISOString().slice(0, 10) });
+    await ecrireVitrine(index, 'Vitrine : film ' + f.nom);
+  }
+  // Met une invitation de l'équipe sur la vitrine (noms remplacés par des exemples)
+  async function publierInvitationEquipe(t, suivi) {
+    const pr = await Equipe.rpc('equipe_projet', { p_projet: t.projet });
+    if (!pr) throw new Error('invitation introuvable');
+    await copierFichiersEquipe(srcsEquipe(pr), suivi);
+    await publierVitrine(pr, publication(pr), false, t.auteur);
+  }
   async function lireVitrine() { try { return JSON.parse(await GitHub.lireTexte('vitrine/index.json')) || []; } catch (e) { if (e.message === 'absent') return []; throw e; } }
   async function ecrireVitrine(index, message) {
     await GitHub.envoyer('vitrine/index.json', JSON.stringify(index, null, 1), message);
@@ -2739,6 +2765,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <div class="ligne"><button class="btn plein" id="film">Enregistrer le film</button><button class="btn" id="film-transparent" title="Vidéo WebM avec transparence : les plans « Sans fond » restent transparents, pour la poser sur une autre vidéo">▦ Vidéo sans fond (WebM)</button><span class="muet" id="film-etat"></span></div></div>
       </div>
       <div class="pile">
+        ${p.commande || p.client || Equipe.admin() ? carteLivraison(p) : ''}
         <div class="carte pile carte-client"><h3>🔗 Les 2 liens à donner au client</h3>
           <ol class="etat-liste">
             <li class="${reglages.github && reglages.github.token ? 'fait' : ''}">Publication reliée (GitHub) ${reglages.github && reglages.github.token ? '✓' : '— <a href="#/reglages">à faire dans Réglages</a>'}</li>
@@ -2798,6 +2825,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     moteurCourant = eng;
     // Le film est une vidéo : les boutons de réponse y sont toujours montrés (comme sur le lien général avec réponses en ligne)
     const projetFilm = () => Fabrique.confirmationPourTous(p);
+    if ($('#lv-etat')) lierLivraison(p, eng);
     eng.setProjet(projetFilm()).then(() => eng.afficherPlan(0, 0.5));
     const fp = $('#film-pour');
     if (fp) fp.onchange = () => { const f = (p.familles || []).find(x => x.code === fp.value) || null; eng.famille = f ? Object.assign({}, f) : null; eng.form = Object.assign(eng.form, { adultes: f ? Number(f.adultes) || Number(f.places) || 1 : null, enfants: f ? Number(f.enfants) || 0 : null }); eng.setProjet(f ? p : projetFilm()).then(() => eng.afficherPlan(Math.max(0, p.plans.findIndex(x => x.role !== 'ouverture')), 0.8)); };
@@ -2878,6 +2906,305 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       } catch (e) { console.error(e); etat.innerHTML = `<div class="erreur-boite">Échec : ${esc(e.message)}</div>`; }
       pb.disabled = false;
     };
+  }
+
+  /* ================= Commandes de la vitrine, démo et version finale avec licence ================= */
+  const STATUTS_CMD = { nouvelle: 'Nouvelle', en_creation: 'En création', demo_envoyee: 'Démo envoyée', corrections: 'Corrections demandées', payee: 'Payée', livree: 'Livrée', annulee: 'Annulée' };
+  const COULEUR_STATUT = { nouvelle: 'alerte', en_creation: '', demo_envoyee: '', corrections: 'alerte', payee: 'ok', livree: 'ok', annulee: '' };
+  const CONDITIONS_DEFAUT = {
+    actif: true, studio: "Studio d'invitations", whatsapp: '',
+    intro: 'Choisissez un modèle, lisez les conditions, puis envoyez-nous toutes les informations : nous adaptons le modèle à votre événement et à vos couleurs.',
+    formules: [
+      { nom: 'Film', prix: '', contenu: 'Film vertical avec musique\nFormat WhatsApp, Facebook, TikTok' },
+      { nom: 'Film + invitation', prix: '', contenu: 'Tout le film\nPage interactive : confirmation, nombre de personnes, plan, appel\nLien personnel par famille' },
+      { nom: 'Complète', prix: '', contenu: 'Tout le reste\nGestion des invités et des réponses\nPlan de tables, export Excel' }
+    ],
+    delai: '3 à 5 jours après réception de toutes les informations et des photos',
+    paiement: '50 % à la commande, le solde avant la livraison de la version finale',
+    conditions: [
+      'Vous recevez d\'abord une version de démonstration (marquée « DÉMO ») pour la vérifier.',
+      'Deux séries de corrections sont comprises ; au-delà, sur devis.',
+      'La version finale est livrée après paiement du solde, avec un code licence personnel.',
+      'Licence personnelle : l\'invitation est réservée à votre événement. Elle ne peut être ni revendue, ni réutilisée pour un autre événement, ni modifiée par un tiers. En cas d\'abus, la licence est désactivée.',
+      'Vous garantissez avoir les droits sur les photos et la musique que vous nous envoyez.'
+    ]
+  };
+  let conditionsVitrine = Stock.lire('studio.vitrine.conditions', null);
+  const urlSiteAbs = () => new URL(urlSite(), location.href).href;
+  const lienDemo = p => urlSiteAbs() + 'i/?p=' + encodeURIComponent(p.slug + '-demo');
+
+  // Publication d'une invitation (version finale, ou démo filigranée sans réponses)
+  async function publierProjet(p, opts, etat) {
+    opts = opts || {}; etat = etat || (() => {});
+    const fichiersIdb = [];
+    p.plans.forEach(pl => { if (/^idb:/.test((pl.fond || {}).media || '')) fichiersIdb.push(pl.fond.media); (pl.calques || []).forEach(c => { if (/^idb:/.test(c.media || '')) fichiersIdb.push(c.media); }); });
+    if (p.musique && /^idb:/.test(p.musique.src)) fichiersIdb.push(p.musique.src);
+    (p.polices_perso || []).forEach(x => { if (/^idb:/.test(x.src || '')) fichiersIdb.push(x.src); });
+    for (const id of [...new Set(fichiersIdb)]) { etat('Envoi de ' + id.slice(4) + '…'); const blob = await IDB.lire(id); if (blob) await GitHub.envoyer('medias/' + id.slice(4), blob, 'Média ' + id.slice(4)); }
+    if (!opts.demo && reglages.supabase) {
+      etat('Base des invités…');
+      if (!p.cle_hote) p.cle_hote = Base.cle();
+      await Base.rpc(reglages.supabase, 'inv_studio_publier', { p_evt: p.id, p_cle: p.cle_hote, p_titre: p.fiche.titre || '', p_slug: p.slug, p_langue: p.fiche.langue || 'fr' });
+      await syncInvites(p);
+    }
+    await copierFichiersEquipe(srcsEquipe(p), etat);
+    etat('Envoi de l\'invitation…');
+    const pub = publication(p);
+    let slug = p.slug;
+    if (opts.demo) {
+      slug = p.slug + '-demo';
+      pub.demo = { date: new Date().toISOString(), studio: (conditionsVitrine || CONDITIONS_DEFAUT).studio || '' };
+      pub.liens = {}; delete pub.licence; pub.publication = Object.assign({}, pub.publication, { supabase: null, firebase: null });
+    }
+    await GitHub.envoyer('projets/' + slug + '.json', JSON.stringify(pub, null, 1), (opts.demo ? 'Démo ' : 'Invitation ') + p.fiche.titre);
+    await GitHub.envoyer('projets/' + slug + '.js', enJS(slug, pub), (opts.demo ? 'Démo ' : 'Invitation ') + p.fiche.titre + ' (js)');
+    return pub;
+  }
+
+  // Badge du menu : nombre de nouvelles commandes
+  async function majBadgeCommandes() {
+    const a = $('.barre nav a[data-nav="commandes"]'); if (!a) return;
+    if (!Equipe.actif() || !Equipe.admin() || !reglages.supabase) { a.removeAttribute('data-n'); return; }
+    try { const l = await Equipe.rpc('commandes_lire'); const n = (l || []).filter(c => c.statut === 'nouvelle').length; if (n) a.setAttribute('data-n', n); else a.removeAttribute('data-n'); } catch (e) {}
+  }
+  setTimeout(majBadgeCommandes, 2500); setInterval(majBadgeCommandes, 3 * 60 * 1000);
+
+  async function vueCommandes(onglet) {
+    onglet = onglet || 'liste';
+    const tete = `<div class="entete"><div><h1>Commandes</h1><p>Les commandes envoyées depuis la vitrine du site, la démo puis la version finale avec licence.</p></div><div class="ligne"><a class="btn" target="_blank" href="${esc(urlSiteAbs())}#modeles">Voir la vitrine ↗</a></div></div>
+      <div class="onglets">${[['liste', 'Commandes'], ['conditions', 'Conditions de la vitrine'], ['licences', 'Licences']].map(([k, n]) => `<a href="#/commandes/${k}" class="${onglet === k ? 'actif' : ''}">${n}</a>`).join('')}</div>`;
+    if (!Equipe.actif() || !Equipe.admin() || !reglages.supabase) {
+      $('#app').innerHTML = tete + `<div class="carte pile" style="max-width:640px"><p>Cette page est réservée à l'<b>admin de l'équipe</b> (avec la base Supabase reliée dans Réglages).</p></div>`; return;
+    }
+    if (onglet === 'conditions') return vueConditionsVitrine(tete);
+    if (onglet === 'licences') return vueLicences(tete);
+    $('#app').innerHTML = tete + `<div id="cmd-zone" class="muet">Chargement…</div>`;
+    let liste = [];
+    try { liste = await Equipe.rpc('commandes_lire') || []; }
+    catch (err) { $('#cmd-zone').innerHTML = /function|schema cache|Could not find/i.test(err.message) ? `<div class="alerte-boite">La base des commandes n'est pas encore installée. Copiez le script et lancez-le une fois dans Supabase → SQL Editor → Run.<div class="ligne" style="margin-top:8px"><button class="btn plein" id="cmd-sql">Copier le script des commandes</button></div></div>` : 'Impossible de lire les commandes : ' + esc(err.message); const b = $('#cmd-sql'); if (b) b.onclick = async () => { copier(await (await fetch('../outils/commandes.sql?v=' + Date.now())).text()); toast('Script copié : Supabase → SQL Editor → coller → Run'); }; return; }
+    const filtre = Stock.lire('studio.cmd.filtre', 'actives');
+    const visibles = liste.filter(c => filtre === 'toutes' || (filtre === 'actives' ? !['livree', 'annulee'].includes(c.statut) : c.statut === filtre));
+    const date = x => x ? new Date(x).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
+    $('#cmd-zone').classList.remove('muet');
+    $('#cmd-zone').innerHTML = `<div class="ligne" style="gap:6px;flex-wrap:wrap;margin-bottom:12px"><div class="seg">${[['actives', 'En cours'], ['nouvelle', 'Nouvelles'], ['livree', 'Livrées'], ['toutes', 'Toutes']].map(([k, n]) => `<button data-cf="${k}" class="${filtre === k ? 'on' : ''}">${n} (${k === 'toutes' ? liste.length : k === 'actives' ? liste.filter(c => !['livree', 'annulee'].includes(c.statut)).length : liste.filter(c => c.statut === k).length})</button>`).join('')}</div><button class="btn petit" id="cmd-maj">Actualiser</button></div>
+      ${visibles.length ? `<div class="pile">${visibles.map(c => { const d = c.details || {}, cl = c.client || {}; return `<div class="carte cmd-ligne" data-num="${esc(c.numero)}">
+        <div><b>${esc(c.numero)}</b> · <span class="badge ${COULEUR_STATUT[c.statut] || ''}">${esc(STATUTS_CMD[c.statut] || c.statut)}</span><div class="muet" style="font-size:12.5px">${date(c.cree)}</div></div>
+        <div><b>${esc(cl.nom || '—')}</b><div class="muet">${esc(cl.telephone || '')}</div></div>
+        <div><b>${esc(d.type || '')}</b> ${esc(d.titre || '')}<div class="muet">${esc(d.date || '')} · modèle « ${esc(c.modele_titre || c.modele || '—')} » · ${esc(d.formule || '')}</div></div>
+        <div class="muet">${(c.photos || []).length} fichier(s)${c.projet && projets[c.projet] ? ' · ✓ invitation créée' : ''}${c.licence ? ' · 🔑 ' + esc(c.licence) : ''}</div>
+        <button class="btn petit plein" data-ouvrir="${esc(c.numero)}">Ouvrir</button></div>`; }).join('')}</div>` : '<p class="muet">Aucune commande ici. Les commandes arrivent quand un visiteur clique « Commander ce modèle » sur la vitrine.</p>'}`;
+    $$('[data-cf]').forEach(b => b.onclick = () => { Stock.ecrire('studio.cmd.filtre', b.dataset.cf); vueCommandes('liste'); });
+    $('#cmd-maj').onclick = () => vueCommandes('liste');
+    $$('[data-ouvrir]').forEach(b => b.onclick = () => ouvrirCommande(liste.find(c => c.numero === b.dataset.ouvrir)));
+    majBadgeCommandes();
+  }
+
+  function ouvrirCommande(c) {
+    const d = c.details || {}, cl = c.client || {};
+    const ligne = (n, v) => v ? `<tr><th>${esc(n)}</th><td>${esc(v).replace(/\n/g, '<br>')}</td></tr>` : '';
+    const urlFichier = f => reglages.supabase.url.replace(/\/+$/, '') + '/storage/v1/object/public/commandes/' + f.chemin;
+    const p = c.projet && projets[c.projet];
+    modale(`<h2>Commande ${esc(c.numero)}</h2>
+      <div class="ligne" style="gap:8px;flex-wrap:wrap;margin-bottom:10px"><label class="champ" style="flex:0 0 220px">Statut<select id="cm-statut">${Object.entries(STATUTS_CMD).map(([k, n]) => `<option value="${k}" ${c.statut === k ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+        ${cl.telephone ? `<a class="btn" target="_blank" href="https://wa.me/${telWa(cl.telephone)}?text=${encodeURIComponent('Bonjour ' + (cl.nom || '') + ', merci pour votre commande ' + c.numero + '. ')}">💬 Écrire au client (WhatsApp)</a>` : ''}</div>
+      <div class="cmd-grille">
+        <div><h3>Client</h3><table class="tableau cmd-table">${ligne('Nom', cl.nom)}${ligne('Téléphone / WhatsApp', cl.telephone)}${ligne('E-mail', cl.email)}</table>
+          <h3>Commande</h3><table class="tableau cmd-table">${ligne('Modèle', c.modele_titre || c.modele)}${ligne('Formule', d.formule)}${ligne('Livraison souhaitée', d.livraison)}${ligne('Conditions acceptées', d.conditions_acceptees ? 'Oui, le ' + new Date(d.conditions_acceptees).toLocaleString('fr-FR') : '')}</table>
+          <h3>Thème</h3><div class="ligne" style="gap:8px">${(d.couleurs || []).map(x => `<span class="pastille-cmd" style="background:${esc(x)}" title="${esc(x)}"></span>`).join('')}<span class="muet">${esc(d.ambiance || '')}</span></div></div>
+        <div><h3>Événement</h3><table class="tableau cmd-table">${ligne('Type', d.type)}${ligne('Titre (Sary)', d.titre)}${ligne('Personnes célébrées', d.celebres)}${ligne('Hôtes / parents', d.hotes)}${ligne('Date', d.date)}${ligne('Heure', d.heure)}${ligne('Lieux', d.lieux)}${ligne('Date limite de réponse', d.date_limite)}${ligne('Contacts', d.contacts)}${ligne('Nombre d\'invités', d.invites)}${ligne('Langue(s)', d.langues)}${ligne('Musique', d.musique)}${ligne('Message', d.message)}</table></div>
+      </div>
+      ${d.texte ? `<h3>Texte de l'invitation</h3><div class="cmd-texte">${esc(d.texte).replace(/\n/g, '<br>')}</div>` : ''}
+      <h3>Photos et fichiers (${(c.photos || []).length})</h3>
+      <div class="cmd-photos">${(c.photos || []).map(f => /^image/.test(f.type || '') ? `<a href="${esc(urlFichier(f))}" target="_blank" download><img src="${esc(urlFichier(f))}" alt=""><span>${esc(f.nom || '')}</span></a>` : `<a href="${esc(urlFichier(f))}" target="_blank" download class="cmd-fichier">📎 ${esc(f.nom || f.chemin)}</a>`).join('') || '<p class="muet">Aucun fichier.</p>'}</div>
+      <label class="champ" style="margin-top:10px">Notes internes<textarea id="cm-notes" rows="3">${esc(c.notes || '')}</textarea></label>
+      <div class="cmd-actions">
+        ${p ? `<a class="btn plein" href="#/p/${p.id}/plans" id="cm-aller">✎ Ouvrir l'invitation</a><a class="btn" href="#/p/${p.id}/publier" id="cm-livrer">📦 Démo et livraison</a>` : `<button class="btn plein" id="cm-creer">1. Créer l'invitation depuis le modèle « ${esc(c.modele_titre || c.modele || '')} »</button>`}
+        <button class="btn" id="cm-ok">Enregistrer statut et notes</button>
+      </div>`, (box, fermer) => {
+      $('#cm-ok', box).onclick = async () => { try { await Equipe.rpc('commande_maj', { p_numero: c.numero, p_champs: { statut: $('#cm-statut', box).value, notes: $('#cm-notes', box).value } }); toast('Commande mise à jour'); fermer(); vueCommandes('liste'); } catch (err) { toast(err.message); } };
+      const cr = $('#cm-creer', box); if (cr) cr.onclick = async () => { cr.disabled = true; cr.textContent = 'Création…'; try { const np = await creerDepuisCommande(c, t => { cr.textContent = t; }); fermer(); location.hash = '#/p/' + np.id + '/plans'; } catch (err) { toast('Échec : ' + err.message); cr.disabled = false; cr.textContent = 'Réessayer'; } };
+      ['#cm-aller', '#cm-livrer'].forEach(id => { const a = $(id, box); if (a) a.addEventListener('click', () => fermer()); });
+    });
+  }
+
+  // Le modèle commandé : projet de l'équipe (de préférence) ou démo publiée sur le site
+  async function modeleDeCommande(c) {
+    const slug = String(c.modele || '').replace(/^demo-/, '');
+    const local = Object.values(projets).find(x => x.slug === slug);
+    if (local) return JSON.parse(JSON.stringify(local));
+    if (Equipe.actif()) {
+      try { const l = await Equipe.rpc('equipe_modeles'); const t = (l || []).find(x => x.slug === slug); if (t) { const src = await Equipe.rpc('equipe_modele', { p_projet: t.projet }); if (src) return JSON.parse(JSON.stringify(src)); } } catch (e) {}
+    }
+    if (/^demo-/.test(c.modele || '')) {
+      for (const base of [BASE, urlSite()]) { try { const r = await fetch(base + 'projets/' + encodeURIComponent(c.modele) + '.json?v=' + Date.now(), { cache: 'no-store' }); if (r.ok) return await r.json(); } catch (e) {} }
+    }
+    return null;
+  }
+  // Crée l'invitation du client à partir du modèle : textes, couleurs et photos du client
+  async function creerDepuisCommande(c, etat) {
+    etat = etat || (() => {});
+    const d = c.details || {}, cl = c.client || {};
+    etat('Lecture du modèle…');
+    const modele = await modeleDeCommande(c);
+    const texte = d.texte || [d.titre, d.celebres, d.hotes, d.date && ('Date : ' + d.date + (d.heure ? ' à ' + d.heure : '')), d.lieux, d.date_limite && ('Réponse avant le ' + d.date_limite), d.contacts].filter(Boolean).join('\n');
+    const fiche = Fabrique.analyserTexte(texte);
+    if (d.titre) fiche.titre = d.titre;
+    if (d.type) fiche.type = d.type;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d.date || '')) fiche.date = d.date;
+    if (/^\d{1,2}:\d{2}$/.test(d.heure || '')) fiche.heure = d.heure;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d.date_limite || '')) fiche.date_limite = d.date_limite;
+    if (d.langues && /malgache|malagasy|mg/i.test(d.langues) && !/fran/i.test(d.langues)) fiche.langue = 'mg';
+    fiche.texte_source = texte;
+    // champs du formulaire : noms (« RAKOTO Hery et RASOA Fanja »), lieux (une ligne chacun), contacts (nom + numéro)
+    const personne = n => { n = n.trim(); const mots = n.split(/\s+/), prenoms = mots.filter(m => !(m.length > 1 && m === m.toUpperCase())); return { nom_complet: n, surnom: (prenoms.length ? prenoms : mots).join(' ') }; };
+    const noms = String(d.celebres || '').split(/\s+(?:et|sy|and)\s+|\s*[&,;\n]\s*/i).map(x => x.trim()).filter(Boolean).map(personne);
+    const lieux = String(d.lieux || '').split('\n').map(x => x.replace(/^\s*(cérémonie|ceremonie|réception|reception|fiangonana|fety|lieu)\s*:\s*/i, '').trim()).filter(Boolean).map((nom, i) => ({ nom, role: i ? 'reception' : 'ceremonie', adresse: '', maps: 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(nom) }));
+    const contacts = (String(d.contacts || '').match(/[^\d,;\n]+[\d\s+]{8,}/g) || []).map(x => { const m = x.match(/^(.*?)([\d\s+]{8,})$/); return { nom: m[1].replace(/[:\-–]+\s*$/, '').trim(), telephone: m[2].trim() }; }).filter(k => k.nom || k.telephone);
+    if (noms.length && !(fiche.hotes || []).length) fiche.hotes = noms;
+    if (noms.length && /bapt|anniv|communion/i.test(d.type || '')) fiche.celebres = noms.map(n => ({ nom_complet: n.nom_complet, occasion: d.type }));
+    if (lieux.length) fiche.lieux = lieux;
+    if (contacts.length) fiche.contacts = contacts;
+    let p;
+    if (modele && modele.plans) {
+      p = modele; p.id = uid(); p.slug = (fiche.titre || 'invitation').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) + '-' + Math.random().toString(36).slice(2, 6);
+      ['publie', 'cle_hote', 'vitrine', 'vitrine_publiee', 'vitrine_noms', 'reponses_generales', 'liens', 'publication', 'demo', 'licence', 'livraison'].forEach(k => delete p[k]);
+      p.familles = []; p.historique_ia = []; p.cree = p.modifie = new Date().toISOString();
+      // remplacer les informations du modèle par celles du client, dans tous les textes
+      etat('Textes du client…');
+      const ancien = modele.fiche || {}, L = fiche.langue || ancien.langue || 'fr', paires = [];
+      const ajout = (a, b) => { a = String(a || '').trim(); b = String(b || '').trim(); if (a.length > 1 && b && a !== b) paires.push([a, b]); };
+      ajout(ancien.titre, fiche.titre);
+      (ancien.hotes || []).forEach((h, i) => { const n = (fiche.hotes || [])[i]; if (n) { ajout(h.nom_complet, n.nom_complet); ajout(h.surnom, n.surnom || n.nom_complet); } });
+      const celebresVus = new Set();
+      (ancien.celebres || []).forEach((h, i) => { if (celebresVus.has(h.nom_complet)) return; celebresVus.add(h.nom_complet); const n = (fiche.celebres || [])[i] || ((ancien.hotes || []).length ? null : noms[i]); if (n) ajout(h.nom_complet, n.nom_complet); });
+      (ancien.lieux || []).forEach((l, i) => { const n = (fiche.lieux || [])[i]; if (n) ajout(l.nom, n.nom); });
+      (ancien.contacts || []).forEach((k, i) => { const n = (fiche.contacts || [])[i]; if (n) { ajout(k.nom, n.nom); ajout(k.telephone, n.telephone); } });
+      if (ancien.date && fiche.date) { ajout(MoteurInfo.dateLisible(ancien.date, L), MoteurInfo.dateLisible(fiche.date, L)); ajout(MoteurInfo.dateLisible(ancien.date, 'fr'), MoteurInfo.dateLisible(fiche.date, 'fr')); }
+      if (ancien.date_limite && fiche.date_limite) ajout(MoteurInfo.dateLisible(ancien.date_limite, L), MoteurInfo.dateLisible(fiche.date_limite, L));
+      if (ancien.heure && fiche.heure) ajout(ancien.heure, fiche.heure);
+      paires.sort((a, b) => b[0].length - a[0].length);
+      const remplacer = t => paires.reduce((s, [a, b]) => s.split(a).join(b), String(t || ''));
+      let nb = 0;
+      p.plans.forEach(pl => (pl.calques || []).forEach(x => { if (typeof x.texte === 'string') { const n = remplacer(x.texte); if (n !== x.texte) nb++; x.texte = n; } if (x.trad) Object.keys(x.trad).forEach(k => { x.trad[k] = remplacer(x.trad[k]); }); }));
+      p.fiche = Object.assign({}, ancien, fiche, { phrases: fiche.phrases && fiche.phrases.length ? fiche.phrases : ancien.phrases });
+      p.adaptation = { remplacements: paires.length, textes: nb };
+    } else {
+      p = Fabrique.nouveauProjet(fiche, tousFonds());
+    }
+    // couleurs du client : la couleur principale et l'accent du modèle prennent les siennes
+    const [c1, c2] = (d.couleurs || []).filter(x => /^#[0-9a-f]{6}$/i.test(x));
+    if (c1) {
+      etat('Couleurs du client…');
+      const vieux1 = String((p.style && p.style.couleur) || '#7a1f2b').toLowerCase(), vieux2 = String((p.style && p.style.couleur2) || '').toLowerCase();
+      const map = { [vieux1]: c1 }; if (c2 && vieux2) map[vieux2] = c2;
+      const conv = v => (typeof v === 'string' && map[v.toLowerCase()]) || v;
+      p.plans.forEach(pl => (pl.calques || []).forEach(x => { ['couleur', 'bordure', 'contour', 'fond_couleur', 'ombre_couleur'].forEach(k => { if (x[k]) x[k] = conv(x[k]); }); if (x.illu) { x.illu.c = conv(x.illu.c); x.illu.a = conv(x.illu.a); if (window.Illustrations) x.media = Illustrations.dataUrl(x.illu.id, x.illu.c, x.illu.a); } }));
+      p.style = Object.assign({}, p.style, { couleur: c1 }, c2 ? { couleur2: c2 } : {});
+    }
+    // photos du client : rangées dans la bibliothèque de l'événement, et posées à la place des photos du modèle
+    const photos = (c.photos || []).filter(f => /^image/.test(f.type || ''));
+    const importees = [];
+    for (const [k, f] of photos.entries()) {
+      etat(`Photo ${k + 1}/${photos.length}…`);
+      try { const r = await fetch(reglages.supabase.url.replace(/\/+$/, '') + '/storage/v1/object/public/commandes/' + f.chemin); if (!r.ok) continue; const b = await r.blob(); const fi = new File([b], f.nom || ('photo-' + (k + 1) + '.jpg'), { type: b.type || f.type }); importees.push(await importerFichier(fi, 'image', p.id)); } catch (e) {}
+    }
+    if (importees.length) sauverMedias();
+    let posees = 0;
+    p.plans.forEach(pl => (pl.calques || []).forEach(x => { if (x.type === 'image' && !x.illu && importees[posees]) { x.media = importees[posees].src; delete x.recadrage; posees++; } }));
+    p.commande = c.numero; p.client = { nom: cl.nom || '', telephone: cl.telephone || '', email: cl.email || '' };
+    p.livraison = { etape: 'creation' };
+    projets[p.id] = p; sauverProjets();
+    try { await Equipe.rpc('commande_maj', { p_numero: c.numero, p_champs: { statut: 'en_creation', projet: p.id } }); } catch (e) {}
+    toast(`Invitation créée depuis le modèle : ${p.adaptation ? p.adaptation.textes + ' texte(s) adapté(s), ' : ''}${importees.length} photo(s) dans la bibliothèque${posees ? ' (' + posees + ' posée(s))' : ''}${c1 ? ', couleurs du client appliquées' : ''}. Vérifiez chaque plan.`);
+    return p;
+  }
+
+  // Carte « Livraison au client » (onglet Film et publication)
+  function carteLivraison(p) {
+    const L = p.livraison || {};
+    const pret = reglages.github && reglages.github.token;
+    return `<div class="carte pile carte-livraison"><h3>📦 Livraison au client${p.commande ? ' · commande ' + esc(p.commande) : ''}</h3>
+      <div class="deux"><label class="champ">Client<input type="text" id="lv-nom" value="${esc((p.client || {}).nom || '')}" placeholder="Nom du client"></label><label class="champ">WhatsApp du client<input type="text" id="lv-tel" value="${esc((p.client || {}).telephone || '')}" placeholder="034 00 000 00"></label></div>
+      <ol class="etat-liste">
+        <li class="${L.demo ? 'fait' : ''}"><b>Démo</b> : invitation marquée « DÉMO », réponses désactivées, pour validation. ${L.demo ? '✓ envoyée le ' + esc(new Date(L.demo).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })) : ''}
+          <div class="ligne" style="gap:6px;margin-top:6px;flex-wrap:wrap"><button class="btn petit plein" id="lv-demo" ${pret ? '' : 'disabled'}>${L.demo ? 'Republier la démo' : 'Publier la démo'}</button><button class="btn petit" id="lv-film-demo">🎬 Film démo (filigrane)</button>${L.demo ? `<a class="btn petit" target="_blank" href="${esc(lienDemo(p))}">Voir la démo ↗</a><button class="btn petit" id="lv-wa-demo">💬 Envoyer la démo au client</button>` : ''}</div></li>
+        <li class="${L.finale ? 'fait' : ''}"><b>Version finale</b> : sans filigrane, réponses enregistrées dans la base, avec un <b>code licence</b> personnel (l'invitation ne marche que pour cet événement ; la licence peut être désactivée). ${p.licence ? '🔑 ' + esc(p.licence.code) : ''}
+          <label class="cases" style="margin-top:6px"><input type="checkbox" id="lv-paye" ${L.paye ? 'checked' : ''}> Paiement reçu</label>
+          <div class="ligne" style="gap:6px;margin-top:6px;flex-wrap:wrap"><button class="btn petit plein" id="lv-finale" ${pret && reglages.supabase && Equipe.admin() ? '' : 'disabled'}>${L.finale ? 'Republier la version finale' : 'Livrer la version finale'}</button>${L.finale ? '<button class="btn petit" id="lv-wa-finale">💬 Envoyer la version finale au client</button>' : ''}</div>
+          ${Equipe.admin() ? '' : '<div class="muet">La licence est créée par l\'admin de l\'équipe.</div>'}</li>
+      </ol><div class="muet" id="lv-etat"></div></div>`;
+  }
+  function lierLivraison(p, eng) {
+    const etat = t => { const e = $('#lv-etat'); if (e) e.textContent = t; };
+    const client = () => { p.client = Object.assign({}, p.client, { nom: $('#lv-nom').value.trim(), telephone: $('#lv-tel').value.trim() }); enregistrer(p); return p.client; };
+    ['#lv-nom', '#lv-tel'].forEach(id => { const e = $(id); if (e) e.onchange = client; });
+    const statut = s => { if (p.commande && Equipe.admin()) Equipe.rpc('commande_maj', { p_numero: p.commande, p_champs: Object.assign({ statut: s, projet: p.id }, p.licence ? { licence: p.licence.code } : {}) }).catch(() => {}); };
+    const wa = (msg) => { const cl = client(); if (!cl.telephone) return toast('Indiquez le WhatsApp du client'); window.open('https://wa.me/' + telWa(cl.telephone) + '?text=' + encodeURIComponent(msg), '_blank'); };
+    const b1 = $('#lv-demo'); if (b1) b1.onclick = async () => { b1.disabled = true; try { await publierProjet(p, { demo: true }, etat); p.livraison = Object.assign({}, p.livraison, { demo: new Date().toISOString() }); enregistrer(p); statut('demo_envoyee'); etat('Démo publiée (visible dans quelques minutes) : ' + lienDemo(p)); ongletPublier(p); toast('Démo publiée'); } catch (err) { etat('Échec : ' + err.message); b1.disabled = false; } };
+    const bf = $('#lv-film-demo'); if (bf) bf.onclick = async () => {
+      bf.disabled = true; etat('Film démo…');
+      try { eng.filigrane = 'DÉMO'; const mus = p.musique ? await resoudre(p.musique.src) : null; const r = await eng.exporterFilm({ musique: mus, debut: p.musique ? Number(p.musique.debut) || 0 : 0, volume: p.musique ? p.musique.volume : 0.8, etape: etat, progres: v => etat('Film démo… ' + Math.round(v * 100) + ' %') }); telecharger(p.slug + '-DEMO.' + r.extension, r.blob); etat('Film démo prêt (marqué DÉMO), à envoyer au client pour validation.'); }
+      catch (err) { etat('Erreur : ' + err.message); } eng.filigrane = null; bf.disabled = false;
+    };
+    const w1 = $('#lv-wa-demo'); if (w1) w1.onclick = () => wa(`Bonjour ${client().nom || ''}, voici la version de démonstration de votre invitation « ${p.fiche.titre} » : ${lienDemo(p)}\nElle est marquée « DÉMO » et les réponses n'y sont pas enregistrées. Dites-nous si tout vous convient ou ce qu'il faut corriger. La version finale vous sera envoyée après le paiement du solde.`);
+    const pa = $('#lv-paye'); if (pa) pa.onchange = () => { p.livraison = Object.assign({}, p.livraison, { paye: pa.checked }); enregistrer(p); if (pa.checked) statut('payee'); };
+    const b2 = $('#lv-finale'); if (b2) b2.onclick = async () => {
+      if (!$('#lv-paye').checked && !confirm('Le paiement n\'est pas coché comme reçu. Livrer quand même la version finale ?')) return;
+      const cl = client(); b2.disabled = true;
+      try {
+        etat('Création de la licence…');
+        const code = await Equipe.rpc('licence_creer', { p_evt: p.id, p_client: cl.nom || p.fiche.titre || '', p_commande: p.commande || '' });
+        p.licence = { code, client: cl.nom || '', date: new Date().toISOString() };
+        await publierProjet(p, {}, etat);
+        p.publie = new Date().toISOString(); p.livraison = Object.assign({}, p.livraison, { finale: new Date().toISOString() }); enregistrer(p); statut('livree');
+        etat('Version finale publiée avec la licence ' + code + '.'); ongletPublier(p); toast('Version finale livrée · licence ' + code);
+      } catch (err) { etat('Échec : ' + err.message); b2.disabled = false; }
+    };
+    const w2 = $('#lv-wa-finale'); if (w2) w2.onclick = () => wa(`Bonjour ${client().nom || ''}, voici la version finale de votre invitation « ${p.fiche.titre} ».\n\n• Lien à envoyer à vos invités : ${lienGeneral(p)}\n• Votre espace organisateur (gardez-le pour vous) : ${lienHote(p) || '—'}\n\nCode licence : ${p.licence ? p.licence.code : ''}\nLicence personnelle : cette invitation est réservée à votre événement ; elle ne peut être ni revendue, ni réutilisée pour un autre événement. Merci pour votre confiance !`);
+  }
+
+  // Conditions et formules affichées sur la vitrine (fichier vitrine/conditions.json du site)
+  async function vueConditionsVitrine(tete) {
+    if (!conditionsVitrine) { try { const r = await fetch(urlSite() + 'vitrine/conditions.json?v=' + Date.now(), { cache: 'no-store' }); if (r.ok) conditionsVitrine = await r.json(); } catch (e) {} }
+    const c = Object.assign({}, CONDITIONS_DEFAUT, conditionsVitrine || {});
+    $('#app').innerHTML = tete + `<div class="ia-grille"><div class="carte pile">
+      <label class="cases"><input type="checkbox" id="cv-actif" ${c.actif !== false ? 'checked' : ''}> Commandes ouvertes sur la vitrine (bouton « Commander ce modèle »)</label>
+      <div class="deux"><label class="champ">Nom du studio<input type="text" id="cv-studio" value="${esc(c.studio || '')}"></label><label class="champ">WhatsApp du studio<input type="text" id="cv-wa" value="${esc(c.whatsapp || '')}" placeholder="034 00 000 00"></label></div>
+      <label class="champ">Présentation<textarea id="cv-intro" rows="2">${esc(c.intro || '')}</textarea></label>
+      <b>Formules et prix</b>${(c.formules || []).map((f, i) => `<div class="cv-formule"><div class="deux"><label class="champ">Nom<input type="text" data-fn="${i}" value="${esc(f.nom)}"></label><label class="champ">Prix (vide = sur devis)<input type="text" data-fp="${i}" value="${esc(f.prix || '')}" placeholder="ex. 150 000 Ar"></label></div><label class="champ">Contenu (une ligne par point)<textarea data-fc="${i}" rows="3">${esc(f.contenu || '')}</textarea></label></div>`).join('')}
+      <label class="champ">Délai de réalisation<input type="text" id="cv-delai" value="${esc(c.delai || '')}"></label>
+      <label class="champ">Paiement<input type="text" id="cv-paiement" value="${esc(c.paiement || '')}"></label>
+      <label class="champ">Conditions (une par ligne) — le client doit les accepter avant de commander<textarea id="cv-cond" rows="8">${esc((c.conditions || []).join('\n'))}</textarea></label>
+      <div class="ligne"><button class="btn plein" id="cv-pub">Publier sur la vitrine</button><span class="muet" id="cv-etat"></span></div>
+    </div><div class="carte pile"><h3>Comment ça marche</h3><ol class="muet">
+      <li>Le visiteur regarde un modèle sur la vitrine, clique « Commander ce modèle ».</li>
+      <li>Il lit ces conditions et les accepte, puis remplit le formulaire (événement, texte, couleurs, photos…).</li>
+      <li>La commande arrive ici (onglet Commandes) avec un numéro ; le client reçoit le numéro et peut vous écrire sur WhatsApp.</li>
+      <li>Vous créez l'invitation depuis le modèle, vous l'adaptez, vous envoyez la <b>démo</b>, puis la <b>version finale</b> avec sa licence.</li></ol>
+      <p class="muet">La base des commandes doit être installée une fois : <button class="btn petit" id="cv-sql">Copier le script des commandes</button> → Supabase → SQL Editor → Run.</p></div></div>`;
+    $('#cv-sql').onclick = async () => { copier(await (await fetch('../outils/commandes.sql?v=' + Date.now())).text()); toast('Script copié : Supabase → SQL Editor → coller → Run'); };
+    $('#cv-pub').onclick = async () => {
+      const n = {
+        actif: $('#cv-actif').checked, studio: $('#cv-studio').value.trim(), whatsapp: $('#cv-wa').value.trim(), intro: $('#cv-intro').value.trim(),
+        formules: (c.formules || []).map((f, i) => ({ nom: $(`[data-fn="${i}"]`).value.trim(), prix: $(`[data-fp="${i}"]`).value.trim(), contenu: $(`[data-fc="${i}"]`).value.trim() })).filter(f => f.nom),
+        delai: $('#cv-delai').value.trim(), paiement: $('#cv-paiement').value.trim(), conditions: $('#cv-cond').value.split('\n').map(x => x.trim()).filter(Boolean),
+        supabase: reglages.supabase ? { url: reglages.supabase.url, anon: reglages.supabase.anon } : null, maj: new Date().toISOString()
+      };
+      conditionsVitrine = n; Stock.ecrire('studio.vitrine.conditions', n);
+      const g = reglages.github || {}; if (!(g.owner && g.repo && g.token)) return toast('Enregistré ici ; reliez GitHub dans Réglages pour publier sur le site');
+      $('#cv-etat').textContent = 'Publication…';
+      try { await GitHub.envoyer('vitrine/conditions.json', JSON.stringify(n, null, 1), 'Vitrine : conditions et formules'); $('#cv-etat').textContent = 'Publié : visible sur la vitrine dans quelques minutes.'; } catch (err) { $('#cv-etat').textContent = 'Échec : ' + err.message; }
+    };
+  }
+
+  async function vueLicences(tete) {
+    $('#app').innerHTML = tete + '<div id="lic-zone" class="muet">Chargement…</div>';
+    let l = []; try { l = await Equipe.rpc('licences_lire') || []; } catch (err) { $('#lic-zone').textContent = 'Impossible de lire les licences : ' + err.message; return; }
+    const nomEvt = id => projets[id] ? projets[id].fiche.titre : id;
+    $('#lic-zone').classList.remove('muet');
+    $('#lic-zone').innerHTML = `<p class="muet">Une licence par invitation livrée. Désactivée, l'invitation affiche « invitation non active » à la place du film.</p>
+      <div class="tableau-boite"><table class="tableau"><thead><tr><th>Code</th><th>Client</th><th>Invitation</th><th>Commande</th><th>Créée</th><th>Statut</th><th></th></tr></thead><tbody>${l.map(x => `<tr><td><b>${esc(x.code)}</b></td><td>${esc(x.client)}</td><td>${esc(nomEvt(x.evt))}</td><td>${esc(x.commande || '')}</td><td>${esc(new Date(x.cree).toLocaleDateString('fr-FR'))}</td><td><span class="badge ${x.statut === 'active' ? 'ok' : 'alerte'}">${esc(x.statut)}</span></td><td>${x.statut === 'active' ? `<button class="btn petit danger" data-lic="${esc(x.code)}" data-st="suspendue">Désactiver</button>` : `<button class="btn petit" data-lic="${esc(x.code)}" data-st="active">Réactiver</button>`}</td></tr>`).join('') || '<tr><td colspan="7" class="muet">Aucune licence pour l\'instant.</td></tr>'}</tbody></table></div>`;
+    $$('[data-lic]').forEach(b => b.onclick = async () => { if (b.dataset.st !== 'active' && !confirm('Désactiver la licence ' + b.dataset.lic + ' ? L\'invitation ne s\'affichera plus.')) return; try { await Equipe.rpc('licence_changer', { p_code: b.dataset.lic, p_statut: b.dataset.st }); toast('Licence mise à jour'); vueLicences(tete); } catch (err) { toast(err.message); } });
   }
 
   /* ================= GitHub (publication sans serveur) ================= */
@@ -3129,14 +3456,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       if (!githubPret()) return;
       const f = films.find(x => x.id === b.dataset.filmVitrine); b.disabled = true; b.textContent = 'Publication…';
       try {
-        const r = await fetch(Equipe.url(f.chemin)); if (!r.ok) throw new Error('film introuvable (' + r.status + ')');
-        const chemin = 'medias/films/' + f.id + '.mp4';
-        await GitHub.envoyer(chemin, await r.blob(), 'Film ' + f.nom);
-        let vignette = 'fonds/fond_2.jpg';
-        if (/^data:/.test(f.vignette || '')) { vignette = 'medias/films/' + f.id + '.jpg'; await GitHub.envoyer(vignette, dataURLversBlob(f.vignette), 'Vignette ' + f.nom); }
-        const index = (await lireVitrine()).filter(x => x.slug !== 'film-' + f.id);
-        index.unshift({ slug: 'film-' + f.id, film: true, video: chemin, titre: (f.evenement || f.nom.replace(/^Film — /, '')), type: 'Film vidéo', vignette, auteur: f.auteur || '', date: new Date().toISOString().slice(0, 10) });
-        await ecrireVitrine(index, 'Vitrine : film ' + f.nom);
+        await publierFilmVitrine(f);
         toast('Film publié sur la vitrine (visible dans quelques minutes)'); modelesEtFilms(zone, admin, filmsSeuls);
       } catch (err) { toast('Échec : ' + err.message); b.disabled = false; b.textContent = 'Publier sur la vitrine'; }
     });
@@ -3174,6 +3494,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           ${Object.entries(parType).map(([k, t]) => `<div class="stat"><b>${dureeTexte(t.s / t.n)}</b><span>en moyenne par ${esc(NOMS[k] || k)} (${t.n})</span></div>`).join('')}</div>
         <div class="carte" style="padding:10px;margin-top:14px"><h3 style="margin:4px 6px 10px">Membres</h3><div class="tableau-boite"><table class="tableau"><thead><tr><th>Membre</th><th>Invitations</th><th>Publiées</th><th>Vidéos</th><th>Temps total de fabrication</th><th>Dernière activité</th></tr></thead>
           <tbody>${Object.values(membres).sort((a, b) => b.derniere.localeCompare(a.derniere)).map(m => `<tr><td><b>${esc(m.nom)}</b></td><td>${m.evts}</td><td>${m.publies}</td><td>${m.videos}</td><td>${dureeTexte(m.secondes)}</td><td>${date(m.derniere)}</td></tr>`).join('') || '<tr><td colspan="6" class="muet">Personne n\'a encore travaillé.</td></tr>'}</tbody></table></div></div>
+        <div class="carte pile" style="padding:12px;margin-top:14px;background:#fbf4ec"><div class="ligne" style="justify-content:space-between;flex-wrap:wrap;gap:8px"><div><b>📢 Vitrine du site</b><div class="muet">Publiez d'un coup toutes les invitations et tous les films de l'équipe qui n'y sont pas encore (noms remplacés par des exemples).</div></div><button class="btn plein" id="vit-tout">Tout publier sur la vitrine</button></div><div class="muet" id="vit-tout-etat"></div></div>
         <div class="carte" style="padding:10px;margin-top:14px"><h3 style="margin:4px 6px 10px">Toutes les invitations de l'équipe</h3>
           <div class="grille" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">${d.travaux.map(t => `<div class="carte pile" style="padding:10px">${t.vignette ? `<img src="${esc(t.vignette)}" alt="" style="width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:8px">` : ''}
             <b>${esc(t.titre || 'Sans titre')}</b><div class="muet">par <b>${esc(t.auteur || '—')}</b> · ${t.plans} plans · modifiée le ${date(t.maj)}</div>
@@ -3214,6 +3535,19 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           };
         });
       });
+      $('#vit-tout').onclick = async () => {
+        if (!githubPret()) return;
+        await Equipe.charger().catch(() => {});
+        const invits = d.travaux.filter(t => t.slug && !surVitrine.has('demo-' + t.slug));
+        const films = Equipe.items.filter(x => x.type === 'film' && !surVitrine.has('film-' + x.id));
+        if (!invits.length && !films.length) return toast('Tout est déjà sur la vitrine');
+        if (!confirm(`Publier sur la vitrine ${invits.length} invitation(s) et ${films.length} film(s) ? (noms et téléphones remplacés par des exemples)`)) return;
+        const etat = $('#vit-tout-etat'), b = $('#vit-tout'); b.disabled = true; let ok = 0; const rates = [];
+        for (const [k, t] of invits.entries()) { etat.textContent = `Invitation ${k + 1}/${invits.length} : ${t.titre}…`; try { await publierInvitationEquipe(t, x => { etat.textContent = `Invitation ${k + 1}/${invits.length} : ${x}`; }); ok++; } catch (err) { rates.push(t.titre + ' (' + err.message + ')'); } }
+        for (const [k, f] of films.entries()) { etat.textContent = `Film ${k + 1}/${films.length} : ${f.nom}…`; try { await publierFilmVitrine(f); ok++; } catch (err) { rates.push(f.nom + ' (' + err.message + ')'); } }
+        etat.innerHTML = `${ok} publié(s) sur la vitrine (visible dans quelques minutes).${rates.length ? '<br>Non publiés : ' + esc(rates.join(' · ')) : ''}`; b.disabled = false;
+        toast(ok + ' publié(s) sur la vitrine'); setTimeout(rendre, 1500);
+      };
       $$('[data-vit-retirer]').forEach(b => b.onclick = async () => {
         if (!githubPret()) return;
         const t = d.travaux.find(x => x.projet === b.dataset.vitRetirer);

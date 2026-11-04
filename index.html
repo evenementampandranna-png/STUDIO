@@ -59,6 +59,40 @@
   .formule h3 { font: 700 24px "Cormorant Garamond", serif; margin: 0 0 8px; color: var(--vin); }
   .formule ul { padding-left: 18px; margin: 0; color: var(--gris); }
   footer { text-align: center; padding: 30px 20px 50px; color: var(--gris); font-size: 14px; }
+  .modele .commander { display: block; width: calc(100% - 28px); margin: 0 14px 14px; font: 600 14px Inter, sans-serif; padding: 10px; border-radius: 999px; border: 0; background: var(--encre); color: #fff; cursor: pointer; }
+  .modele .commander:hover { background: var(--vin); }
+  .formule .prix { font: 700 20px Inter, sans-serif; color: var(--encre); margin: -2px 0 10px; }
+  #cmd { position: fixed; inset: 0; z-index: 60; background: rgba(20,10,10,.75); display: none; overflow: auto; padding: 24px 12px; }
+  #cmd.ouvert { display: block; }
+  .cmd-boite { position: relative; max-width: 820px; margin: 0 auto; background: #fffdf9; border-radius: 18px; padding: 26px 24px; box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+  .cmd-x { position: absolute; top: 10px; right: 14px; border: 0; background: none; font-size: 30px; cursor: pointer; color: var(--gris); }
+  .cmd-boite h2 { margin: 0 30px 10px 0; }
+  .cmd-boite h3 { font: 700 20px "Cormorant Garamond", serif; margin: 16px 0 6px; color: var(--vin); }
+  .cmd-etapes { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .cmd-etapes span { font-size: 13px; padding: 4px 10px; border-radius: 999px; background: #f1e8dc; color: var(--gris); }
+  .cmd-etapes span.on { background: var(--vin); color: #fff; }
+  .cmd-formules { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+  .cmd-formules div { border: 1px solid var(--ligne); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
+  .cmd-formules span { font-weight: 700; } .cmd-formules small { color: var(--gris); }
+  .cmd-cond ol { padding-left: 20px; color: #4a3d3d; } .cmd-cond li { margin: 4px 0; }
+  .cmd-accepte { display: flex; gap: 8px; align-items: center; font-weight: 600; margin: 14px 0; }
+  .cmd-accepte input { width: 20px; height: 20px; }
+  .cta:disabled { opacity: .45; cursor: not-allowed; }
+  button.cta { border: 0; font: 600 16px Inter, sans-serif; cursor: pointer; }
+  .cmd-aide { color: var(--gris); }
+  .cmd-form fieldset { border: 1px solid var(--ligne); border-radius: 14px; padding: 12px 14px 14px; margin: 0 0 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .cmd-form legend { font: 700 18px "Cormorant Garamond", serif; color: var(--vin); padding: 0 6px; }
+  .cmd-form label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; font-weight: 600; color: #4a3d3d; }
+  .cmd-form .large { grid-column: 1 / -1; }
+  .cmd-form input, .cmd-form select, .cmd-form textarea { font: 15px Inter, sans-serif; padding: 9px 11px; border: 1px solid #d8cabb; border-radius: 10px; background: #fff; width: 100%; }
+  .cmd-form input[type=color] { padding: 2px; height: 42px; }
+  .cmd-pastilles { display: flex; gap: 6px; flex-wrap: wrap; }
+  .cmd-pastilles button { width: 34px; height: 34px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px #d8cabb; cursor: pointer; }
+  .cmd-apercus { display: flex; gap: 6px; flex-wrap: wrap; } .cmd-apercus img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; }
+  .cmd-bas { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+  #cmd-etat { color: var(--gris); font-size: 14px; }
+  .cmd-num { font-size: 22px; color: var(--vin); letter-spacing: .04em; }
+  @media (max-width: 600px) { .cmd-form fieldset { grid-template-columns: 1fr; } .cmd-boite { padding: 20px 14px; } }
   @media (max-width: 800px) { .hero { grid-template-columns: 1fr; } .etapes, .formules { grid-template-columns: 1fr 1fr; } }
   @media (max-width: 520px) { .etapes, .formules { grid-template-columns: 1fr; } .cta.contour { margin: 10px 0 0; } }
 </style>
@@ -92,10 +126,10 @@
 <section id="contact"><h2>Contact</h2><p id="contact-texte" style="color:var(--gris)">Écrivez-nous pour un devis.</p></section>
 <footer>Invitations vidéo interactives</footer>
 <div id="boite"><button id="fermer" aria-label="Fermer">×</button><div class="lecteur" id="lecteur"><div class="fin-film" id="fin"><button id="revoir">↺ Revoir le film</button><a id="essayer" target="_blank">Essayer l'invitation interactive</a></div></div><div class="barre-lecture"><div id="progression"></div></div></div>
-<script src="config.js?v=202611041409"></script>
-<script src="moteur/moteur.js?v=202611041409"></script>
-<script src="moteur/fabrique.js?v=202611041409"></script>
-<script src="vitrine/index.js?v=202611041409"></script>
+<script src="config.js?v=202611041433"></script>
+<script src="moteur/moteur.js?v=202611041433"></script>
+<script src="moteur/fabrique.js?v=202611041433"></script>
+<script src="vitrine/index.js?v=202611041433"></script>
 <script>
 (async function () {
   const $ = s => document.querySelector(s);
@@ -112,6 +146,7 @@
   await Promise.all(liste.filter(m => !m.film).map(m => charger('projets/' + encodeURIComponent(m.slug) + '.js?v=' + Date.now())));
   const projets = window.PROJETS || {};
   liste = liste.filter(m => m.film ? m.video : projets[m.slug]);
+  window.LISTE_VITRINE = liste;
   const box = $('#liste');
   if (!liste.length) { box.innerHTML = '<p style="color:var(--gris)">Les premiers modèles arrivent bientôt.</p>'; return; }
   const familleDe = p => { const l = p.liens || {}; const k = Object.keys(l)[0]; return k ? Object.assign({ code: k }, l[k]) : null; };
@@ -151,7 +186,7 @@
   /* Lecteur plein écran : le film du modèle, du début à la fin */
   let lecteur = null;
   async function ouvrir(i) {
-    const m = liste[i];
+    const m = liste[i]; window.MODELE_OUVERT = m;
     $('#boite').classList.add('ouvert'); $('#fin').classList.remove('vu'); $('#progression').style.width = '0';
     $('#essayer').style.display = m.film ? 'none' : '';
     $('#essayer').href = 'i/?p=' + encodeURIComponent(m.slug) + '&f=DEMO';
@@ -187,6 +222,169 @@
   $('#boite').onclick = e => { if (e.target.id === 'boite') fermer(); };
   document.addEventListener('keydown', e => { if (e.key === 'Escape') fermer(); });
   box.querySelectorAll('.modele').forEach(el => el.onclick = () => ouvrir(Number(el.dataset.i)));
+})();
+</script>
+<script>
+/* ---- Commandes : conditions, formulaire, envoi des photos ---- */
+(async function () {
+  const $ = s => document.querySelector(s);
+  const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  let cond = null;
+  try { const r = await fetch('vitrine/conditions.json?v=' + Date.now(), { cache: 'no-store' }); if (r.ok) cond = await r.json(); } catch (e) {}
+  window.CONDITIONS_VITRINE = cond;
+  if (!cond || cond.actif === false) return;
+  const wa = String(cond.whatsapp || (window.STUDIO_CONFIG && window.STUDIO_CONFIG.contact && window.STUDIO_CONFIG.contact.whatsapp) || '').replace(/\D/g, '').replace(/^0/, '261');
+  // Formules et prix
+  if (cond.formules && cond.formules.length) {
+    const fz = document.querySelector('.formules');
+    if (fz) fz.innerHTML = cond.formules.map(f => `<div class="formule"><h3>${esc(f.nom)}</h3><div class="prix">${esc(f.prix || 'Prix sur devis')}</div><ul>${String(f.contenu || '').split('\n').filter(Boolean).map(l => `<li>${esc(l)}</li>`).join('')}</ul></div>`).join('');
+  }
+  if (wa) { const d = $('#devis'); if (d) d.href = 'https://wa.me/' + wa + '?text=' + encodeURIComponent('Bonjour, je souhaite une invitation vidéo.'); }
+  const sb = cond.supabase;
+  const rpc = async (fn, args) => {
+    const h = { apikey: sb.anon, 'Content-Type': 'application/json' }; if (/^eyJ/.test(sb.anon)) h.Authorization = 'Bearer ' + sb.anon;
+    const r = await fetch(sb.url.replace(/\/+$/, '') + '/rest/v1/rpc/' + fn, { method: 'POST', headers: h, body: JSON.stringify(args) });
+    const t = await r.text(); let j = null; try { j = t ? JSON.parse(t) : null; } catch (e) {}
+    if (!r.ok) throw new Error((j && (j.message || j.hint)) || t || ('Erreur ' + r.status));
+    return j;
+  };
+  const envoyerFichier = async (chemin, f) => {
+    const h = { apikey: sb.anon, 'Content-Type': f.type || 'application/octet-stream', 'x-upsert': 'false' }; if (/^eyJ/.test(sb.anon)) h.Authorization = 'Bearer ' + sb.anon;
+    const r = await fetch(sb.url.replace(/\/+$/, '') + '/storage/v1/object/commandes/' + chemin, { method: 'POST', headers: h, body: f });
+    if (!r.ok) throw new Error('fichier refusé (' + r.status + ')');
+  };
+
+  // Boutons « Commander ce modèle »
+  const ajouterBoutons = () => {
+    document.querySelectorAll('.modele').forEach(el => {
+      if (el.querySelector('[data-commander]')) return;
+      const i = Number(el.dataset.i), m = (window.LISTE_VITRINE || [])[i]; if (!m) return;
+      const b = document.createElement('button'); b.className = 'commander'; b.dataset.commander = i; b.textContent = 'Commander ce modèle';
+      b.onclick = e => { e.stopPropagation(); ouvrir(m); };
+      el.appendChild(b);
+    });
+  };
+  ajouterBoutons(); setTimeout(ajouterBoutons, 1500); setTimeout(ajouterBoutons, 4000);
+  const fin = $('#fin');
+  if (fin) { const b = document.createElement('button'); b.id = 'fin-commander'; b.textContent = 'Commander ce modèle'; b.style.cssText = 'background:#7a1f2b;color:#fff'; b.onclick = () => { const m = window.MODELE_OUVERT; $('#fermer').click(); if (m) ouvrir(m); }; fin.appendChild(b); }
+  const sec = document.createElement('section'); sec.id = 'commander';
+  sec.innerHTML = `<h2>Commander</h2><p style="color:var(--gris);max-width:680px">${esc(cond.intro || '')}</p><p><a class="cta" href="#modeles">Choisir un modèle</a> <button class="cta contour" id="cmd-libre" style="cursor:pointer">Commander sans modèle</button></p>`;
+  const contact = $('#contact'); if (contact) contact.parentNode.insertBefore(sec, contact);
+  $('#cmd-libre').onclick = () => ouvrir(null);
+
+  // Fenêtre de commande : 1. conditions, 2. formulaire, 3. confirmation
+  const boite = document.createElement('div'); boite.id = 'cmd'; boite.innerHTML = '<div class="cmd-boite"><button class="cmd-x" aria-label="Fermer">×</button><div class="cmd-contenu"></div></div>';
+  document.body.appendChild(boite);
+  const fermer = () => { boite.classList.remove('ouvert'); document.body.style.overflow = ''; };
+  boite.querySelector('.cmd-x').onclick = () => { if (!boite.dataset.envoi || confirm('Fermer la commande ?')) fermer(); };
+  const zone = boite.querySelector('.cmd-contenu');
+  let brouillon = {}; try { brouillon = JSON.parse(localStorage.getItem('cmd.brouillon') || '{}'); } catch (e) {}
+  function ouvrir(m) {
+    boite.classList.add('ouvert'); document.body.style.overflow = 'hidden'; boite.scrollTop = 0;
+    const titre = m ? (m.titre || m.slug) : 'Sans modèle (sur mesure)';
+    zone.innerHTML = `<h2>Commander : ${esc(titre)}</h2>
+      <div class="cmd-etapes"><span class="on">1. Conditions</span><span>2. Vos informations</span><span>3. Envoi</span></div>
+      <div class="cmd-cond">
+        ${(cond.formules || []).length ? `<h3>Formules</h3><div class="cmd-formules">${cond.formules.map(f => `<div><b>${esc(f.nom)}</b><span>${esc(f.prix || 'Prix sur devis')}</span><small>${esc(String(f.contenu || '').split('\n').join(' · '))}</small></div>`).join('')}</div>` : ''}
+        ${cond.delai ? `<p><b>Délai :</b> ${esc(cond.delai)}</p>` : ''}${cond.paiement ? `<p><b>Paiement :</b> ${esc(cond.paiement)}</p>` : ''}
+        <h3>Conditions</h3><ol>${(cond.conditions || []).map(c => `<li>${esc(c)}</li>`).join('')}</ol>
+        <label class="cmd-accepte"><input type="checkbox" id="cmd-ok-cond"> J'ai lu et j'accepte ces conditions</label>
+        <button class="cta" id="cmd-suite" disabled>Continuer</button>
+      </div>`;
+    const ok = $('#cmd-ok-cond'); ok.onchange = () => { $('#cmd-suite').disabled = !ok.checked; };
+    $('#cmd-suite').onclick = () => formulaire(m, new Date().toISOString());
+  }
+  function formulaire(m, accepte) {
+    const b = brouillon, v = k => esc(b[k] || '');
+    const formules = (cond.formules || []).map(f => f.nom);
+    zone.innerHTML = `<h2>Vos informations</h2>
+      <div class="cmd-etapes"><span>1. Conditions ✓</span><span class="on">2. Vos informations</span><span>3. Envoi</span></div>
+      <p class="cmd-aide">Modèle choisi : <b>${esc(m ? (m.titre || m.slug) : 'sur mesure')}</b>. Plus vous donnez de détails, plus la démo sera juste du premier coup. Les champs * sont obligatoires.</p>
+      <form id="cmd-form" class="cmd-form">
+        <fieldset><legend>Vous</legend>
+          <label>Nom *<input name="nom" required value="${v('nom')}"></label>
+          <label>Téléphone / WhatsApp *<input name="telephone" required inputmode="tel" value="${v('telephone')}" placeholder="034 00 000 00"></label>
+          <label>E-mail<input name="email" type="email" value="${v('email')}"></label>
+          ${formules.length ? `<label>Formule<select name="formule">${formules.map(f => `<option ${b.formule === f ? 'selected' : ''}>${esc(f)}</option>`).join('')}</select></label>` : ''}
+        </fieldset>
+        <fieldset><legend>L'événement</legend>
+          <label>Type *<select name="type" required>${['Mariage', 'Fiançailles', 'Baptême', 'Anniversaire', 'Anniversaire de mariage', 'Communion', 'Autre'].map(t => `<option ${b.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+          <label>Titre de l'invitation (Sary)<input name="titre" value="${v('titre')}" placeholder="Ex. : Mariage de Hery et Fanja"></label>
+          <label class="large">Personnes célébrées (noms complets) *<input name="celebres" required value="${v('celebres')}" placeholder="Ex. : RAKOTO Hery et RASOA Fanja"></label>
+          <label class="large">Hôtes / parents qui invitent<input name="hotes" value="${v('hotes')}"></label>
+          <label>Date *<input name="date" type="date" required value="${v('date')}"></label>
+          <label>Heure<input name="heure" type="time" value="${v('heure')}"></label>
+          <label class="large">Lieux (cérémonie, réception, adresse ou lien Google Maps) *<textarea name="lieux" rows="2" required>${v('lieux')}</textarea></label>
+          <label>Réponse avant le<input name="date_limite" type="date" value="${v('date_limite')}"></label>
+          <label>Nombre d'invités (environ)<input name="invites" inputmode="numeric" value="${v('invites')}"></label>
+          <label class="large">Contacts pour les invités (noms et numéros)<input name="contacts" value="${v('contacts')}"></label>
+          <label>Langue(s) de l'invitation<select name="langues">${['Malgache', 'Français', 'Malgache et français', 'Anglais', 'Autre'].map(t => `<option ${b.langues === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+          <label>Livraison souhaitée avant le<input name="livraison" type="date" value="${v('livraison')}"></label>
+        </fieldset>
+        <fieldset><legend>Le texte</legend>
+          <label class="large">Texte complet de l'invitation (tel que vous le voulez)<textarea name="texte" rows="7" placeholder="Copiez ici tout le texte : versets, phrases, programme, remerciements…">${v('texte')}</textarea></label>
+        </fieldset>
+        <fieldset><legend>Thème et ambiance</legend>
+          <label>Couleur principale<input name="couleur1" type="color" value="${esc(b.couleur1 || '#7a1f2b')}"></label>
+          <label>Couleur d'accent<input name="couleur2" type="color" value="${esc(b.couleur2 || '#b08a4f')}"></label>
+          <div class="large cmd-pastilles">${[['#7a1f2b', '#b08a4f'], ['#1f2a44', '#c9a15a'], ['#3b4a3a', '#d8c3a5'], ['#c86b85', '#f2c4ce'], ['#000000', '#d4af37'], ['#2e5e7e', '#e6eef4'], ['#6b4226', '#e8d6bd']].map(([a, c]) => `<button type="button" data-p="${a},${c}" style="background:linear-gradient(135deg,${a} 50%,${c} 50%)" title="${a} / ${c}"></button>`).join('')}</div>
+          <label class="large">Ambiance souhaitée<input name="ambiance" value="${v('ambiance')}" placeholder="Ex. : champêtre, chic doré, fleurs blanches, bord de mer…"></label>
+          <label class="large">Musique (titre, artiste ou lien)<input name="musique" value="${v('musique')}"></label>
+        </fieldset>
+        <fieldset><legend>Photos</legend>
+          <label class="large">Vos photos (jusqu'à 15, 15 Mo chacune max.) — et si vous voulez, votre musique (MP3)<input name="fichiers" type="file" multiple accept="image/*,audio/*,video/mp4,video/quicktime"></label>
+          <div class="large cmd-apercus" id="cmd-apercus"></div>
+        </fieldset>
+        <fieldset><legend>Autre chose ?</legend><label class="large">Message<textarea name="message" rows="3">${v('message')}</textarea></label></fieldset>
+        <div class="cmd-bas"><span id="cmd-etat"></span><button class="cta" type="submit">Envoyer la commande</button></div>
+      </form>`;
+    const form = $('#cmd-form');
+    form.querySelectorAll('[data-p]').forEach(x => x.onclick = () => { const [a, c] = x.dataset.p.split(','); form.couleur1.value = a; form.couleur2.value = c; garder(); });
+    const garder = () => { const d = Object.fromEntries(new FormData(form)); delete d.fichiers; brouillon = d; try { localStorage.setItem('cmd.brouillon', JSON.stringify(d)); } catch (e) {} };
+    form.addEventListener('input', garder);
+    form.fichiers.onchange = () => {
+      const fs = [...form.fichiers.files];
+      $('#cmd-apercus').innerHTML = fs.map(f => /^image/.test(f.type) ? `<img src="${URL.createObjectURL(f)}" alt="">` : `<span>📎 ${esc(f.name)}</span>`).join('') + (fs.length > 15 ? '<b style="color:#b0453a">15 fichiers au plus</b>' : '');
+    };
+    form.onsubmit = async e => {
+      e.preventDefault(); garder();
+      const d = Object.fromEntries(new FormData(form)); const fs = [...form.fichiers.files].slice(0, 15);
+      const trop = fs.find(f => f.size > 15 * 1024 * 1024); if (trop) return alert('« ' + trop.name + ' » dépasse 15 Mo');
+      const btn = form.querySelector('[type=submit]'); btn.disabled = true; boite.dataset.envoi = '1';
+      const etat = t => { $('#cmd-etat').textContent = t; };
+      const details = { formule: d.formule || '', type: d.type, titre: d.titre, celebres: d.celebres, hotes: d.hotes, date: d.date, heure: d.heure, lieux: d.lieux, date_limite: d.date_limite, invites: d.invites, contacts: d.contacts, langues: d.langues, livraison: d.livraison, texte: d.texte, couleurs: [d.couleur1, d.couleur2], ambiance: d.ambiance, musique: d.musique, message: d.message, conditions_acceptees: accepte };
+      try {
+        if (!sb) throw new Error('commandes en ligne indisponibles');
+        etat('Envoi de la commande…');
+        const r = await rpc('commande_creer', { p_commande: { modele: m ? m.slug : '', modele_titre: m ? (m.titre || m.slug) : 'Sur mesure', client: { nom: d.nom, telephone: d.telephone, email: d.email }, details } });
+        const photos = [];
+        for (const [k, f] of fs.entries()) {
+          etat(`Envoi des fichiers ${k + 1}/${fs.length}…`);
+          const nom = (k + 1) + '-' + f.name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w.\-]+/g, '-').slice(-60);
+          try { await envoyerFichier(r.jeton + '/' + nom, f); photos.push({ chemin: r.jeton + '/' + nom, nom: f.name, type: f.type, taille: f.size }); } catch (err) { console.warn(err); }
+        }
+        if (photos.length) await rpc('commande_photos', { p_numero: r.numero, p_jeton: r.jeton, p_photos: photos });
+        try { localStorage.removeItem('cmd.brouillon'); } catch (e) {} brouillon = {}; delete boite.dataset.envoi;
+        merci(r.numero, d, photos.length, fs.length);
+      } catch (err) {
+        console.warn(err); delete boite.dataset.envoi; btn.disabled = false;
+        // repli : tout part par WhatsApp
+        const texte = `Commande d'invitation — modèle « ${m ? (m.titre || m.slug) : 'sur mesure'} »\nNom : ${d.nom}\nTéléphone : ${d.telephone}\nFormule : ${d.formule || ''}\nType : ${d.type}\nTitre : ${d.titre}\nCélébrés : ${d.celebres}\nHôtes : ${d.hotes}\nDate : ${d.date} ${d.heure}\nLieux : ${d.lieux}\nRéponse avant : ${d.date_limite}\nInvités : ${d.invites}\nContacts : ${d.contacts}\nLangues : ${d.langues}\nCouleurs : ${d.couleur1} / ${d.couleur2}\nAmbiance : ${d.ambiance}\nMusique : ${d.musique}\nTexte :\n${d.texte}\n\nMessage : ${d.message}\n(J'accepte les conditions.)`;
+        etat('La commande en ligne n\'a pas pu partir (' + err.message + ').');
+        if (wa) { const a = document.createElement('a'); a.className = 'cta'; a.target = '_blank'; a.href = 'https://wa.me/' + wa + '?text=' + encodeURIComponent(texte); a.textContent = 'Envoyer plutôt par WhatsApp'; $('#cmd-etat').appendChild(document.createElement('br')); $('#cmd-etat').appendChild(a); }
+      }
+    };
+  }
+  function merci(numero, d, n, total) {
+    zone.innerHTML = `<h2>Merci ${esc(d.nom)} !</h2>
+      <div class="cmd-etapes"><span>1. Conditions ✓</span><span>2. Vos informations ✓</span><span class="on">3. Envoyée</span></div>
+      <p style="font-size:18px">Votre commande est bien arrivée. Numéro : <b class="cmd-num">${esc(numero)}</b></p>
+      <p>${n} fichier(s) reçu(s)${total > n ? ` sur ${total} (envoyez les autres sur WhatsApp en rappelant votre numéro)` : ''}. Nous préparons une <b>version de démonstration</b> et vous l'envoyons sur WhatsApp au ${esc(d.telephone)}.</p>
+      ${wa ? `<p><a class="cta" target="_blank" href="https://wa.me/${wa}?text=${encodeURIComponent('Bonjour, je viens d\'envoyer la commande ' + numero + ' (' + (d.celebres || d.titre || '') + ').')}">💬 Nous écrire sur WhatsApp</a></p>` : ''}
+      <button class="cta contour" id="cmd-fin" style="cursor:pointer">Fermer</button>`;
+    $('#cmd-fin').onclick = fermer;
+  }
+  window.ouvrirCommande = ouvrir;
 })();
 </script>
 </body>

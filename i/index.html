@@ -21,6 +21,7 @@
   #ecran-ouvrir .titre { font-family: "Great Vibes", cursive; font-size: clamp(40px, 11vw, 64px); text-shadow: 0 2px 12px rgba(0,0,0,.6); line-height: 1.1; }
   #ecran-ouvrir .bouton { font: 600 20px "Cormorant Garamond", serif; background: var(--vin); color: #fff; border: 0; border-radius: 999px; padding: 14px 30px; box-shadow: 0 6px 20px rgba(0,0,0,.35); animation: pulse 2s infinite; }
   @keyframes pulse { 50% { transform: scale(1.05); } }
+  #bandeau-demo { position: fixed; z-index: 14; left: 50%; top: 10px; transform: translateX(-50%); background: rgba(122,31,43,.92); color: #fff; font: 600 13px Inter, system-ui, sans-serif; padding: 6px 14px; border-radius: 999px; pointer-events: none; white-space: nowrap; max-width: 92vw; overflow: hidden; text-overflow: ellipsis; }
   #pause { position: fixed; z-index: 15; left: 64px; bottom: 12px; width: 44px; height: 44px; border-radius: 50%; border: 0; background: rgba(255,255,255,.85); color: var(--vin); font-size: 17px; display: none; cursor: pointer; }
   #son { position: fixed; z-index: 15; left: 12px; bottom: 12px; width: 44px; height: 44px; border-radius: 50%; border: 0; background: rgba(255,255,255,.85); color: var(--vin); font-size: 20px; display: none; }
   #bandeau { position: fixed; z-index: 25; left: 50%; bottom: 18px; transform: translateX(-50%); width: min(92vw, 440px); background: #fffaf3; color: #3a2323; border-radius: 16px; padding: 16px 18px; box-shadow: 0 10px 40px rgba(0,0,0,.4); font-size: 18px; display: none; }
@@ -48,10 +49,10 @@
 <button id="son" aria-label="Son">♪</button><button id="pause" aria-label="Pause">❚❚</button>
 <div id="bandeau" role="dialog"></div>
 <div id="erreur"></div>
-<script src="../config.js?v=202611041409"></script>
-<script src="../moteur/moteur.js?v=202611041409"></script>
-<script src="../moteur/fabrique.js?v=202611041409"></script>
-<script src="../moteur/base.js?v=202611041409"></script>
+<script src="../config.js?v=202611041433"></script>
+<script src="../moteur/moteur.js?v=202611041433"></script>
+<script src="../moteur/fabrique.js?v=202611041433"></script>
+<script src="../moteur/base.js?v=202611041433"></script>
 <script>
 (async function () {
   const q = new URLSearchParams(location.search);
@@ -73,6 +74,13 @@
     }
   } catch (e) { console.error(e); }
   if (!projet) return montrerErreur('Invitation introuvable. Vérifiez le lien reçu.');
+  // Version finale livrée avec licence : on vérifie qu'elle est toujours active (sans bloquer si la base ne répond pas)
+  if (projet.licence && projet.licence.code && projet.publication && projet.publication.supabase && !apercu) {
+    try {
+      const v = await Promise.race([Base.rpc(projet.publication.supabase, 'licence_verifier', { p_evt: projet.id, p_code: projet.licence.code }), new Promise(ok => setTimeout(() => ok(null), 5000))]);
+      if (v && v.ok === false) return montrerErreur(projet.fiche && projet.fiche.langue === 'mg' ? 'Tsy mandeha intsony ity fanasana ity (fahazoan-dalana tsy manan-kery). Mifandraisa amin\'ny nanao azy.' : 'Cette invitation n\'est pas active (licence non valable). Contactez le studio qui l\'a réalisée.');
+    } catch (e) { console.warn('licence', e); }
+  }
 
   const fiche = projet.fiche || {};
   const L = Fabrique.LIB[fiche.langue] || Fabrique.LIB.fr;
@@ -159,6 +167,12 @@
   const moteur = new Moteur($('#scene'), { resolveur: resoudre, mode: 'invitation', famille, onAction });
   await moteur.setProjet(projet);
   moteurPret = moteur; moteur.changerLangue(LG);
+  if (projet.demo && typeof projet.demo === 'object') {   // démo envoyée au client (pas les modèles de la vitrine)
+    moteur.filigrane = 'DÉMO';
+    const bd = document.createElement('div'); bd.id = 'bandeau-demo';
+    bd.textContent = fiche.langue === 'mg' ? 'Fanandramana (DÉMO) — tsy voatahiry ny valiny' : 'Version de démonstration — les réponses ne sont pas enregistrées';
+    document.body.appendChild(bd);
+  }
   window.moteurInvitation = moteur;
   if (langues.length > 1) $('#btn-langue').style.display = 'block';
   moteur.afficherPlan(0, 0.01);
@@ -198,7 +212,7 @@
     b.querySelectorAll('[data-fermer]').forEach(x => x.onclick = () => { b.style.display = 'none'; });
     if (o.auto) tBandeau = setTimeout(() => { b.style.display = 'none'; }, o.auto);
   }
-  const demo = /^demo-/.test(slug || '');   // invitation de la vitrine : rien n'est enregistré
+  const demo = /^demo-/.test(slug || '') || !!projet.demo;   // vitrine ou version de démonstration : rien n'est enregistré
   function messageReponse(presence, form) {
     const nom = famille ? famille.nom : '';
     if (fiche.langue === 'mg') return presence ? `Salama! ${nom}: ho tonga izahay. Olon-dehibe ${form.adultes || 0}, ankizy ${form.enfants || 0}. Misaotra!` : `Salama! ${nom}: miala tsiny fa tsy ho afaka izahay. Misaotra tamin'ny fanasana!`;

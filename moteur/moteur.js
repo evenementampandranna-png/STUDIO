@@ -464,6 +464,17 @@
         this._dessinerPlan(p, this.t, 1, true);
       }
       ctx.restore();
+      if (this.filigrane) this._dessinerFiligrane(this.filigrane);
+    }
+
+    // Version de démonstration : mention répétée en travers de l'image
+    _dessinerFiligrane(texte) {
+      const ctx = this.ctx;
+      ctx.save(); ctx.translate(W / 2, H / 2); ctx.rotate(-Math.PI / 6);
+      ctx.font = '700 70px Inter, Arial, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(255,255,255,0.32)'; ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 2;
+      for (let y = -H; y <= H; y += 230) for (let x = -W; x <= W; x += 420) { const dx = (Math.round(y / 230) % 2) * 210; ctx.strokeText(texte, x + dx, y); ctx.fillText(texte, x + dx, y); }
+      ctx.restore();
     }
 
     _dessinerImage(el, x, y, w, h, cover, rec) {
