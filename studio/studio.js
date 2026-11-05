@@ -299,9 +299,12 @@
       <div class="pop-liste polices"></div>
       <label class="btn petit" style="margin-top:6px;width:100%;justify-content:center">+ Importer une police (.ttf, .otf, .woff)<input type="file" class="pop-import" accept=".ttf,.otf,.woff,.woff2,font/*" hidden></label>`, 'pop-polices');
     const liste = $('.polices', d);
-    const montrer = (noms) => { liste.innerHTML = noms.map(n => `<button class="police-choix ${n === actuelle ? 'on' : ''}" data-n="${esc(n)}"><span style="font-family:'${esc(n)}',serif">${esc(n)}${site.includes(n) ? ' <em class="pc-tag">studio</em>' : perso.includes(n) ? ' <em class="pc-tag">importée</em>' : ''}</span><small style="font-family:'${esc(n)}',serif">${n === 'Intro' && !perso.includes('Intro') ? 'Police payante : à importer (fichier .ttf / .otf)' : 'Mariage · Ho tonga 2026'}</small>${perso.includes(n) && !site.includes(n) && mesPolices.some(m => m.nom === n) ? `<i class="pc-partager" data-partager="${esc(n)}" title="Mettre cette police dans le studio : toute l'équipe l'aura">⇪ pour toute l'équipe</i>` : ''}</button>`).join('') || '<p class="muet">Aucune police.</p>'; };
+    const montrer = (noms) => { liste.innerHTML = noms.map(n => `<button class="police-choix ${n === actuelle ? 'on' : ''}" data-n="${esc(n)}"><span style="font-family:'${esc(n)}',serif">${esc(n)}${site.includes(n) ? ' <em class="pc-tag">studio</em>' : perso.includes(n) ? ' <em class="pc-tag">importée</em>' : ''}</span><small style="font-family:'${esc(n)}',serif">${n === 'Intro' && !perso.includes('Intro') ? 'Intro Regular — touchez ici pour ajouter son fichier .ttf / .otf' : 'Mariage · Ho tonga 2026'}</small>${perso.includes(n) && !site.includes(n) && mesPolices.some(m => m.nom === n) ? `<i class="pc-partager" data-partager="${esc(n)}" title="Mettre cette police dans le studio : toute l'équipe l'aura">⇪ pour toute l'équipe</i>` : ''}</button>`).join('') || '<p class="muet">Aucune police.</p>'; };
     const groupe = g => g === '*' ? [...new Set(site.concat(perso, cat.map(x => x[0])))] : (groupes.find(x => x[0] === g) || [0, []])[1];
-    $('.pop-import', d).onchange = async e => { const f = e.target.files[0]; if (!f) return; try { const nom = await importerPolice(f); if (!nom) return; toast('Police « ' + nom + ' » importée'); Stock.ecrire('studio.polices.recentes', [nom].concat(recentes.filter(x => x !== nom)).slice(0, 6)); fermerPop(); choisir(nom); } catch (err) { toast(err.message); } };
+    let pourIntro = false;
+    $('.pop-import', d).onchange = async e => { const f = e.target.files[0]; if (!f) return; try { const nom = await importerPolice(f); if (!nom) return; toast('Police « ' + nom + ' » importée');
+      // Intro : mise tout de suite dans le studio pour toute l'équipe (si la publication GitHub est reliée)
+      if (pourIntro && reglages.github && reglages.github.token && !policesSite.some(x => x.nom === nom)) { try { await partagerPolice(nom); toast('« ' + nom + ' » est dans le studio pour toute l\'équipe'); } catch (err) { toast('Importée pour vous ; partage équipe : ' + err.message); } } Stock.ecrire('studio.polices.recentes', [nom].concat(recentes.filter(x => x !== nom)).slice(0, 6)); fermerPop(); choisir(nom); } catch (err) { toast(err.message); } };
     montrer(groupe('★ Demandées'));
     $$('[data-g]', d).forEach(b => b.onclick = () => { $$('[data-g]', d).forEach(x => x.classList.toggle('on', x === b)); $('.pop-cherche', d).value = ''; montrer(groupe(b.dataset.g)); });
     $('.pop-cherche', d).oninput = e => { const q = e.target.value.trim().toLowerCase(); montrer(q ? groupe('*').filter(n => n.toLowerCase().includes(q)) : groupe('*')); };
@@ -309,7 +312,7 @@
       const pt = e.target.closest('[data-partager]');
       if (pt) { e.stopPropagation(); const n = pt.dataset.partager; pt.textContent = 'Envoi…'; try { await partagerPolice(n); toast('« ' + n + ' » est maintenant dans le studio pour toute l\'équipe'); fermerPop(); } catch (err) { toast(err.message); pt.textContent = '⇪ pour toute l\'équipe'; } return; }
       const b = e.target.closest('[data-n]'); if (!b) return;
-      if (b.dataset.n === 'Intro' && !perso.includes('Intro')) { toast('Intro est une police payante (Fontfabric) : achetez-la, puis « + Importer une police » ci-dessous et « ⇪ pour toute l\'équipe ». En attendant, Urbanist lui ressemble.'); return; } const n = b.dataset.n; Stock.ecrire('studio.polices.recentes', [n].concat(recentes.filter(x => x !== n)).slice(0, 6)); fermerPop(); choisir(n); };
+      if (b.dataset.n === 'Intro' && !perso.includes('Intro')) { pourIntro = true; toast('Choisissez le fichier de la police Intro Regular (.ttf / .otf) : elle sera ajoutée pour toute l\'équipe'); $('.pop-import', d).click(); return; } const n = b.dataset.n; Stock.ecrire('studio.polices.recentes', [n].concat(recentes.filter(x => x !== n)).slice(0, 6)); fermerPop(); choisir(n); };
     setTimeout(() => $('.pop-cherche', d).focus(), 30);
   }
   // Emojis rangés par thème (les derniers utilisés en premier)
@@ -482,6 +485,12 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-05-1', date: '5 novembre 2026', titre: 'Compte à rebours réglable, textes du haut dans le film, police Intro', points: [
+      '<b>Compte à rebours</b> : touchez le texte du compte à rebours (plan de confirmation) → bloc <b>⏱ Compte à rebours</b> : affichage (jours-heures-minutes-secondes, jours et heures, jours seulement, horloge 12 : 05 : 33 : 10), mots des unités (« andro », « ora »…), date et heure visées, texte le jour J. Bouton « ⏱ Ajouter le compte à rebours » sur n\'importe quel texte.',
+      '<b>Film téléchargé</b> : les textes du haut de la confirmation réservés au lien personnel (« Réponse à l\'invitation », « Ho an\'i {famille} », « {places} olona »…) sont maintenant dans le film pour tout le monde. Film et publication → « {famille} devient » / « {places} devient » pour choisir ce qui s\'affiche.',
+      'Un nombre écrit entre accolades (ex. « {4} ») s\'affiche maintenant sans les accolades.',
+      '<b>Intro Regular</b> : dans la liste des polices (★ Demandées), touchez « Intro » et choisissez son fichier .ttf / .otf : elle est ajoutée pour toute l\'équipe.'
+    ] },
     { id: '2026-11-04-4', date: '4 novembre 2026', titre: 'Adultes / enfants par famille, réponses en direct, pause sur l\'invitation', points: [
       '<b>Jeton GitHub refusé</b> : une petite fenêtre demande maintenant le nouveau jeton, le vérifie, puis la publication reprend toute seule.',
       '<b>Espace organisateur → Ajouter / Modifier une famille</b> : nombre d\'<b>adultes</b> et d\'<b>enfants</b> invités. L\'invité ne peut pas confirmer plus que ce nombre.',
@@ -1775,6 +1784,23 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       </details>`;
     }
     // Arrière-plan, ombre et contour d'un texte
+    // Compte à rebours : visible quand le texte contient {compte_a_rebours}
+    function blocCompte(c) {
+      if (!String(c.texte || '').includes('{compte_a_rebours}')) return '';
+      const fiche = E.p.fiche || {};
+      return `<details class="bloc" open><summary>⏱ Compte à rebours</summary><div class="pile">
+        <label class="champ">Affichage<select data-k="compte_format">${opts([['complet', 'Jours, heures, minutes, secondes'], ['jhm', 'Jours, heures, minutes'], ['jh', 'Jours et heures'], ['j', 'Jours seulement'], ['horloge', 'Horloge  12 : 05 : 33 : 10']], c.compte_format || 'complet')}</select></label>
+        <div class="quatre" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+          <label class="champ">Jours<input type="text" data-k="compte_j" placeholder="${fiche.langue === 'mg' ? 'andro' : 'jours'}" value="${esc(c.compte_j || '')}"></label>
+          <label class="champ">Heures<input type="text" data-k="compte_h" placeholder="${fiche.langue === 'mg' ? 'ora' : 'h'}" value="${esc(c.compte_h || '')}"></label>
+          <label class="champ">Minutes<input type="text" data-k="compte_m" placeholder="min" value="${esc(c.compte_m || '')}"></label>
+          <label class="champ">Secondes<input type="text" data-k="compte_s" placeholder="s" value="${esc(c.compte_s || '')}"></label></div>
+        <div class="deux"><label class="champ">Jusqu'au<input type="date" data-k="compte_date" value="${esc(c.compte_date || '')}"></label><label class="champ">À<input type="time" data-k="compte_heure" value="${esc(c.compte_heure || '')}"></label></div>
+        <span class="muet">Vide = date et heure de l'événement (${esc(fiche.date || 'à remplir dans Informations')}${fiche.heure ? ' à ' + esc(fiche.heure) : ''}).</span>
+        <label class="champ">Texte le jour J<input type="text" data-k="compte_fini" placeholder="${fiche.langue === 'mg' ? 'Androany ny andro lehibe !' : 'C\'est aujourd\'hui !'}" value="${esc(c.compte_fini || '')}"></label>
+        <span class="muet">Le texte autour reste modifiable au-dessus (ex. « Plus que {compte_a_rebours} ! »).</span>
+      </div></details>`;
+    }
     function blocStyleTexte(c) {
       const v = (k, d) => c[k] != null && c[k] !== '' ? c[k] : d;
       const typeOmbre = !c.ombre ? 'aucune' : Number(c.ombre_decalage) ? 'portee' : 'halo';
@@ -1807,13 +1833,13 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       let s = `<div class="section-titre">${nomType(c)} choisi${c.illu ? 'e' : ''}</div>`;
       if (c.type === 'texte') s += `<details class="bloc" open><summary>Texte</summary><div class="pile">
         <label class="champ">Texte <span class="muet">— variables : {famille} {places} {date} {heure} {date_limite} {compte_a_rebours}</span><textarea data-k="texte" rows="3">${esc(c.texte)}</textarea></label>
-        <div class="ligne" style="gap:6px"><button class="btn petit" data-emoji-texte>😊 Ajouter un emoji</button></div>
+        <div class="ligne" style="gap:6px"><button class="btn petit" data-emoji-texte>😊 Ajouter un emoji</button>${String(c.texte || '').includes('{compte_a_rebours}') ? '' : '<button class="btn petit" data-ajout-compte>⏱ Ajouter le compte à rebours</button>'}</div>
         <div class="deux"><label class="champ">Police<button class="btn police-btn" data-police style="font-family:'${esc(c.police || 'Cormorant Garamond')}',serif">${esc(c.police || 'Cormorant Garamond')} ▾</button></label><label class="champ">Taille<input type="range" data-k="taille" min="1.5" max="12" step="0.1" value="${c.taille || 4}"></label></div>
         <div class="trois"><label class="champ">Couleur<input type="color" data-k="couleur" value="${c.couleur || '#7a1f2b'}"></label><label class="champ">Alignement<select data-k="align">${opts([['center', 'Centré'], ['left', 'Gauche'], ['right', 'Droite'], ['justify', 'Justifié']], c.align || 'center')}</select></label><label class="champ">Interligne<input type="number" data-k="interligne" step="0.05" min="0.8" max="2" value="${c.interligne || 1.25}"></label></div>
         <div class="cases"><label><input type="checkbox" data-k="gras" ${c.gras ? 'checked' : ''}> Gras</label><label><input type="checkbox" data-k="italique" ${c.italique ? 'checked' : ''}> Italique</label><label><input type="checkbox" data-k="majuscules" ${c.majuscules ? 'checked' : ''}> Majuscules</label></div>
         <label class="champ">Épaisseur des lettres<select data-k="graisse">${opts([['', c.gras ? 'Gras (auto)' : 'Normale (auto)'], ['100', 'Très fine (100)'], ['300', 'Fine (300)'], ['400', 'Normale (400)'], ['500', 'Moyenne (500)'], ['600', 'Demi-grasse (600)'], ['700', 'Grasse (700)'], ['800', 'Extra-grasse (800)'], ['900', 'Noire (900)']], c.graisse || '')}</select></label>
         <label class="champ">Superposition (mode de fusion)<select data-k="fusion">${opts(I.FUSIONS, c.fusion || 'normal')}</select></label>
-        </div></details>` + blocStyleTexte(c) + blocTraductions(c) + blocAnimation(c);
+        </div></details>` + blocCompte(c) + blocStyleTexte(c) + blocTraductions(c) + blocAnimation(c);
       if (c.type === 'bouton') s += `<details class="bloc" open><summary>Bouton</summary><div class="pile">
         <label class="champ">Libellé<input type="text" data-k="texte" value="${esc(c.texte)}"></label>
         <div class="deux"><label class="champ">Action<select data-k="action">${opts(I.ACTIONS, c.action)}</select></label><label class="champ">N° du lieu / contact<input type="number" data-k="cible" min="0" value="${c.cible || 0}"></label></div>
@@ -1886,6 +1912,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         if (t === 'neon') Object.assign(c, { ombre: true, ombre_couleur: c.couleur || '#ff4fa0', ombre_opacite: 1, ombre_force: 2.5, ombre_decalage: 0 });
         majStyle();
       });
+      const ac = $('#props [data-ajout-compte]');
+      if (ac) ac.onclick = () => { E.modif(true); c.texte = (c.texte ? c.texte + '\n' : '') + '{compte_a_rebours}'; E.rafraichir(); rendreReglages(); };
       const va = $('#props [data-voir-anim]');
       if (va) va.onclick = () => { eng.mode = 'invitation'; eng.jouerPlan(E.i); };
       $$('#props [data-k]').forEach(inp => {
@@ -2780,7 +2808,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <div class="apercu-cadre" style="height:340px;margin:0 auto" id="cadre-film"><div id="scene-film"></div></div>
           <div class="progres"><div id="barre"></div></div>
           <label class="champ">Film pour<select id="film-pour"><option value="">Tout le monde (comme le lien général)</option>${(p.familles || []).filter(f => f.nom).map(f => `<option value="${esc(f.code)}">${esc(f.nom)} (film personnalisé)</option>`).join('')}</select></label>
-          ${(() => { const n = p.plans.reduce((k, pl) => k + (pl.calques || []).filter(c => c.condition === 'famille' && c.type === 'texte' && !c.masque).length, 0); return n ? `<p class="muet" id="film-note" style="margin:0">ℹ️ ${n} texte(s) sont réservés au lien personnel (ex. « ${esc(((p.plans.flatMap(pl => pl.calques || []).find(c => c.condition === 'famille' && c.type === 'texte') || {}).texte || '').slice(0, 40))} ») : ils ne sont pas dans le film pour tout le monde. Choisissez une famille ci-dessus pour un film à son nom, où ils apparaissent.</p>` : ''; })()}
+          ${p.plans.some(pl => (pl.calques || []).some(c => c.condition === 'famille' && c.type === 'texte' && !c.masque)) ? `<div class="pile" id="film-tous" style="gap:6px"><span class="muet">Textes du lien personnel (« Pour {famille} », « {places} personnes »…) : dans le film pour tout le monde, ils s'affichent avec :</span>
+            <div class="deux"><label class="champ">{famille} devient<input type="text" id="film-nom" value="${esc((p.film || {}).nom != null ? p.film.nom : nomFilmDefaut(p))}"></label><label class="champ">{places} devient<input type="text" id="film-places" placeholder="vide = phrase sans nombre" value="${esc((p.film || {}).places || '')}"></label></div></div>` : ''}
           <div class="ligne"><button class="btn plein" id="film">Enregistrer le film</button><button class="btn" id="film-transparent" title="Vidéo WebM avec transparence : les plans « Sans fond » restent transparents, pour la poser sur une autre vidéo">▦ Vidéo sans fond (WebM)</button><span class="muet" id="film-etat"></span></div></div>
       </div>
       <div class="pile">
@@ -2843,7 +2872,9 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     const eng = new Moteur($('#scene-film'), { mode: 'rendu', resolveur: resoudre });
     moteurCourant = eng;
     // Le film est une vidéo : les boutons de réponse y sont toujours montrés (comme sur le lien général avec réponses en ligne)
-    const projetFilm = () => Fabrique.confirmationPourTous(p);
+    const projetFilm = () => textesPourTous(Fabrique.confirmationPourTous(p), p);
+    const fn = $('#film-nom'), fpl = $('#film-places');
+    [fn, fpl].forEach(x => x && x.addEventListener('change', () => { p.film = { nom: fn.value, places: fpl.value }; enregistrer(p); if (!eng.famille) eng.setProjet(projetFilm()).then(() => eng.afficherPlan(Math.max(0, p.plans.findIndex(x => x.role === 'confirmation')), 1.5)); }));
     if ($('#lv-etat')) lierLivraison(p, eng);
     eng.setProjet(projetFilm()).then(() => eng.afficherPlan(0, 0.5));
     const fp = $('#film-pour');
@@ -3228,6 +3259,31 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
 
   // Jeton GitHub expiré ou supprimé : petite fenêtre pour coller le nouveau, sans quitter ce qu'on fait
   let demandeJeton = null;
+  // Film pour tout le monde : les textes réservés au lien personnel s'affichent avec un nom et un nombre généraux
+  function nomFilmDefaut(p) { const l = (p.fiche || {}).langue; return l === 'mg' ? 'havana sy namana' : l === 'en' ? 'our guests' : 'nos invités'; }
+  function textesPourTous(d, p) {
+    const nom = ((p.film || {}).nom != null ? p.film.nom : nomFilmDefaut(p)).trim(), places = String((p.film || {}).places || '').trim();
+    const general = { fr: 'Nous avons la joie de vous inviter', mg: 'Manasa anao am-pitiavana', en: 'We are delighted to invite you' };
+    const adapter = t => {
+      if (!t) return t;
+      if (nom && /^[a-zà-ÿ]/.test(nom)) t = t.replace(/an'i \{famille\}/gi, "an'ny {famille}").replace(/Ho an'i\s*$/i, "Ho an'ny");
+      t = t.replace(/\{famille\}/g, nom);
+      if (t.includes('{places}')) {
+        if (places) t = t.replace(/\{places\}/g, places);
+        else if (/^Nous invitons \{places\} personnes$/i.test(t.trim())) t = general.fr;
+        else if (/^Manasa olona \{places\}$/i.test(t.trim())) t = general.mg;
+        else if (/^We are inviting \{places\} people$/i.test(t.trim())) t = general.en;
+        else t = t.replace(/\s*\{places\}\s*/g, ' ').trim();
+      }
+      return t;
+    };
+    (d.plans || []).forEach(pl => (pl.calques || []).forEach(c => {
+      if (c.condition !== 'famille' || c.type !== 'texte' || c.masque) return;
+      c.condition = ''; c.texte = adapter(c.texte);
+      if (c.trad) Object.keys(c.trad).forEach(k => { c.trad[k] = adapter(c.trad[k]); });
+    }));
+    return d;
+  }
   function demanderJeton() {
     if (demandeJeton) return demandeJeton;
     demandeJeton = new Promise(fin => {

@@ -65,6 +65,26 @@
     if (isNaN(t)) return null;
     return Math.max(0, t - Date.now());
   }
+  // Compte à rebours réglable sur le calque texte : format, mots des unités, date visée, texte le jour J
+  const MOTS_COMPTE = { mg: ['andro', 'ora', 'min', 's'], fr: ['jours', 'h', 'min', 's'] };
+  function compteDe(c, projet, langue) {
+    const f = (projet && projet.fiche) || {};
+    const ms = joursAvant(c.compte_date || f.date, c.compte_date ? (c.compte_heure || '00:00') : (c.compte_heure || f.heure));
+    if (ms == null) return '';
+    if (ms <= 0 && c.compte_fini) return c.compte_fini;
+    const fmt = c.compte_format || 'complet';
+    if (fmt === 'complet' && !c.compte_j && !c.compte_h && !c.compte_m && !c.compte_s) return texteCompte(ms, langue);
+    const s = Math.floor(ms / 1000), j = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60;
+    const p = n => String(n).padStart(2, '0');
+    if (fmt === 'horloge') return `${p(j)} : ${p(h)} : ${p(m)} : ${p(sec)}`;
+    const d = MOTS_COMPTE[langue] || ['days', 'h', 'min', 's'];
+    const mots = [c.compte_j || d[0], c.compte_h || d[1], c.compte_m || d[2], c.compte_s || d[3]];
+    const parts = [`${j} ${mots[0]}`];
+    if (fmt !== 'j') parts.push(`${p(h)} ${mots[1]}`);
+    if (fmt === 'complet' || fmt === 'jhm') parts.push(`${p(m)} ${mots[2]}`);
+    if (fmt === 'complet') parts.push(`${p(sec)} ${mots[3]}`);
+    return parts.join('  ');
+  }
   function texteCompte(ms, langue) {
     if (ms == null) return '';
     const s = Math.floor(ms / 1000), j = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60;
@@ -157,7 +177,7 @@
   }
   function remplacer(texte, vars) {
     if (!texte) return '';
-    return String(texte).replace(/\{(\w+)\}/g, (all, k) => (vars && vars[k] != null && vars[k] !== '') ? String(vars[k]) : (k === 'places' ? '' : all));
+    return String(texte).replace(/\{(\w+)\}/g, (all, k) => (vars && vars[k] != null && vars[k] !== '') ? String(vars[k]) : (k === 'places' ? '' : /^\d+$/.test(k) ? k : all));
   }
   // Texte d'un calque dans la langue affichée (traduction si elle existe, sinon le texte d'origine)
   function texteDe(c, langue) { return (langue && c.trad && c.trad[langue]) || c.texte; }
@@ -661,7 +681,9 @@
         ctx.textBaseline = 'middle';
         const align = c.align || 'center', justifie = align === 'justify';
         ctx.textAlign = justifie ? 'left' : align;
-        let txt = remplacer(texteDe(c, this.langue), vars);
+        const brut = texteDe(c, this.langue);
+        if (brut && brut.indexOf('{compte_a_rebours}') >= 0) vars = Object.assign({}, vars, { compte_a_rebours: compteDe(c, this.projet, this.langue || (this.projet.fiche || {}).langue || 'fr') });
+        let txt = remplacer(brut, vars);
         if (c.majuscules) txt = txt.toUpperCase();
         const ls = lignes(ctx, txt, larg);
         const inter = taille * (Number(c.interligne) || 1.25);
