@@ -629,6 +629,7 @@
       '<b>Les invitations</b> : enregistrées à chaque modification sur cet ordinateur (copie de secours « sûre », qui résiste à une coupure de courant), une version toutes les 2 minutes (« 🕘 Versions »), et en ligne avec l\'équipe. Rien à faire.',
       '<b>Tout le reste aussi</b> : bibliothèque (fonds, photos, vidéos importés), mes polices, styles, règles, préférences, réglages. Copie de secours sur cet ordinateur ; s\'il a perdu ses données, tout est remis à l\'ouverture du studio.',
       '<b>En ligne (équipe)</b> : bibliothèque et polices, fichiers compris, envoyées automatiquement, et renvoyées dès que la connexion revient. Sur un autre PC : Événements → « ☁ Récupérer depuis la copie en ligne » → <b>📚 Bibliothèque, mes polices et préférences</b>.',
+      '<b>Invités</b> : si la connexion (ou le serveur) ne répond pas au moment de confirmer, la réponse reste sur le téléphone de l\'invité et part toute seule plus tard.',
       '<b>Espace organisateur</b> : sans connexion, les familles ajoutées ou modifiées restent sur le téléphone et partent toutes seules au retour de la connexion ; la dernière liste reste visible hors connexion.',
       'À faire une fois : Réglages → <b>« Mise à jour sauvegarde en ligne »</b>, coller dans Supabase → SQL Editor → Run.'
     ] },

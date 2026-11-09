@@ -51,10 +51,10 @@
 <button id="son" aria-label="Son">♪</button><button id="pause" aria-label="Pause">❚❚</button>
 <div id="bandeau" role="dialog"></div>
 <div id="erreur"></div>
-<script src="../config.js?v=202611091506"></script>
-<script src="../moteur/moteur.js?v=202611091506"></script>
-<script src="../moteur/fabrique.js?v=202611091506"></script>
-<script src="../moteur/base.js?v=202611091506"></script>
+<script src="../config.js?v=202611091518"></script>
+<script src="../moteur/moteur.js?v=202611091518"></script>
+<script src="../moteur/fabrique.js?v=202611091518"></script>
+<script src="../moteur/base.js?v=202611091518"></script>
 <script>
 (async function () {
   const q = new URLSearchParams(location.search);
@@ -229,10 +229,24 @@
     return presence ? `Bonjour ! ${nom} : nous serons présents. Adultes ${form.adultes || 0}, enfants ${form.enfants || 0}. Merci !` : `Bonjour ! ${nom} : nous ne pourrons malheureusement pas venir. Merci pour l'invitation !`;
   }
   let erreurBase = '';
+  // réponse restée sur le téléphone (connexion coupée, serveur indisponible) : renvoyée toute seule
+  const renvoyerReponse = async () => {
+    if (!sbConf || demo) return; let a; try { a = JSON.parse(localStorage.getItem('inv.attente.' + projet.id)); } catch (e) {} if (!a) return;
+    try { await Base.rpc(sbConf, 'inv_repondre', a); localStorage.removeItem('inv.attente.' + projet.id); } catch (e) { if (/places|Plus d|inconnu/i.test(e.message || '')) { try { localStorage.removeItem('inv.attente.' + projet.id); } catch (er) {} } }
+  };
+  window.addEventListener('online', renvoyerReponse); setTimeout(renvoyerReponse, 4000); setInterval(renvoyerReponse, 30000);
   async function enregistrer(presence, form) {
     if (sbConf) {
       try {
-        await Base.rpc(sbConf, 'inv_repondre', { p_evt: projet.id, p_code: famille ? famille.code : null, p_nom: famille ? famille.nom : (form.nom || form.famille || ''), p_presence: presence ? 'oui' : 'non', p_adultes: Number(form.adultes) || 0, p_enfants: Number(form.enfants) || 0, p_message: form.message || '' });
+        var argsRep = { p_evt: projet.id, p_code: famille ? famille.code : null, p_nom: famille ? famille.nom : (form.nom || form.famille || ''), p_presence: presence ? 'oui' : 'non', p_adultes: Number(form.adultes) || 0, p_enfants: Number(form.enfants) || 0, p_message: form.message || '' };
+        try { await Base.rpc(sbConf, 'inv_repondre', argsRep); }
+        catch (e) {
+          // pas de connexion / serveur indisponible : la réponse reste sur le téléphone et part dès que possible
+          if (/places|Plus d|inconnu/i.test(e.message || '')) throw e;
+          try { localStorage.setItem('inv.attente.' + projet.id, JSON.stringify(argsRep)); } catch (er) {}
+          console.warn('réponse gardée pour plus tard', e.message); return true;
+        }
+        try { localStorage.removeItem('inv.attente.' + projet.id); } catch (er) {}
         return true;
       } catch (e) { console.warn(e); erreurBase = e.message; if (/places/.test(e.message)) return 'places'; }
     }
