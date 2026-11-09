@@ -10,14 +10,18 @@
   const BASE = '../';
 
   /* ================= Stockage ================= */
+  let surEcriture = null;   // sauvegarde de tout (accessoires), branchée plus bas
+  // ce que le navigateur avait vraiment au démarrage (pour savoir quoi reprendre de la copie de secours)
+  const clesDemarrage = new Set(); try { for (let i = 0; i < localStorage.length; i++) clesDemarrage.add(localStorage.key(i)); } catch (e) {}
   const Stock = {
     lire(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
-    ecrire(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { toast('Mémoire du navigateur pleine : exportez vos projets.'); return false; } }
+    ecrire(k, v) { let ok = true; try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { ok = false; toast('Mémoire du navigateur pleine : exportez vos projets.'); } if (surEcriture) surEcriture(k); return ok; }
   };
   let projets = Stock.lire('studio.projets', {});
   let medias = Stock.lire('studio.medias', []);
   let reglages = Stock.lire('studio.reglages', { github: { owner: '', repo: '', branche: 'main', token: '' }, firebase: null });
-  const sauverProjets = () => Stock.ecrire('studio.projets', projets);
+  let tSauve = 0;
+  const sauverProjets = () => { const ok = Stock.ecrire('studio.projets', projets); Sauve.copie(); return ok; };
   const sauverMedias = () => Stock.ecrire('studio.medias', medias);
   const sauverReglages = () => Stock.ecrire('studio.reglages', reglages);
   // Un autre onglet a changé les réglages (ex. nouveau jeton GitHub) : on les reprend ici aussi
@@ -29,10 +33,144 @@
       if (this._db) return Promise.resolve(this._db);
       return new Promise((ok, ko) => { const r = indexedDB.open('studio', 1); r.onupgradeneeded = () => r.result.createObjectStore('fichiers'); r.onsuccess = () => { this._db = r.result; ok(r.result); }; r.onerror = () => ko(r.error); });
     },
-    async mettre(cle, blob) { const db = await this.ouvrir(); return new Promise((ok, ko) => { const t = db.transaction('fichiers', 'readwrite'); t.objectStore('fichiers').put(blob, cle); t.oncomplete = ok; t.onerror = () => ko(t.error); }); },
+    async mettre(cle, blob) { const db = await this.ouvrir(); return new Promise((ok, ko) => { let t; try { t = db.transaction('fichiers', 'readwrite', { durability: 'strict' }); } catch (e) { t = db.transaction('fichiers', 'readwrite'); } t.objectStore('fichiers').put(blob, cle); t.oncomplete = ok; t.onerror = () => ko(t.error); }); },
     async lire(cle) { const db = await this.ouvrir(); return new Promise((ok, ko) => { const r = db.transaction('fichiers').objectStore('fichiers').get(cle); r.onsuccess = () => ok(r.result); r.onerror = () => ko(r.error); }); },
     async suppr(cle) { const db = await this.ouvrir(); return new Promise(ok => { const t = db.transaction('fichiers', 'readwrite'); t.objectStore('fichiers').delete(cle); t.oncomplete = ok; }); }
   };
+  IDB.cles = async function (debut) { const db = await this.ouvrir(); return new Promise(ok => { const r = db.transaction('fichiers').objectStore('fichiers').getAllKeys(); r.onsuccess = () => ok((r.result || []).filter(k => typeof k === 'string' && k.startsWith(debut))); r.onerror = () => ok([]); }); };
+
+  /* ================= Sauvegarde automatique =================
+     1) chaque modification : navigateur (localStorage) + copie de secours (IndexedDB, survit à une mémoire pleine)
+     2) une version datée toutes les 2 minutes de travail (30 par événement) : « 🕘 Versions » dans l'éditeur
+     3) avec l'équipe : copie en ligne quelques secondes après, renvoyée dès que la connexion revient
+     4) à l'ouverture du studio : ce qui est plus récent dans la copie de secours est repris tout seul */
+  const Sauve = {
+    _t: 0, attente: new Set(), enLigne: Stock.lire('studio.sauve.enligne', {}),
+    copie() { clearTimeout(this._t); this._t = setTimeout(() => this.copieMaintenant(), 300); },
+    copieMaintenant() { clearTimeout(this._t); return IDB.mettre('sauve:projets', JSON.stringify(projets)).catch(() => {}); },
+    async version(p, forcer) {
+      if (!p || !p.id) return;
+      const der = this._der || (this._der = {});
+      if (!forcer && der[p.id] && Date.now() - der[p.id] < 120000) return;
+      der[p.id] = Date.now();
+      try {
+        await IDB.mettre('version:' + p.id + ':' + Date.now(), JSON.stringify(p));
+        const ks = (await IDB.cles('version:' + p.id + ':')).sort();
+        for (const k of ks.slice(0, Math.max(0, ks.length - 30))) await IDB.suppr(k);
+      } catch (e) {}
+    },
+    async versions(id) {
+      const ks = (await IDB.cles('version:' + id + ':')).sort().reverse();
+      return ks.map(k => ({ cle: k, date: Number(k.split(':').pop()) }));
+    },
+    // au démarrage : reprendre la copie de secours si elle est plus récente
+    async reprendre() {
+      let n = 0;
+      try {
+        const t = await IDB.lire('sauve:projets'); if (!t) { this.copieMaintenant(); return 0; }
+        const sec = JSON.parse(t);
+        Object.values(sec).forEach(p => {
+          const ici = projets[p.id];
+          if (!ici || (p.modifie || '') > (ici.modifie || '')) { projets[p.id] = p; n++; }
+        });
+        if (n) Stock.ecrire('studio.projets', projets);
+        this.copieMaintenant();
+      } catch (e) {}
+      return n;
+    },
+    etat(p) {
+      const e = $('#etat-sauve'); if (!e || !p) return;
+      const h = d => new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+      let t = '✓ Enregistré sur cet ordinateur';
+      if (Equipe.actif()) {
+        if (!navigator.onLine) t = '⚠ Hors connexion — enregistré sur cet ordinateur, envoi en ligne au retour de la connexion';
+        else if (this.attente.has(p.id)) t = '✓ Enregistré sur cet ordinateur · ☁ envoi en ligne…';
+        else if (this.enLigne[p.id]) t = '✓ Enregistré · ☁ copie en ligne à ' + h(this.enLigne[p.id]);
+      }
+      e.textContent = t; e.title = 'Sauvegarde automatique : rien à faire. Si le PC s\'éteint ou si la connexion coupe, le travail est repris à la prochaine ouverture.';
+    }
+  };
+  /* ---- Sauvegarde de TOUT le reste (bibliothèque, mes polices, réglages, préférences…) ----
+     1) sur cet ordinateur : copie de secours dans IndexedDB à chaque changement (écriture « sûre », résiste à une coupure de courant)
+     2) avec l'équipe : copie en ligne (fichiers compris), renvoyée au retour de la connexion
+     3) si le navigateur a perdu ses données : tout est remis à l'ouverture du studio */
+  const CLES_EN_LIGNE = ['studio.medias', 'studio.polices.perso', 'studio.polices.recentes', 'studio.emojis.recents', 'studio.style', 'studio.regles', 'studio.presse', 'studio.vitrine.conditions', 'studio.illu.cat'];
+  Object.assign(Sauve, {
+    _tt: 0, _ta: 0, pret: false, accAttente: !!Stock.lire('studio.sauve.acc.attente', false),
+    tout() { clearTimeout(this._tt); this._tt = setTimeout(() => this.toutMaintenant(), 400); },
+    toutMaintenant() {
+      clearTimeout(this._tt); if (!this.pret) return Promise.resolve(); const o = {};
+      try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (/^studio\./.test(k) && k !== 'studio.projets' && !/^studio\.sauve\./.test(k)) o[k] = localStorage.getItem(k); } } catch (e) {}
+      // fusion : une clé effacée par le navigateur ne disparaît pas de la copie de secours
+      return IDB.lire('sauve:tout').then(t => { let a = {}; try { a = JSON.parse(t || '{}'); } catch (e) {} return IDB.mettre('sauve:tout', JSON.stringify(Object.assign(a, o))); }).catch(() => {});
+    },
+    // navigateur vidé (ou données perdues) : on remet ce qui manque
+    async reprendreTout() {
+      try {
+        const t = await IDB.lire('sauve:tout'); if (!t) { this.pret = true; this.toutMaintenant(); return 0; }
+        let n = 0; Object.entries(JSON.parse(t)).forEach(([k, v]) => { if (!clesDemarrage.has(k) && k !== 'studio.nouveautes.vu') { try { localStorage.setItem(k, v); n++; } catch (e) {} } });
+        this.pret = true; if (!n) this.toutMaintenant();
+        return n;
+      } catch (e) { this.pret = true; return 0; }
+    },
+    // copie en ligne des accessoires (équipe) : les fichiers de la bibliothèque et des polices sont envoyés une fois
+    accEnLigne(delai) {
+      this.accAttente = true; try { localStorage.setItem('studio.sauve.acc.attente', 'true'); } catch (e) {}
+      clearTimeout(this._ta);
+      if (!Equipe.actif() || !navigator.onLine) return;
+      this._ta = setTimeout(() => this.accEnvoyer().catch(e => console.warn('sauvegarde en ligne :', e.message)), delai == null ? 8000 : delai);
+    },
+    async accEnvoyer() {
+      if (!Equipe.actif() || !navigator.onLine) return;
+      const enLigne = async src => {
+        if (!/^idb:/.test(src || '')) return src;
+        if (Equipe.urlDe(src)) return Equipe.urlDe(src);
+        const b = await IDB.lire(src); if (!b || b.size > 50e6) return src;
+        const chemin = reglages.equipe.cle + '/' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7) + '.' + ((src.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin');
+        await Equipe.envoyerFichier(chemin, b); Equipe.urls[src] = Equipe.url(chemin); Stock.ecrire('studio.equipe.urls', Equipe.urls);
+        return Equipe.urls[src];
+      };
+      const cles = {};
+      for (const k of CLES_EN_LIGNE) { const v = Stock.lire(k, null); if (v != null) cles[k] = v; }
+      for (const m of (cles['studio.medias'] || [])) { if (/^idb:/.test(m.src || '')) { try { const u = await enLigne(m.src); if (u !== m.src) m.url = u; } catch (e) {} } }
+      for (const x of (cles['studio.polices.perso'] || [])) { if (/^idb:/.test(x.src || '')) { try { const u = await enLigne(x.src); if (u !== x.src) x.url = u; } catch (e) {} } }
+      const donnees = JSON.stringify({ version: 1, date: new Date().toISOString(), cles });
+      if (donnees.length > 4e6) throw new Error('copie trop grosse');
+      await Equipe.rpc('equipe_accessoires_sauver', { p_membre: Equipe.membre(), p_donnees: JSON.parse(donnees) });
+      this.accAttente = false; try { localStorage.removeItem('studio.sauve.acc.attente'); localStorage.setItem('studio.sauve.acc.date', JSON.stringify(Date.now())); } catch (e) {}
+    },
+    // PC changé / navigateur effacé : remettre bibliothèque, polices et préférences depuis la copie en ligne
+    async accRecuperer() {
+      const d = await Equipe.rpc('equipe_accessoires_lire', { p_membre: Equipe.membre() });
+      if (!d || !d.cles) throw new Error('Aucune copie en ligne de votre bibliothèque');
+      let fichiers = 0;
+      const rapatrier = async (o) => {
+        if (!o.url || !/^idb:/.test(o.src || '')) return;
+        try { if (await IDB.lire(o.src)) return; const r = await fetch(o.url); if (!r.ok) return; await IDB.mettre(o.src, await r.blob()); Equipe.urls[o.src] = o.url; fichiers++; } catch (e) {}
+      };
+      const medIci = Stock.lire('studio.medias', []);
+      for (const m of (d.cles['studio.medias'] || [])) { await rapatrier(m); delete m.url; if (!medIci.some(x => x.id === m.id)) medIci.push(m); }
+      d.cles['studio.medias'] = medIci;
+      const polIci = Stock.lire('studio.polices.perso', []);
+      for (const x of (d.cles['studio.polices.perso'] || [])) { await rapatrier(x); delete x.url; if (!polIci.some(y => y.nom === x.nom)) polIci.push(x); }
+      d.cles['studio.polices.perso'] = polIci;
+      Object.entries(d.cles).forEach(([k, v]) => { if (k === 'studio.medias' || k === 'studio.polices.perso' || localStorage.getItem(k) == null) Stock.ecrire(k, v); });
+      Stock.ecrire('studio.equipe.urls', Equipe.urls);
+      return { date: d.date, medias: medIci.length, polices: polIci.length, fichiers };
+    }
+  });
+  surEcriture = k => { if (k === 'studio.projets' || /^studio\.sauve\./.test(k)) return; Sauve.tout(); try { if (CLES_EN_LIGNE.includes(k)) Sauve.accEnLigne(); } catch (e) {} };
+  // fermeture, mise en veille, coupure : on écrit tout de suite ce qui attend
+  const toutEcrire = () => { if (tSauve) { clearTimeout(tSauve); tSauve = 0; Stock.ecrire('studio.projets', projets); } Sauve.copieMaintenant(); if (Sauve._tt) Sauve.toutMaintenant(); };
+  window.addEventListener('pagehide', toutEcrire);
+  window.addEventListener('beforeunload', toutEcrire);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) toutEcrire(); });
+  window.addEventListener('offline', () => { const id = (location.hash.match(/#\/p\/([^/]+)/) || [])[1]; Sauve.etat(projets[id]); toast('Connexion coupée : votre travail continue d\'être enregistré sur cet ordinateur'); });
+  window.addEventListener('online', () => { if (Sauve.accAttente) Sauve.accEnLigne(3000); });
+  window.addEventListener('online', () => { const ids = [...Sauve.attente]; ids.forEach(id => projets[id] && Equipe.travail(projets[id], 500)); const id = (location.hash.match(/#\/p\/([^/]+)/) || [])[1]; Sauve.etat(projets[id]); if (ids.length) toast('Connexion revenue : envoi de la copie en ligne'); });
+  // filet de sécurité : toutes les 20 s, si une écriture attend encore
+  setInterval(() => { if (tSauve) toutEcrire(); }, 20000);
+
   const urlsIdb = {};
   async function resoudre(src) {
     if (!src) return null;
@@ -151,9 +289,11 @@
     },
     // le travail de chacun, visible par l'admin (avec ses fichiers, pour qu'il puisse le publier)
     _t: {},
-    travail(p) {
+    travail(p, delai) {
       if (!this.actif() || !p) return;
+      Sauve.attente.add(p.id);
       clearTimeout(this._t[p.id]);
+      if (!navigator.onLine) return;
       this._t[p.id] = setTimeout(async () => {
         const srcs = [...new Set(p.plans.flatMap(pl => [pl.fond && pl.fond.media].concat((pl.calques || []).map(c => c.media))).concat(p.musique ? [p.musique.src] : []).filter(x => /^idb:/.test(x || '')))];
         for (const src of srcs) { try { await this.envoyerSrc(src); } catch (e) { console.warn('équipe : envoi', src, e.message); } }
@@ -163,8 +303,8 @@
         if (d.musique && d.musique.src) d.musique.src = loc(d.musique.src);
         for (const x of (d.polices_perso || [])) { if (/^idb:/.test(x.src || '')) { try { const b = await IDB.lire(x.src); if (b && b.size < 1.5e6) x.src = await new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(b); }); } catch (e) {} } }
         const v = vignetteDe(((p.plans.find(x => x.role !== 'ouverture') || p.plans[0] || {}).fond || {}).media || '');
-        this.rpc('equipe_travail', { p_travail: { projet: p.id, auteur: this.membre(), titre: p.fiche.titre || '', slug: p.slug || '', plans: p.plans.length, publie: p.publie || null, vignette: /^data:/.test(v) ? (v.length < 150000 ? v : '') : (v ? new URL(v, location.href).href : ''), donnees: d } }).catch(() => {});
-      }, 8000);
+        this.rpc('equipe_travail', { p_travail: { projet: p.id, auteur: this.membre(), titre: p.fiche.titre || '', slug: p.slug || '', plans: p.plans.length, publie: p.publie || null, vignette: /^data:/.test(v) ? (v.length < 150000 ? v : '') : (v ? new URL(v, location.href).href : ''), donnees: d } }).then(() => { Sauve.attente.delete(p.id); Sauve.enLigne[p.id] = Date.now(); Stock.ecrire('studio.sauve.enligne', Sauve.enLigne); Sauve.etat(projets[p.id]); }).catch(() => { Sauve.etat(projets[p.id]); });
+      }, delai || 4000);
     }
   };
   if (Equipe.actif()) setTimeout(() => Equipe.charger().catch(() => {}), 1500);
@@ -485,6 +625,13 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-09-1', date: '9 novembre 2026', titre: 'Sauvegarde automatique de tout, même si le PC s\'éteint ou si la connexion coupe', points: [
+      '<b>Les invitations</b> : enregistrées à chaque modification sur cet ordinateur (copie de secours « sûre », qui résiste à une coupure de courant), une version toutes les 2 minutes (« 🕘 Versions »), et en ligne avec l\'équipe. Rien à faire.',
+      '<b>Tout le reste aussi</b> : bibliothèque (fonds, photos, vidéos importés), mes polices, styles, règles, préférences, réglages. Copie de secours sur cet ordinateur ; s\'il a perdu ses données, tout est remis à l\'ouverture du studio.',
+      '<b>En ligne (équipe)</b> : bibliothèque et polices, fichiers compris, envoyées automatiquement, et renvoyées dès que la connexion revient. Sur un autre PC : Événements → « ☁ Récupérer depuis la copie en ligne » → <b>📚 Bibliothèque, mes polices et préférences</b>.',
+      '<b>Espace organisateur</b> : sans connexion, les familles ajoutées ou modifiées restent sur le téléphone et partent toutes seules au retour de la connexion ; la dernière liste reste visible hors connexion.',
+      'À faire une fois : Réglages → <b>« Mise à jour sauvegarde en ligne »</b>, coller dans Supabase → SQL Editor → Run.'
+    ] },
     { id: '2026-11-05-1', date: '5 novembre 2026', titre: 'Compte à rebours réglable, textes du haut dans le film, police Intro', points: [
       '<b>Compte à rebours</b> : touchez le texte du compte à rebours (plan de confirmation) → bloc <b>⏱ Compte à rebours</b> : affichage (jours-heures-minutes-secondes, jours et heures, jours seulement, horloge 12 : 05 : 33 : 10), mots des unités (« andro », « ora »…), date et heure visées, texte le jour J. Bouton « ⏱ Ajouter le compte à rebours » sur n\'importe quel texte.',
       '<b>Film téléchargé</b> : les textes du haut de la confirmation réservés au lien personnel (« Réponse à l\'invitation », « Ho an\'i {famille} », « {places} olona »…) sont maintenant dans le film pour tout le monde. Film et publication → « {famille} devient » / « {places} devient » pour choisir ce qui s\'affiche.',
@@ -657,7 +804,7 @@
     const liste = Object.values(projets).sort((a, b) => (b.modifie || '').localeCompare(a.modifie || ''));
     $('#app').innerHTML = `
       <div class="entete"><div><h1>Vos événements</h1><p>Chaque invitation part d'un texte et de quelques fonds vidéo vierges.</p></div>
-        <div class="ligne"><label class="btn">Importer un projet<input type="file" accept=".json" id="imp-projet" hidden></label><a class="btn plein" href="#/nouveau">+ Nouvel événement</a></div></div>
+        <div class="ligne">${Equipe.actif() ? '<button class="btn" id="recup-ligne" title="Après une panne ou sur un autre ordinateur">☁ Récupérer depuis la copie en ligne</button>' : ''}<label class="btn">Importer un projet<input type="file" accept=".json" id="imp-projet" hidden></label><a class="btn plein" href="#/nouveau">+ Nouvel événement</a></div></div>
       ${liste.length ? `<div class="grille">${liste.map(p => `
         <div class="carte projet-carte" data-id="${p.id}">
           <img src="${esc(vignettePlan(p.plans.find(x => x.role !== 'ouverture') || p.plans[0] || {}))}" alt="">
@@ -669,6 +816,7 @@
         <div class="carte vide"><h2>Aucun événement pour l'instant</h2><p class="muet">Collez le texte d'une invitation : le studio en tire les informations et propose les plans.</p><a class="btn plein" href="#/nouveau">Créer le premier événement</a>
         <p style="margin-top:14px"><button class="btn" id="demo">Charger l'exemple « Jobily faha-10 taona mariazy — Batemy »</button></p></div>`}`;
     $$('.projet-carte').forEach(c => c.onclick = () => { location.hash = '#/p/' + c.dataset.id + '/plans'; });
+    const rl = $('#recup-ligne'); if (rl) rl.onclick = recupererEnLigne;
     const imp = $('#imp-projet');
     if (imp) imp.onchange = async () => {
       try { const p = JSON.parse(await imp.files[0].text()); if (!p.plans || !p.fiche) throw new Error(); p.id = p.id || uid(); projets[p.id] = p; sauverProjets(); toast('Projet importé'); route(); }
@@ -854,23 +1002,70 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
   function vueProjet(p, onglet) {
     $('#app').innerHTML = `
       <div class="entete"><div><a href="#/" class="muet" style="text-decoration:none">‹ Événements</a><h1 style="margin-top:4px">${esc(p.fiche.titre)}</h1><p>${esc(MoteurInfo.dateLisible(p.fiche.date, p.fiche.langue))}${p.fiche.heure ? ' · ' + esc(p.fiche.heure) : ''}</p></div>
-        <div class="ligne"><a class="btn ${p.publie ? 'plein' : ''}" href="#/p/${p.id}/publier" title="Les 2 liens à donner au client">🔗 Liens du client</a><span class="muet" id="etat-sauve">Enregistré</span></div></div>
+        <div class="ligne"><a class="btn ${p.publie ? 'plein' : ''}" href="#/p/${p.id}/publier" title="Les 2 liens à donner au client">🔗 Liens du client</a><button class="btn petit" id="btn-versions" title="Versions enregistrées automatiquement (revenir en arrière)">🕘 Versions</button><span class="muet" id="etat-sauve">Enregistré</span></div></div>
       <div class="onglets">
         <a href="#/p/${p.id}/plans" class="${onglet === 'plans' ? 'actif' : ''}">Plans</a>
         <a href="#/p/${p.id}/fiche" class="${onglet === 'fiche' ? 'actif' : ''}">Fiche</a>
         <a href="#/p/${p.id}/invites" class="${onglet === 'invites' ? 'actif' : ''}">Invités</a>
         <a href="#/p/${p.id}/publier" class="${onglet === 'publier' ? 'actif' : ''}">Film et publication</a>
       </div><div id="onglet"></div>`;
+    Sauve.etat(p);
+    $('#btn-versions').onclick = () => ouvrirVersions(p);
     if (onglet === 'invites') return ongletInvites(p);
     if (onglet === 'publier') return ongletPublier(p);
     if (onglet === 'fiche') return ongletFiche(p);
     return ongletPlans(p);
   }
-  let tSauve;
+  async function ouvrirVersions(p) {
+    toutEcrire();
+    const vs = await Sauve.versions(p.id);
+    const j = d => new Date(d).toLocaleString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    modale(`<h2>🕘 Versions enregistrées</h2><p class="muet">Le studio garde tout seul une version toutes les 2 minutes de travail (les 30 dernières), sur cet ordinateur. Choisissez-en une pour y revenir : la version actuelle est gardée elle aussi.</p>
+      <div class="pile" style="max-height:55vh;overflow:auto;gap:6px">${vs.map(v => `<div class="ligne" style="justify-content:space-between;border:1px solid #eadfd3;border-radius:10px;padding:8px 10px"><span>${esc(j(v.date))}</span><button class="btn petit" data-v="${esc(v.cle)}">Revenir à cette version</button></div>`).join('') || '<p class="muet">Pas encore de version : elles apparaissent après quelques minutes de travail.</p>'}</div>`, (m, fermer) => {
+      $$('[data-v]', m).forEach(b => b.onclick = async () => {
+        try {
+          const v = JSON.parse(await IDB.lire(b.dataset.v));
+          await Sauve.version(p, true);
+          v.modifie = new Date().toISOString(); if (p.cle_hote && !v.cle_hote) v.cle_hote = p.cle_hote;
+          projets[p.id] = v; sauverProjets(); fermer(); toast('Version du ' + j(Number(b.dataset.v.split(':').pop())) + ' rétablie'); route();
+        } catch (e) { toast('Version illisible'); }
+      });
+    });
+  }
+  // Récupérer ses invitations depuis la copie en ligne de l'équipe (PC changé, navigateur effacé…)
+  async function recupererEnLigne() {
+    let liste;
+    try { liste = await Equipe.rpc('equipe_mes_projets', { p_auteur: Equipe.membre() }); }
+    catch (e) {
+      if (Equipe.admin()) { try { liste = (await Equipe.rpc('equipe_admin')).travaux; } catch (e2) { toast(e2.message); return; } }
+      else { toast(/equipe_mes_projets|PGRST202|404/.test(e.message) ? 'La base doit être mise à jour : Réglages → « Mise à jour sauvegarde en ligne »' : e.message); return; }
+    }
+    const j = d => new Date(d).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    modale(`<h2>☁ Récupérer depuis la copie en ligne</h2><p class="muet">Les invitations enregistrées en ligne par ${Equipe.admin() ? 'l\'équipe' : 'vous (<b>' + esc(Equipe.membre()) + '</b>)'}. Utile après une panne de l'ordinateur ou sur un autre PC.</p>
+      <div class="pile" style="max-height:55vh;overflow:auto;gap:6px">${(liste || []).map(t => { const ici = projets[t.projet]; return `<div class="ligne" style="justify-content:space-between;border:1px solid #eadfd3;border-radius:10px;padding:8px 10px"><span><b>${esc(t.titre || 'Sans titre')}</b><br><span class="muet">${t.auteur ? 'par ' + esc(t.auteur) + ' · ' : ''}en ligne le ${esc(j(t.maj))}${ici ? ' · déjà sur cet ordinateur' : ''}</span></span><button class="btn petit ${ici ? '' : 'plein'}" data-r="${esc(t.projet)}">${ici ? 'Remplacer par la copie en ligne' : 'Récupérer'}</button></div>`; }).join('') || '<p class="muet">Aucune copie en ligne.</p>'}</div>
+      <div class="ligne" style="justify-content:space-between;border:1px dashed #d8c3ae;border-radius:10px;padding:8px 10px;margin-top:8px"><span><b>📚 Bibliothèque, mes polices et préférences</b><br><span class="muet">fonds, photos et vidéos importés, polices importées, styles, réglages des textes</span></span><button class="btn petit plein" id="acc-recup">Récupérer</button></div>`, (m, fermer) => {
+      $('#acc-recup', m).onclick = async e => {
+        const b = e.target; b.textContent = 'Récupération…'; b.disabled = true;
+        try { const r = await Sauve.accRecuperer(); toast('Récupéré : ' + r.medias + ' élément(s) de bibliothèque, ' + r.polices + ' police(s)'); setTimeout(() => location.reload(), 1500); }
+        catch (err) { b.disabled = false; b.textContent = 'Réessayer'; toast(/accessoires|PGRST202|404/.test(err.message) ? 'La base doit être mise à jour : Réglages → « Mise à jour sauvegarde en ligne »' : err.message); }
+      };
+      $$('[data-r]', m).forEach(b => b.onclick = async () => {
+        if (projets[b.dataset.r] && !confirm('Remplacer la version de cet ordinateur par la copie en ligne ? (elle reste dans « 🕘 Versions »)')) return;
+        b.textContent = 'Récupération…';
+        try {
+          let d; try { d = await Equipe.rpc('equipe_mon_projet', { p_projet: b.dataset.r, p_auteur: Equipe.membre() }); } catch (e) { if (!Equipe.admin()) throw e; d = await Equipe.rpc('equipe_projet', { p_projet: b.dataset.r }); }
+          if (!d || !d.plans) throw new Error('Copie vide');
+          const ici = projets[d.id];
+          if (ici) { await Sauve.version(ici, true); if (ici.cle_hote) d.cle_hote = ici.cle_hote; }
+          d.modifie = new Date().toISOString(); projets[d.id] = d; sauverProjets(); toast('« ' + (d.fiche.titre || '') + ' » récupérée'); fermer(); route();
+        } catch (e) { toast(e.message); b.textContent = 'Réessayer'; }
+      });
+    });
+  }
   function enregistrer(p) {
     p.modifie = new Date().toISOString();
     const e = $('#etat-sauve'); if (e) e.textContent = 'Enregistrement…';
-    clearTimeout(tSauve); tSauve = setTimeout(() => { sauverProjets(); const e2 = $('#etat-sauve'); if (e2) e2.textContent = 'Enregistré'; }, 400);
+    clearTimeout(tSauve); tSauve = setTimeout(() => { tSauve = 0; sauverProjets(); Sauve.version(p); Sauve.etat(p); }, 400);
     Equipe.travail(p);
   }
 
@@ -3713,7 +3908,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
             <li>Dans le projet : <b>SQL Editor</b> → <b>New query</b> → collez le script (bouton ci-dessous) → <b>Run</b>.</li>
             <li><b>Project Settings → API</b> (ou <b>Connect</b>) : copiez la <b>Project URL</b> et la clé <b>anon public</b> (ou « publishable ») dans les deux champs ci-dessus, puis Enregistrer et Tester.</li>
             <li>Republiez vos invitations : le lien organisateur apparaît dans l'onglet Film et publication.</li></ol>
-            <button class="btn petit" id="sb-sql">Copier le script SQL</button> <button class="btn petit" id="sb-sql2" title="Adultes et enfants invités séparément, par famille">Mise à jour adultes / enfants</button>
+            <button class="btn petit" id="sb-sql">Copier le script SQL</button> <button class="btn petit" id="sb-sql2" title="Adultes et enfants invités séparément, par famille">Mise à jour adultes / enfants</button> <button class="btn petit" id="sb-sql3" title="Chaque membre peut récupérer ses invitations depuis la copie en ligne">Mise à jour sauvegarde en ligne</button>
             <p class="muet">La formule gratuite se met en pause après 7 jours sans aucune visite ; une invitation en cours reçoit des visites, sinon réactivez-la d'un clic dans Supabase.</p></details>
         </div>
         <div class="carte pile"><h3>Réponses des invités (Firebase, facultatif)</h3>
@@ -3777,6 +3972,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         reglages.equipe = { id: r.id, nom: r.nom, cle: r.cle, cle_admin: r.cle_admin, membre: nom, auto: true }; sauverReglages(); toast('Équipe créée : envoyez le lien d\'équipe à vos membres'); location.hash = '#/equipe'; }
       catch (e) { toast(/function|schema cache|Could not find/i.test(e.message) ? 'Installez d\'abord le script SQL de l\'équipe dans Supabase' : e.message); }
     };
+    const sbs3 = $('#sb-sql3'); if (sbs3) sbs3.onclick = async () => { try { copier(await (await fetch('../outils/sauvegarde.sql?v=' + Date.now())).text()); toast('Script copié : Supabase → SQL Editor → coller → Run'); } catch (e) { toast('Script introuvable'); } };
     const sbs2 = $('#sb-sql2'); if (sbs2) sbs2.onclick = async () => { try { copier(await (await fetch('../outils/invites-2.sql?v=' + Date.now())).text()); toast('Script copié : Supabase → SQL Editor → coller → Run'); } catch (e) { toast('Script introuvable'); } };
     const eqs2 = $('#eq-sql2'); if (eqs2) eqs2.onclick = async () => { try { copier(await (await fetch('../outils/equipe-2.sql?v=' + Date.now())).text()); toast('Script copié : Supabase → SQL Editor → coller → Run'); } catch (e) { toast('Script introuvable'); } };
     const eqs = $('#eq-sql'); if (eqs) eqs.onclick = async () => { try { copier(await (await fetch('../outils/equipe.sql?v=' + Date.now())).text()); toast('Script copié : Supabase → SQL Editor → coller → Run'); } catch (e) { toast('Script introuvable'); } };
@@ -4018,4 +4214,9 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
   setInterval(() => { if (Veille.boite && Veille.etat) { Veille.etat.inactif += 1; boiteVeille(Veille.etat); } }, 1000);
 
   route();
+  // reprise après coupure : la copie de secours est-elle plus récente ?
+  Sauve.reprendreTout().then(n => { if (n) { toast('Bibliothèque et réglages repris depuis la sauvegarde automatique'); setTimeout(() => location.reload(), 1200); } else Sauve.toutMaintenant(); });
+  if (Sauve.accAttente) setTimeout(() => Sauve.accEnLigne(0), 6000);
+  else if (Equipe.actif()) { const der = Stock.lire('studio.sauve.acc.date', 0); if (Date.now() - der > 24 * 3600e3) setTimeout(() => Sauve.accEnLigne(0), 20000); }
+  Sauve.reprendre().then(n => { if (n) { toast(n + ' invitation(s) reprise(s) depuis la sauvegarde automatique'); route(); } });
 })();

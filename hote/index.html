@@ -72,14 +72,14 @@
 <div id="erreur" hidden></div>
 <dialog id="dlg"><form method="dialog" id="dlg-form"></form></dialog>
 <div id="toast"></div>
-<script src="../config.js?v=202611050945"></script>
-<script src="../moteur/base.js?v=202611050945"></script>
+<script src="../config.js?v=202611091506"></script>
+<script src="../moteur/base.js?v=202611091506"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
 <script>
 (async function () {
   const $ = (s, r) => (r || document).querySelector(s), $$ = (s, r) => [...(r || document).querySelectorAll(s)];
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  let tt; const toast = (t, ms) => { const e = $('#toast'); e.textContent = t; e.classList.add('vu'); clearTimeout(tt); tt = setTimeout(() => e.classList.remove('vu'), ms || 2600); };
+  let tt, toastFixe = 0; const toast = (t, ms) => { if (Date.now() < toastFixe) return; const e = $('#toast'); e.textContent = t; e.classList.add('vu'); clearTimeout(tt); tt = setTimeout(() => e.classList.remove('vu'), ms || 2600); };
   const erreur = t => { $('#app').hidden = true; const e = $('#erreur'); e.hidden = false; e.innerHTML = t; $('#titre').textContent = 'Espace organisateur'; };
   const q = new URLSearchParams(location.search);
   const slug = q.get('p'), cle = decodeURIComponent((location.hash || '').slice(1));
@@ -118,10 +118,31 @@
   };
   document.addEventListener('visibilitychange', () => { if (!document.hidden) document.title = document.title.replace(/^\(\d+\) /, ''); });
   const lire = async (silencieux) => {
-    try { D = await Base.rpc(conf, 'inv_hote_lire', { p_evt: projet.id, p_cle: cle }); annoncer(); rendre(); $('.etat-sync') && ($('.etat-sync').textContent = 'À jour · ' + new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })); }
-    catch (e) { if (/invalide/.test(e.message)) return erreur('<h2>Lien organisateur invalide</h2><p class="muet">Demandez au studio le lien organisateur à jour.</p>'); if (!silencieux) toast('Connexion impossible : ' + e.message); }
+    try { D = await Base.rpc(conf, 'inv_hote_lire', { p_evt: projet.id, p_cle: cle }); try { localStorage.setItem('hote.donnees.' + slug, JSON.stringify(D)); } catch (er) {} annoncer(); rendre(); $('.etat-sync') && ($('.etat-sync').textContent = 'À jour · ' + new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })); }
+    catch (e) { if (/invalide/.test(e.message)) return erreur('<h2>Lien organisateur invalide</h2><p class="muet">Demandez au studio le lien organisateur à jour.</p>'); if (!D.familles.length) { try { const c = JSON.parse(localStorage.getItem('hote.donnees.' + slug)); if (c) { D = c; rendre(); toast('Hors connexion : dernière liste enregistrée sur cet appareil', 4000); return; } } catch (er) {} } if (!silencieux) toast('Connexion impossible : ' + e.message); }
   };
-  const envoyer = async liste => { await Base.rpc(conf, 'inv_hote_familles', { p_evt: projet.id, p_cle: cle, p_familles: liste }); await lire(true); };
+  // Connexion coupée : les familles ajoutées / modifiées restent sur cet appareil et partent dès que la connexion revient
+  const cleAtt = 'hote.attente.' + slug;
+  const attente = () => { try { return JSON.parse(localStorage.getItem(cleAtt)) || []; } catch (e) { return []; } };
+  const mettreAtt = l => { try { if (l.length) localStorage.setItem(cleAtt, JSON.stringify(l)); else localStorage.removeItem(cleAtt); } catch (e) {} };
+  const coupure = e => !navigator.onLine || /fetch|network|réseau|load failed|timeout|abort/i.test((e && e.message) || '');
+  const envoyer = async liste => {
+    try { await Base.rpc(conf, 'inv_hote_familles', { p_evt: projet.id, p_cle: cle, p_familles: liste }); }
+    catch (e) {
+      if (!coupure(e)) throw e;
+      const m = new Map(attente().map(f => [f.code, f])); liste.forEach(f => m.set(f.code, f)); mettreAtt([...m.values()]);
+      if (D && D.familles) { liste.forEach(f => { const i = D.familles.findIndex(x => x.code === f.code); if (i >= 0) D.familles[i] = Object.assign({}, D.familles[i], f); else D.familles.push(f); }); rendre(); }
+      toast('Pas de connexion : enregistré sur cet appareil, envoyé tout seul quand la connexion revient', 5000); toastFixe = Date.now() + 2500; return;
+    }
+    await lire(true);
+  };
+  let envoiAtt = false;
+  const viderAttente = async () => {
+    const l = attente(); if (!l.length || !navigator.onLine || envoiAtt) return; envoiAtt = true;
+    try { await Base.rpc(conf, 'inv_hote_familles', { p_evt: projet.id, p_cle: cle, p_familles: l }); mettreAtt([]); toast('✓ ' + l.length + ' famille(s) enregistrée(s) hors connexion : envoyée(s)', 4000); await lire(true); } catch (e) {}
+    envoiAtt = false;
+  };
+  window.addEventListener('online', viderAttente); setInterval(viderAttente, 30000); setTimeout(viderAttente, 3000);
 
   /* ---- Affichage ---- */
   const somme = (l, k) => l.reduce((s, f) => s + (Number(f[k]) || 0), 0);
