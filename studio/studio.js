@@ -337,12 +337,16 @@
     },
     // le travail de chacun, visible par l'admin (avec ses fichiers, pour qu'il puisse le publier)
     _t: {},
+    // envoi immédiat (attend la fin) : utilisé pour demander la publication à l'admin
+    envoyerTravail(p) { return new Promise((ok, ko) => { this._fin = this._fin || {}; this._fin[p.id] = { ok, ko }; this.travail(p, 10); }); },
     travail(p, delai) {
       if (!this.actif() || !p) return;
       Sauve.attente.add(p.id);
       clearTimeout(this._t[p.id]);
       if (!navigator.onLine) return;
       this._t[p.id] = setTimeout(async () => {
+       const fin = (this._fin || {})[p.id]; if (fin) delete this._fin[p.id];
+       try {
         const srcs = [...new Set(p.plans.flatMap(pl => [pl.fond && pl.fond.media].concat((pl.calques || []).map(c => c.media))).concat(p.musique ? [p.musique.src] : []).filter(x => /^idb:/.test(x || '')))];
         for (const src of srcs) { try { await this.envoyerSrc(src); } catch (e) { console.warn('équipe : envoi', src, e.message); } }
         const loc = src => (src && this.urlDe(src)) || src;
@@ -351,7 +355,8 @@
         if (d.musique && d.musique.src) d.musique.src = loc(d.musique.src);
         for (const x of (d.polices_perso || [])) { if (/^idb:/.test(x.src || '')) { try { const b = await IDB.lire(x.src); if (b && b.size < 1.5e6) x.src = await new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(b); }); } catch (e) {} } }
         const v = vignetteDe(((p.plans.find(x => x.role !== 'ouverture') || p.plans[0] || {}).fond || {}).media || '');
-        this.rpc('equipe_travail', { p_travail: { projet: p.id, auteur: this.membre(), titre: p.fiche.titre || '', slug: p.slug || '', plans: p.plans.length, publie: p.publie || null, vignette: /^data:/.test(v) ? (v.length < 150000 ? v : '') : (v ? new URL(v, location.href).href : ''), donnees: d } }).then(() => { Sauve.attente.delete(p.id); Sauve.enLigne[p.id] = Date.now(); Stock.ecrire('studio.sauve.enligne', Sauve.enLigne); Sauve.etat(projets[p.id]); }).catch(() => { Sauve.etat(projets[p.id]); });
+        await this.rpc('equipe_travail', { p_travail: { projet: p.id, auteur: this.membre(), titre: p.fiche.titre || '', slug: p.slug || '', plans: p.plans.length, publie: p.publie || null, vignette: /^data:/.test(v) ? (v.length < 150000 ? v : '') : (v ? new URL(v, location.href).href : ''), donnees: d } }).then(() => { Sauve.attente.delete(p.id); Sauve.enLigne[p.id] = Date.now(); Stock.ecrire('studio.sauve.enligne', Sauve.enLigne); Sauve.etat(projets[p.id]); }).then(() => { if (fin) fin.ok(); }).catch(e => { Sauve.etat(projets[p.id]); if (fin) fin.ko(e); });
+       } catch (e) { if (fin) fin.ko(e); }
       }, delai || 4000);
     }
   };
@@ -673,6 +678,12 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-10-11', date: '10 novembre 2026', titre: 'Publication par les membres, plan de tables, partage partout', points: [
+      '<b>Les membres publient</b> : sans GitHub, « 📤 Demander la publication » (Film et publication, ou 🎬 Vidéos pour un film). L\'admin voit les demandes dans <b>Équipe</b> (pastille sur le menu) → « ✓ Valider et publier » ou « Refuser ». Le membre reçoit ensuite ses liens (invités, organisateur) dans son studio. À faire une fois : Réglages → « Mise à jour publication par les membres » → Supabase → Run.',
+      '<b>🪑 Plan de tables</b> (onglet Invités) : nombre de tables, personnes par table, places par table, noms des familles à chaque table (+ Ajouter / ✕), « Placer automatiquement », 🖨 Imprimer, feuille « Tables » dans l\'export Excel. Le client a aussi un onglet <b>🪑 Tables</b> dans son espace organisateur.',
+      '<b>📤 Partager</b> : WhatsApp, Facebook, Messenger, Instagram, TikTok, Telegram, Viber, SMS, e-mail, copier, partage du téléphone — pour le lien général, le lien organisateur et le lien de chaque famille (studio et espace organisateur).',
+      '<b>Formes</b> : réglage « Arrondi » comme pour l\'arrière-plan du texte.'
+    ] },
     { id: '2026-11-10-10', date: '10 novembre 2026', titre: 'Aperçu en grand, angles arrondis, couleurs utilisées, recherche', points: [
       '<b>Aperçu en grand</b> : il remplit maintenant toute la largeur du centre (on fait défiler le centre pour voir le bas). Bouton <b>↔ / ↕</b> dans la colonne d\'outils pour le faire tenir en hauteur ; ⛶ plein écran ; zoom.',
       '<b>Icône Maps</b> : épingle rouge, comme demandé.',
@@ -2606,7 +2617,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       if (c.type === 'forme') s += `<details class="bloc" open><summary>▭ Forme</summary><div class="pile">
         ${grilleFormes(c, ratioCalque(c)).replace(/<button class="forme-btn[^"]*" data-forme=""[\s\S]*?<\/button>/, '')}
         ${c.forme === 'arrondi' ? `<label class="champ">Arrondi des coins<input type="range" data-k="arrondi" min="0" max="100" step="1" value="${c.arrondi != null && c.arrondi !== '' ? c.arrondi : 16}"></label>` : ''}
-        ${c.forme !== 'arrondi' && c.forme !== 'rond' && c.forme !== 'pilule' ? `<label class="champ">Arrondir les angles<input type="range" data-k="coins" min="0" max="100" step="1" value="${Number(c.coins) || 0}"></label>` : ''}
+        ${c.forme !== 'arrondi' && c.forme !== 'rond' && c.forme !== 'pilule' ? `<label class="champ">Arrondi (comme l'arrière-plan du texte)<input type="range" data-k="coins" min="0" max="100" step="1" value="${Number(c.coins) || 0}"></label>` : ''}
         <button class="btn petit ${c.forme === 'libre' ? 'plein' : ''}" data-forme-libre>✎ ${c.forme === 'libre' ? 'Modifier les points' : 'Dessiner une forme libre'}</button>
         <div class="trois"><label class="champ">Couleur<input type="color" data-k="couleur" value="${esc(c.couleur || '#7a1f2b')}"></label><label class="champ">Hauteur (%)<input type="number" data-k="hauteur" step="0.5" value="${c.hauteur || 22}"></label><label class="champ">Opacité<input type="range" data-k="opacite" min="0" max="1" step="0.05" value="${c.opacite != null && c.opacite !== '' ? c.opacite : 1}"></label></div>
         <label class="cases"><input type="checkbox" data-forme-deg ${c.couleur2 ? 'checked' : ''}> Dégradé</label>
@@ -3390,7 +3401,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <td><input type="text" data-k="telephone" value="${esc(f.telephone || '')}" style="width:130px"></td>
           <td><select data-k="statut"><option value="attente" ${!f.statut || f.statut === 'attente' ? 'selected' : ''}>En attente</option><option value="vient" ${f.statut === 'vient' ? 'selected' : ''}>Vient</option><option value="non" ${f.statut === 'non' ? 'selected' : ''}>Ne vient pas</option></select></td>
           <td><input type="text" data-k="table" value="${esc(f.table || '')}" style="width:60px"></td>
-          <td class="ligne" style="flex-wrap:nowrap"><button class="btn petit" data-a="copier">Copier</button><button class="btn petit" data-a="wa">WhatsApp</button><button class="btn petit" data-a="voir">Voir</button></td>
+          <td class="ligne" style="flex-wrap:nowrap"><button class="btn petit" data-a="copier">Copier</button><button class="btn petit" data-a="wa">WhatsApp</button><button class="btn petit" data-a="partager" title="Facebook, Messenger, Instagram, SMS, e-mail…">📤</button><button class="btn petit" data-a="voir">Voir</button></td>
           <td><button class="btn petit danger" data-a="suppr">✕</button></td></tr>`).join('') || '<tr><td colspan="10" class="muet" style="padding:16px">Aucune famille. Ajoutez-en ou importez un fichier Excel (colonnes : Famille, Catégorie, Adultes, Enfants, Téléphone).</td></tr>'}</tbody>
       </table></div></div>
       ${planTables(p)}
@@ -3402,6 +3413,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       </div>`;
     $('#msg-envoi').oninput = e => { p.message_envoi = e.target.value; enregistrer(p); };
     $$('[data-cap]').forEach(i => i.onchange = () => { p.tables = p.tables || {}; p.tables[i.dataset.cap] = Number(i.value) || 0; enregistrer(p); ongletInvites(p); });
+    lierPlanTables(p, () => ongletInvites(p, true));
     $('#copier-gen').onclick = () => copier(lienGeneral(p));
     if (!dejaSync && reglages.supabase && p.cle_hote && p.publie) syncInvites(p).then(ok => { if (ok && $('#add-fam')) ongletInvites(p, true); }).catch(e => toast('Base des invités : ' + e.message));
     $('#add-fam').onclick = () => { const f = { id: uid(), code: codeFamille(), nom: 'Nouvelle famille', categorie: '', places: 2, adultes: 2, enfants: 0, telephone: '', statut: 'attente' }; fs.push(f); enregistrer(p); pousserFamille(p, f); ongletInvites(p, true); };
@@ -3418,6 +3430,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         if (a === 'copier') copier(lienFamille(p, f));
         if (a === 'wa') { const msg = p.message_envoi.replace(/\{famille\}/g, f.nom).replace(/\{lien\}/g, lienFamille(p, f)); window.open((f.telephone ? 'https://wa.me/' + telWa(f.telephone) : 'https://wa.me/') + '?text=' + encodeURIComponent(msg), '_blank'); }
         if (a === 'voir') { Stock.ecrire('studio.apercu', publication(p, true)); window.open('../i/?apercu=1&f=' + encodeURIComponent(f.code), '_blank'); }
+        if (a === 'partager') Base.partager(b, lienFamille(p, f), p.message_envoi.replace(/\{famille\}/g, f.nom).replace(/\{lien\}/g, '').trim());
         if (a === 'suppr') { if (confirm('Supprimer ' + f.nom + ' ?')) { fs.splice(Number(tr.dataset.k), 1); if (f.code && p.cle_hote) { p.supprimes = (p.supprimes || []).concat(f.code); if (reglages.supabase && p.publie) syncInvites(p).catch(() => {}); } enregistrer(p); ongletInvites(p, true); } }
       });
     });
@@ -3429,7 +3442,9 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     $('#exp-xls').onclick = () => {
       if (!window.XLSX) return toast('Chargement de l\'outil Excel…');
       const lignes = fs.map(f => ({ Famille: f.nom, Catégorie: f.categorie || '', Places: f.places, Adultes: f.adultes, Enfants: f.enfants, Téléphone: f.telephone || '', Statut: f.statut === 'vient' ? 'Vient' : f.statut === 'non' ? 'Ne vient pas' : 'En attente', Table: f.table || '', Lien: lienFamille(p, f) }));
-      const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(lignes), 'Invités'); XLSX.writeFile(wb, (p.slug || 'invites') + '-invites.xlsx');
+      const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(lignes), 'Invités');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(tablesDe(p).flatMap(t => t.familles.length ? t.familles.map(f => ({ Table: t.nom, 'Places de la table': t.cap, Famille: f.nom, Personnes: personnesFamille(f) })) : [{ Table: t.nom, 'Places de la table': t.cap, Famille: '', Personnes: 0 }])), 'Tables');
+      XLSX.writeFile(wb, (p.slug || 'invites') + '-invites.xlsx');
     };
     $('#imp-xls').onchange = async e => {
       if (!window.XLSX) return toast('Chargement de l\'outil Excel…');
@@ -3454,23 +3469,54 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     if (cr) cr.onclick = () => chargerReponses(p);
   }
 
+  // Plan de tables : nombre de tables, places par table, noms des invités à chaque table
+  function personnesFamille(f) { return f.statut === 'vient' ? ((Number(f.adultes) || 0) + (Number(f.enfants) || 0)) : (Number(f.places) || ((Number(f.prevus_adultes) || 0) + (Number(f.prevus_enfants) || 0)) || 1); }
+  function tablesDe(p) {
+    const fs = (p.familles || []).filter(f => f.statut !== 'non');
+    const conf = p.plan_tables || {}, n = Math.max(0, Number(conf.n) || 0), places = Number(conf.places) || 10;
+    const noms = new Set(); for (let i = 1; i <= n; i++) noms.add(String(i));
+    fs.forEach(f => { const t = String(f.table || '').trim(); if (t) noms.add(t); });
+    return [...noms].sort((x, y) => x.localeCompare(y, 'fr', { numeric: true })).map(t => {
+      const l = fs.filter(f => String(f.table || '').trim() === t);
+      return { nom: t, familles: l, pers: l.reduce((s, f) => s + personnesFamille(f), 0), cap: Number((p.tables || {})[t]) || places };
+    });
+  }
   function planTables(p) {
-    const fs = p.familles || [];
-    const groupes = {};
-    fs.forEach(f => { const t = String(f.table || '').trim(); if (!t) return; (groupes[t] = groupes[t] || []).push(f); });
-    const noms = Object.keys(groupes).sort((a, b) => a.localeCompare(b, 'fr', { numeric: true }));
-    const sans = fs.filter(f => !String(f.table || '').trim() && f.statut !== 'non');
-    if (!noms.length) return `<div class="carte" style="margin-top:14px"><h3>Plan de tables</h3><p class="muet">Écrivez un numéro ou un nom de table dans la colonne « Table » : les tables apparaîtront ici avec leur remplissage.</p></div>`;
-    return `<div class="carte" style="margin-top:14px"><h3>Plan de tables</h3>
-      <div class="grille" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:8px">${noms.map(t => {
-        const l = groupes[t].filter(f => f.statut !== 'non');
-        const pers = l.reduce((s, f) => s + ((Number(f.adultes) || 0) + (Number(f.enfants) || 0) || Number(f.places) || 0), 0);
-        const cap = (p.tables || {})[t] || 10;
-        return `<div class="stat"><div class="ligne" style="justify-content:space-between"><b style="font-size:20px">Table ${esc(t)}</b><span class="badge ${pers > cap ? 'alerte' : 'ok'}">${pers} / ${cap}</span></div>
-          <div class="muet" style="margin:4px 0">${l.map(f => esc(f.nom)).join(', ') || '—'}</div>
-          <label class="champ">Capacité<input type="number" min="1" data-cap="${esc(t)}" value="${cap}" style="width:80px"></label></div>`;
-      }).join('')}</div>
+    const fs = (p.familles || []).filter(f => f.statut !== 'non');
+    const conf = p.plan_tables || {};
+    const ts = tablesDe(p), sans = fs.filter(f => !String(f.table || '').trim());
+    const tot = ts.reduce((s, t) => s + t.cap, 0), places = ts.reduce((s, t) => s + t.pers, 0);
+    return `<div class="carte" style="margin-top:14px" id="plan-tables"><div class="ligne" style="justify-content:space-between;flex-wrap:wrap"><h3 style="margin:0">🪑 Plan de tables</h3>
+        <div class="ligne" style="gap:8px;flex-wrap:wrap"><label class="champ" style="margin:0">Nombre de tables<input type="number" min="0" max="200" id="pt-n" value="${Number(conf.n) || ts.length || ''}" placeholder="ex. 12" style="width:90px"></label>
+        <label class="champ" style="margin:0">Personnes par table<input type="number" min="1" max="60" id="pt-places" value="${Number(conf.places) || 10}" style="width:90px"></label>
+        <button class="btn petit" id="pt-auto" title="Place les familles sans table là où il reste de la place">Placer automatiquement</button><button class="btn petit" id="pt-imprimer">🖨 Imprimer</button></div></div>
+      <div class="stats" style="margin-top:10px"><div class="stat"><b>${ts.length}</b><span>tables</span></div><div class="stat"><b>${tot}</b><span>places</span></div><div class="stat"><b>${places}</b><span>personnes placées</span></div><div class="stat"><b>${sans.reduce((s, f) => s + personnesFamille(f), 0)}</b><span>personnes sans table (${sans.length} familles)</span></div></div>
+      ${ts.length ? `<div class="grille" style="grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin-top:10px">${ts.map(t => `<div class="stat table-carte">
+          <div class="ligne" style="justify-content:space-between"><b style="font-size:19px">Table ${esc(t.nom)}</b><span class="badge ${t.pers > t.cap ? 'alerte' : t.pers === t.cap ? 'ok' : ''}">${t.pers} / ${t.cap} pers.</span></div>
+          <div class="pile" style="gap:3px;margin:6px 0">${t.familles.map(f => `<div class="ligne" style="justify-content:space-between;gap:6px;font-size:13px"><span>${esc(f.nom)} <span class="muet">(${personnesFamille(f)}${f.statut === 'vient' ? ' ✓' : ''})</span></span><button class="btn petit" data-pt-retirer="${esc(f.code || f.id)}" title="Retirer de cette table">✕</button></div>`).join('') || '<span class="muet">Table vide</span>'}</div>
+          ${sans.length ? `<select data-pt-ajout="${esc(t.nom)}"><option value="">+ Ajouter une famille…</option>${sans.map(f => `<option value="${esc(f.code || f.id)}">${esc(f.nom)} (${personnesFamille(f)})</option>`).join('')}</select>` : ''}
+          <label class="champ" style="margin-top:6px">Places à cette table<input type="number" min="1" data-cap="${esc(t.nom)}" value="${t.cap}" style="width:80px"></label></div>`).join('')}</div>`
+        : '<p class="muet">Indiquez le nombre de tables ci-dessus (ou écrivez une table dans la colonne « Table » de chaque famille).</p>'}
       ${sans.length ? `<p class="muet" style="margin-top:10px">Sans table : ${sans.map(f => esc(f.nom)).join(', ')}</p>` : ''}</div>`;
+  }
+  function lierPlanTables(p, relancer) {
+    const z = $('#plan-tables'); if (!z) return;
+    const fam = id => (p.familles || []).find(f => (f.code || f.id) === id);
+    const majConf = () => { p.plan_tables = { n: Number($('#pt-n').value) || 0, places: Number($('#pt-places').value) || 10 }; enregistrer(p); relancer(); };
+    $('#pt-n').onchange = majConf; $('#pt-places').onchange = majConf;
+    $$('[data-pt-ajout]', z).forEach(sel => sel.onchange = () => { const f = fam(sel.value); if (!f) return; f.table = sel.dataset.ptAjout; enregistrer(p); pousserFamille(p, f); relancer(); });
+    $$('[data-pt-retirer]', z).forEach(b => b.onclick = () => { const f = fam(b.dataset.ptRetirer); if (!f) return; f.table = ''; enregistrer(p); pousserFamille(p, f); relancer(); });
+    $('#pt-auto').onclick = () => {
+      const ts = tablesDe(p); if (!ts.length) return toast('Indiquez d\'abord le nombre de tables');
+      const sans = (p.familles || []).filter(f => f.statut !== 'non' && !String(f.table || '').trim()).sort((a, b) => personnesFamille(b) - personnesFamille(a));
+      let n = 0; sans.forEach(f => { const t = ts.find(x => x.cap - x.pers >= personnesFamille(f)); if (t) { f.table = t.nom; t.pers += personnesFamille(f); pousserFamille(p, f); n++; } });
+      enregistrer(p); toast(n + ' famille(s) placée(s)' + (n < sans.length ? ' · ' + (sans.length - n) + ' sans place : ajoutez des tables ou des places' : '')); relancer();
+    };
+    $('#pt-imprimer').onclick = () => {
+      const w = window.open('', '_blank'); if (!w) return toast('Autorisez les fenêtres pour imprimer');
+      w.document.write(`<!doctype html><meta charset="utf-8"><title>Plan de tables — ${esc(p.fiche.titre)}</title><style>body{font:14px Georgia,serif;margin:24px;color:#222}h1{font-size:22px}.g{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.t{border:1px solid #999;border-radius:8px;padding:10px;break-inside:avoid}.t b{font-size:17px}li{margin:2px 0}</style><h1>Plan de tables — ${esc(p.fiche.titre)}</h1><div class="g">${tablesDe(p).map(t => `<div class="t"><b>Table ${esc(t.nom)}</b> <small>(${t.pers} / ${t.cap})</small><ul>${t.familles.map(f => `<li>${esc(f.nom)} — ${personnesFamille(f)} pers.</li>`).join('')}</ul></div>`).join('')}</div><script>print()<\/script>`);
+      w.document.close();
+    };
   }
 
   async function chargerScript(src) { if ($$(`script[src="${src}"]`).length) return; return new Promise((ok, ko) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = ko; document.head.appendChild(s); }); }
@@ -3617,18 +3663,19 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <div class="lien-client">
             <b>1. Lien des invités</b> <span class="muet">— l'invitation : les invités la regardent et confirment</span>
             <div class="ligne"><input type="text" readonly value="${esc(lienGeneral(p))}" style="flex:1"><button class="btn petit" id="cp-gen" ${p.publie ? '' : 'disabled'}>Copier</button></div>
-            <div class="ligne"><a class="btn petit" target="_blank" href="https://wa.me/?text=${encodeURIComponent(lienGeneral(p))}">Partager sur WhatsApp</a><a class="btn petit" target="_blank" href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(lienGeneral(p))}">Partager sur Facebook</a><a class="btn petit" href="#/p/${p.id}/invites">Liens personnels par famille →</a></div>
+            <div class="ligne"><button class="btn petit plein" data-partage="gen">📤 Partager (WhatsApp, Facebook, Messenger, Instagram…)</button><a class="btn petit" href="#/p/${p.id}/invites">Liens personnels par famille →</a></div>
           </div>
           <div class="lien-client">
             <b>2. Lien organisateur</b> <span class="muet">— privé : le client ajoute ses invités et voit qui vient, combien</span>
             ${!reglages.supabase ? `<p class="muet" style="margin:0">Activez d'abord la <a href="#/reglages">base des invités</a> (Réglages, une seule fois), puis publiez.</p>`
               : !p.cle_hote || !p.publie ? `<p class="muet" style="margin:0">Il apparaîtra ici dès que vous aurez publié.</p>`
               : `<div class="ligne"><input type="text" readonly value="${esc(lienHote(p))}" style="flex:1"><button class="btn petit" id="cp-hote">Copier</button><a class="btn petit" target="_blank" href="${esc(lienHote(p))}">Ouvrir</a></div>
-                <div class="ligne"><a class="btn petit" target="_blank" href="https://wa.me/?text=${encodeURIComponent((p.fiche.langue === 'mg' ? 'Ity ny rohy hitantananao ny vahiny (aza zaraina): ' : 'Voici votre lien pour gérer vos invités (à garder pour vous) : ') + lienHote(p))}">Envoyer au client sur WhatsApp</a></div>`}
+                <div class="ligne"><a class="btn petit" target="_blank" href="https://wa.me/?text=${encodeURIComponent((p.fiche.langue === 'mg' ? 'Ity ny rohy hitantananao ny vahiny (aza zaraina): ' : 'Voici votre lien pour gérer vos invités (à garder pour vous) : ') + lienHote(p))}">Envoyer au client sur WhatsApp</a><button class="btn petit" data-partage="hote">📤 Autre (Messenger, SMS, e-mail…)</button></div>`}
           </div>
           ${p.publie ? '' : '<div class="alerte-boite">Tant que l\'invitation n\'est pas publiée, ces liens affichent « Invitation introuvable ».</div>'}
           ${p.fiche.date_limite && Date.now() > Date.parse(p.fiche.date_limite + 'T23:59:59+03:00') ? `<div class="alerte-boite"><b>Date limite des réponses dépassée</b> (${esc(MoteurInfo.dateLisible(p.fiche.date_limite, 'fr'))}) : les invités ne peuvent plus confirmer, l'invitation affiche « réponses closes ». Pour rouvrir, changez la date limite dans l'onglet <a href="#/p/${p.id}/fiche">Fiche</a>, puis republiez.</div>` : ''}
         </div>
+        ${!pret && Equipe.actif() ? '<div class="carte pile" id="carte-demande"></div>' : ''}
         <div class="carte pile"><h3>Publier en ligne</h3>
           ${pret ? `<p class="muet">Dépôt : <b>${esc(g.owner)}/${esc(g.repo)}</b>. La publication envoie l'invitation${fichiersIdb.length ? ` et ${fichiersIdb.length} fichier(s) importé(s)` : ''} sur GitHub Pages (1 à 10 minutes avant d'être visible).</p>
             <div class="carte pile" style="padding:10px;background:#fbf7f1;margin:0">
@@ -3647,6 +3694,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <button class="btn" id="tele-projet">Sauvegarder le projet complet (.json)</button>
         </div>
       </div></div>`;
+    carteDemande(p, $('#carte-demande'));
+    $$('[data-partage]').forEach(b => b.onclick = () => b.dataset.partage === 'gen' ? Base.partager(b, lienGeneral(p), p.fiche.titre || '') : Base.partager(b, lienHote(p), p.fiche.langue === 'mg' ? 'Ity ny rohy hitantananao ny vahiny (aza zaraina):' : 'Votre lien pour gérer vos invités (à garder pour vous) :'));
     $('#ap-gen').onclick = () => { Stock.ecrire('studio.apercu', publication(p, true)); window.open('../i/?apercu=1', '_blank'); };
     $('#ap-fam').onclick = () => { Stock.ecrire('studio.apercu', publication(p, true)); window.open('../i/?apercu=1&test=1', '_blank'); };
     $('#cp-gen').onclick = () => copier(lienGeneral(p));
@@ -4396,6 +4445,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     try { const r = await fetch(urlSite() + 'vitrine/index.json?v=' + Date.now(), { cache: 'no-store' }); if (r.ok) surSite = new Set((await r.json()).map(x => x.slug)); } catch (e) {}
     if (horsLigne && !films.length) { zone.textContent = 'Impossible de lire les vidéos de l\'équipe : ' + horsLigne; return; }
     const pub = f => surSite.has('film-' + f.id);
+    const demandesFilms = {}; try { (await mesDemandes()).filter(d => d.type === 'film').forEach(d => { if (!demandesFilms[d.objet] || d.statut === 'attente') demandesFilms[d.objet] = d.statut; }); } catch (e) {}
     const g = reglages.github || {}, peutPublier = !!(g.owner && g.repo && g.token);
     const membres = [...new Set(tout.map(x => x.auteur || '—'))].sort();
     const base = vpFiltre.type === 'fond' ? fondsEq : vpFiltre.type === 'tout' ? tout : films;
@@ -4407,7 +4457,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       ${aPartager ? `<div class="carte ligne" style="padding:10px 12px;margin-bottom:10px;background:#fbf4ec;justify-content:space-between"><span><b>${aPartager}</b> de vos vidéos / fonds ne sont pas encore visibles par l'équipe.</span><button class="btn petit plein" id="vp-rattraper">Les partager maintenant</button></div>` : ''}
       <div class="stats"><div class="stat"><b>${films.length}</b><span>films terminés</span></div><div class="stat"><b>${fondsEq.length}</b><span>fonds vidéo partagés</span></div><div class="stat"><b>${nPub}</b><span>sur le site</span></div><div class="stat"><b>${films.length - nPub}</b><span>pas encore publiés</span></div><div class="stat"><b>${membres.length}</b><span>membres</span></div></div>
       ${horsLigne ? `<div class="carte" style="padding:10px 12px;margin-top:10px;background:#fdecec">Serveur de l'équipe injoignable (${esc(horsLigne)}) : dernière liste connue. Les vidéos se liront et se publieront de nouveau quand il répondra.</div>` : ''}
-      ${peutPublier ? '' : '<div class="carte" style="padding:10px 12px;margin-top:10px;background:#fbf4ec">La publication sur le site se fait depuis le studio relié à GitHub (Réglages → GitHub), en général celui de l\'admin. Vous pouvez quand même regarder et télécharger toutes les vidéos.</div>'}
+      ${peutPublier ? '' : '<div class="carte" style="padding:10px 12px;margin-top:10px;background:#fbf4ec">Pour mettre un film sur le site : « Demander la publication » — l\'admin valide et il est publié. Vous pouvez regarder et télécharger toutes les vidéos de l\'équipe.</div>'}
       <div class="ligne" style="margin:14px 0 10px;gap:6px;flex-wrap:wrap">
         ${[['tout', 'Toutes', films.length], ['non', 'Pas encore sur le site', films.length - nPub], ['oui', 'Sur le site', nPub]].map(([k, n, c]) => `<button class="btn petit ${vpFiltre.etat === k ? 'plein' : ''}" data-vpf="${k}">${n} (${c})</button>`).join('')}
         <select id="vp-membre"><option value="">Tous les membres</option>${membres.map(m => `<option ${vpFiltre.membre === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select>
@@ -4417,11 +4467,15 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <video src="${esc(u)}" poster="${esc(f.vignette || '')}" controls preload="none" playsinline style="width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:8px;background:#000"></video>
         <div class="ligne" style="justify-content:space-between">${!estFilm ? '<span class="badge">🎞 fond vidéo</span>' : sv ? '<span class="badge ok">✓ sur le site</span>' : '<span class="badge">pas encore publié</span>'}${peutPublier && estFilm && !sv ? `<input type="checkbox" data-vp-sel="${esc(f.id)}" title="Sélectionner">` : ''}</div>
         <b style="font-size:13px">${esc((f.evenement || f.nom || '').replace(/^Film — /, ''))}</b><div class="muet" style="font-size:12px">par <b>${esc(f.auteur || '—')}</b> · ${date(f.cree)}${f.duree ? ' · ' + Math.round(f.duree) + ' s' : ''}</div>
-        <div class="ligne"><a class="btn petit" href="${esc(u)}" download target="_blank">Télécharger</a>${!estFilm ? '<a class="btn petit" href="#/bibliotheque">Dans la bibliothèque</a>' : peutPublier ? (sv ? `<button class="btn petit danger" data-vp-retirer="${esc(f.id)}">Retirer du site</button>` : `<button class="btn petit plein" data-vp-pub="${esc(f.id)}">Publier sur le site</button>`) : ''}</div></div>`; }).join('') || '<p class="muet">Aucune vidéo ici. Les films fabriqués par l\'équipe arrivent tout seuls ; on peut aussi en ajouter avec « + Ajouter un film terminé ».</p>'}</div>`;
+        <div class="ligne"><a class="btn petit" href="${esc(u)}" download target="_blank">Télécharger</a>${!estFilm ? '<a class="btn petit" href="#/bibliotheque">Dans la bibliothèque</a>' : !peutPublier ? (sv ? '' : demandesFilms[f.id] ? `<span class="badge">${demandesFilms[f.id] === 'attente' ? '⏳ demandé' : demandesFilms[f.id] === 'refusee' ? 'refusé' : ''}</span>` : `<button class="btn petit plein" data-vp-demander="${esc(f.id)}">Demander la publication</button>`) : peutPublier ? (sv ? `<button class="btn petit danger" data-vp-retirer="${esc(f.id)}">Retirer du site</button>` : `<button class="btn petit plein" data-vp-pub="${esc(f.id)}">Publier sur le site</button>`) : ''}</div></div>`; }).join('') || '<p class="muet">Aucune vidéo ici. Les films fabriqués par l\'équipe arrivent tout seuls ; on peut aussi en ajouter avec « + Ajouter un film terminé ».</p>'}</div>`;
     $$('[data-vpf]', zone).forEach(b => b.onclick = () => { vpFiltre.etat = b.dataset.vpf; Stock.ecrire('studio.vp.filtre', vpFiltre); vueVideos(); });
     $$('[data-vpt]', zone).forEach(b => b.onclick = () => { vpFiltre.type = b.dataset.vpt; Stock.ecrire('studio.vp.filtre', vpFiltre); vueVideos(); });
     const vr = $('#vp-rattraper', zone); if (vr) vr.onclick = async () => { vr.disabled = true; vr.textContent = 'Partage en cours…'; await Equipe.rattraper(); vueVideos(); };
     $('#vp-membre', zone).onchange = e => { vpFiltre.membre = e.target.value; Stock.ecrire('studio.vp.filtre', vpFiltre); vueVideos(); };
+    $$('[data-vp-demander]', zone).forEach(b => b.onclick = async () => {
+      const f = films.find(x => x.id === b.dataset.vpDemander); b.disabled = true;
+      try { await demanderPublication('film', f.id, (f.evenement || f.nom || '').replace(/^Film — /, '')); toast('Demande envoyée à l\'admin'); vueVideos(); } catch (e) { toast(e.message); b.disabled = false; }
+    });
     if (!peutPublier) return;
     const etat = $('#vp-etat', zone);
     const publierListe = async liste => {
@@ -4446,6 +4500,78 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     });
   }
 
+  /* ---------- Publication par les membres : demande → l'admin valide → publiée ---------- */
+  const DATE_C = x => x ? new Date(x).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
+  async function mesDemandes() { try { return await Equipe.rpc('equipe_pub_liste', { p_membre: Equipe.membre() }) || []; } catch (e) { if (/function|schema cache|Could not find/i.test(e.message)) throw new Error('Mise à jour de la base à installer : Réglages → « Mise à jour publication par les membres »'); throw e; } }
+  async function demanderPublication(type, objet, titre) { return Equipe.rpc('equipe_pub_demander', { p_membre: Equipe.membre(), p_type: type, p_objet: objet, p_titre: titre || '' }); }
+  // l'admin : liste des demandes, valider = publier depuis ce studio
+  async function rendreDemandes(zone) {
+    if (!zone || !Equipe.admin()) return;
+    let l = [];
+    try { l = await mesDemandes(); } catch (e) { zone.innerHTML = `<div class="carte" style="padding:10px 12px;margin-bottom:12px;background:#fbf4ec">📥 Demandes de publication : ${esc(e.message)}</div>`; return; }
+    const att = l.filter(d => d.statut === 'attente');
+    majBadgeDemandes(att.length);
+    zone.innerHTML = `<div class="carte" style="padding:10px;margin-bottom:14px;${att.length ? 'border-color:var(--vin)' : ''}"><h3 style="margin:4px 6px 10px">📥 Demandes de publication des membres <span class="badge ${att.length ? 'alerte' : ''}">${att.length} à valider</span></h3>
+      <div class="tableau-boite"><table class="tableau"><thead><tr><th>Date</th><th>Membre</th><th>Quoi</th><th>Titre</th><th>Statut</th><th></th></tr></thead><tbody>
+      ${l.slice(0, 60).map(d => `<tr><td>${DATE_C(d.cree)}</td><td><b>${esc(d.membre || '—')}</b></td><td>${d.type === 'film' ? '🎬 Film (site)' : '💌 Invitation'}</td><td>${esc(d.titre || d.objet)}</td>
+        <td>${d.statut === 'attente' ? '<span class="badge alerte">à valider</span>' : d.statut === 'publiee' ? '<span class="badge ok">publiée ' + DATE_C(d.maj) + '</span>' : '<span class="badge">refusée</span>' + (d.message ? ' <span class="muet">' + esc(d.message) + '</span>' : '')}</td>
+        <td class="ligne" style="flex-wrap:nowrap">${d.type === 'invitation' ? `<button class="btn petit" data-dm-voir="${esc(d.objet)}">Voir</button>` : ''}${d.statut !== 'publiee' ? `<button class="btn petit plein" data-dm-ok="${d.id}">✓ Valider et publier</button>` : `<button class="btn petit" data-dm-ok="${d.id}">Republier</button>`}${d.statut === 'attente' ? `<button class="btn petit danger" data-dm-non="${d.id}">Refuser</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="muet" style="padding:12px">Aucune demande pour l\'instant. Les membres sans publication GitHub envoient leurs invitations et leurs films ici.</td></tr>'}
+      </tbody></table></div><div class="muet" id="dm-etat" style="margin:6px"></div></div>`;
+    const etat = $('#dm-etat', zone);
+    $$('[data-dm-voir]', zone).forEach(b => b.onclick = async () => {
+      try { const pr = await Equipe.rpc('equipe_projet', { p_projet: b.dataset.dmVoir }); if (!pr) return toast('Invitation introuvable en ligne'); Stock.ecrire('studio.apercu', publication(pr, true)); window.open('../i/?apercu=1', '_blank'); } catch (e) { toast(e.message); }
+    });
+    $$('[data-dm-non]', zone).forEach(b => b.onclick = async () => {
+      const m = prompt('Pourquoi ? (le membre verra ce message)', ''); if (m === null) return;
+      try { await Equipe.rpc('equipe_pub_maj', { p_id: Number(b.dataset.dmNon), p_statut: 'refusee', p_message: m, p_resultat: null }); toast('Demande refusée'); rendreDemandes(zone); } catch (e) { toast(e.message); }
+    });
+    $$('[data-dm-ok]', zone).forEach(b => b.onclick = async () => {
+      const d = l.find(x => String(x.id) === b.dataset.dmOk); if (!d) return;
+      const g = reglages.github || {}; if (!(g.owner && g.repo && g.token)) return toast('Reliez d\'abord GitHub dans Réglages (c\'est lui qui publie)');
+      b.disabled = true;
+      try {
+        let resultat = {};
+        if (d.type === 'film') {
+          await Equipe.charger().catch(() => {}); const f = Equipe.items.find(x => x.id === d.objet); if (!f) throw new Error('vidéo introuvable dans l\'équipe');
+          etat.textContent = 'Publication du film sur le site…'; await publierFilmVitrine(f); resultat = { date: new Date().toISOString() };
+        } else {
+          etat.textContent = 'Lecture de l\'invitation du membre…';
+          const pr = await Equipe.rpc('equipe_projet', { p_projet: d.objet }); if (!pr) throw new Error('invitation introuvable en ligne (le membre doit la renvoyer)');
+          const ici = projets[pr.id]; if (ici && ici.cle_hote) pr.cle_hote = ici.cle_hote;
+          await publierProjet(pr, {}, x => { etat.textContent = x; });
+          pr.publie = new Date().toISOString(); pr.de_membre = d.membre;
+          if (!ici) { projets[pr.id] = pr; sauverProjets(); }
+          resultat = { cle_hote: pr.cle_hote, slug: pr.slug, date: pr.publie };
+        }
+        await Equipe.rpc('equipe_pub_maj', { p_id: d.id, p_statut: 'publiee', p_message: '', p_resultat: resultat });
+        etat.textContent = ''; toast('Publié ✓ (visible dans quelques minutes) — ' + (d.membre || 'le membre') + ' verra les liens dans son studio'); rendreDemandes(zone);
+      } catch (e) { etat.textContent = 'Échec : ' + e.message; b.disabled = false; }
+    });
+  }
+  function majBadgeDemandes(n) { const a = $('.barre nav a[data-nav="equipe"]'); if (a) { if (n) a.setAttribute('data-n', n); else a.removeAttribute('data-n'); } }
+  if (Equipe.admin()) setTimeout(() => mesDemandes().then(l => majBadgeDemandes(l.filter(d => d.statut === 'attente').length)).catch(() => {}), 9000);
+  // le membre : carte « Publication par l'admin » dans Film et publication
+  async function carteDemande(p, zone) {
+    if (!zone) return;
+    const rendre = async () => {
+      let d = null, err = '';
+      try { d = (await mesDemandes()).find(x => x.type === 'invitation' && x.objet === p.id) || null; } catch (e) { err = e.message; }
+      if (d && d.statut === 'publiee' && d.resultat && d.resultat.cle_hote && (p.cle_hote !== d.resultat.cle_hote || !p.publie)) {
+        p.cle_hote = d.resultat.cle_hote; p.publie = d.resultat.date || new Date().toISOString(); if (d.resultat.slug) p.slug = d.resultat.slug; enregistrer(p);
+        toast('Votre invitation a été publiée par l\'admin ✓'); return ongletPublier(p);
+      }
+      zone.innerHTML = `<h3>📤 Publication par l'admin</h3>
+        <p class="muet">La publication n'est pas reliée sur cet ordinateur : envoyez l'invitation à l'admin de l'équipe. Dès qu'il la valide, elle est publiée et les liens (invités, organisateur) apparaissent ici.</p>
+        ${err ? `<div class="alerte-boite">${esc(err)}</div>` : !d ? '' : d.statut === 'attente' ? `<div class="alerte-boite" style="background:#eef3fb;border-color:#c9d6ea;color:#33445c">⏳ Demande envoyée le ${DATE_C(d.maj || d.cree)} — en attente de validation.</div>` : d.statut === 'publiee' ? `<div class="alerte-boite" style="background:#eef7ee;border-color:#bfe0bf;color:#245a24">✓ Publiée par l'admin le ${DATE_C(d.maj)}. Après une modification, redemandez la publication.</div>` : `<div class="alerte-boite">✗ Refusée${d.message ? ' : ' + esc(d.message) : ''}. Corrigez puis redemandez.</div>`}
+        <div class="ligne"><button class="btn plein" id="dp-envoyer">${d && d.statut === 'attente' ? 'Renvoyer la dernière version' : 'Demander la publication'}</button><span class="muet" id="dp-etat"></span></div>`;
+      $('#dp-envoyer', zone).onclick = async e => {
+        const b = e.target; b.disabled = true; $('#dp-etat', zone).textContent = 'Envoi de l\'invitation et de ses fichiers à l\'équipe…';
+        try { await Equipe.envoyerTravail(p); await demanderPublication('invitation', p.id, p.fiche.titre); toast('Demande envoyée à l\'admin'); rendre(); }
+        catch (er) { $('#dp-etat', zone).textContent = 'Échec : ' + er.message; b.disabled = false; }
+      };
+    };
+    rendre();
+  }
   async function vueEquipe() {
     if (!Equipe.actif()) { $('#app').innerHTML = `<div class="entete"><div><h1>Équipe</h1><p>Travaillez à plusieurs : bibliothèque de fonds commune, et l'admin voit le travail de chacun.</p></div></div><div class="carte pile" style="max-width:640px"><p>Vous n'êtes dans aucune équipe. Ouvrez le lien d'équipe reçu, ou créez l'équipe dans <a href="#/reglages">Réglages</a> (vous en serez l'admin).</p></div>`; return; }
     const e = reglages.equipe;
@@ -4476,7 +4602,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       const parType = {}; d.creations.forEach(c => { const t = parType[c.type] = parType[c.type] || { n: 0, s: 0 }; t.n++; t.s += Number(c.secondes) || 0; });
       const NOMS = { wan: 'Fond Wan 2.2', animer: 'Image animée', recolorer: 'Recoloration', film: 'Film MP4' };
       const date = x => x ? new Date(x).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
-      $('#eq-vue').innerHTML = `
+      $('#eq-vue').innerHTML = `<div id="eq-demandes"></div>
         <div class="stats"><div class="stat"><b>${Object.keys(membres).length}</b><span>membres actifs</span></div><div class="stat"><b>${d.travaux.length}</b><span>invitations (modèles)</span></div>
           <div class="stat"><b>${d.creations.length}</b><span>vidéos fabriquées</span></div><div class="stat"><b>${d.biblio}</b><span>fichiers dans la bibliothèque commune</span></div>
           ${Object.entries(parType).map(([k, t]) => `<div class="stat"><b>${dureeTexte(t.s / t.n)}</b><span>en moyenne par ${esc(NOMS[k] || k)} (${t.n})</span></div>`).join('')}</div>
@@ -4498,6 +4624,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <div class="ligne"><input type="text" readonly value="${esc(lienEquipe(e.cle_admin))}" style="flex:1"><button class="btn petit" id="eq-cpa">Copier</button></div></div></div>`;
       $('#eq-cp').onclick = () => copier(lienEquipe(e.cle)); $('#eq-cpa').onclick = () => copier(lienEquipe(e.cle_admin));
       modelesEtFilms($('#eq-films'), true, true);
+      rendreDemandes($('#eq-demandes'));
       const githubPret = () => { const g = reglages.github || {}; if (g.owner && g.repo && g.token) return true; toast('Reliez d\'abord GitHub dans Réglages (pour publier sur le site)'); return false; };
       $$('[data-vitrine]').forEach(b => b.onclick = () => {
         if (!githubPret()) return;
@@ -4593,7 +4720,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
             <li>Dans le projet : <b>SQL Editor</b> → <b>New query</b> → collez le script (bouton ci-dessous) → <b>Run</b>.</li>
             <li><b>Project Settings → API</b> (ou <b>Connect</b>) : copiez la <b>Project URL</b> et la clé <b>anon public</b> (ou « publishable ») dans les deux champs ci-dessus, puis Enregistrer et Tester.</li>
             <li>Republiez vos invitations : le lien organisateur apparaît dans l'onglet Film et publication.</li></ol>
-            <button class="btn petit" id="sb-sql">Copier le script SQL</button> <button class="btn petit" id="sb-sql2" title="Adultes et enfants invités séparément, par famille">Mise à jour adultes / enfants</button> <button class="btn petit" id="sb-sql3" title="Chaque membre peut récupérer ses invitations depuis la copie en ligne">Mise à jour sauvegarde en ligne</button>
+            <button class="btn petit" id="sb-sql">Copier le script SQL</button> <button class="btn petit" id="sb-sql2" title="Adultes et enfants invités séparément, par famille">Mise à jour adultes / enfants</button> <button class="btn petit" id="sb-sql3" title="Chaque membre peut récupérer ses invitations depuis la copie en ligne">Mise à jour sauvegarde en ligne</button> <button class="btn petit" id="sb-sql4" title="Les membres demandent la publication, l'admin valide">Mise à jour publication par les membres</button>
             <p class="muet">La formule gratuite se met en pause après 7 jours sans aucune visite ; une invitation en cours reçoit des visites, sinon réactivez-la d'un clic dans Supabase.</p></details>
         </div>
         <div class="carte pile"><h3>Réponses des invités (Firebase, facultatif)</h3>
@@ -4657,6 +4784,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         reglages.equipe = { id: r.id, nom: r.nom, cle: r.cle, cle_admin: r.cle_admin, membre: nom, auto: true }; sauverReglages(); toast('Équipe créée : envoyez le lien d\'équipe à vos membres'); location.hash = '#/equipe'; }
       catch (e) { toast(/function|schema cache|Could not find/i.test(e.message) ? 'Installez d\'abord le script SQL de l\'équipe dans Supabase' : e.message); }
     };
+    const sbs4 = $('#sb-sql4'); if (sbs4) sbs4.onclick = async () => { try { copier(await (await fetch('../outils/publications.sql?v=' + Date.now())).text()); toast('Script copié : Supabase → SQL Editor → coller → Run'); } catch (e) { toast(e.message); } };
     const sbs3 = $('#sb-sql3'); if (sbs3) sbs3.onclick = async () => { try { copier(await (await fetch('../outils/sauvegarde.sql?v=' + Date.now())).text()); toast('Script copié : Supabase → SQL Editor → coller → Run'); } catch (e) { toast('Script introuvable'); } };
     const sbs2 = $('#sb-sql2'); if (sbs2) sbs2.onclick = async () => { try { copier(await (await fetch('../outils/invites-2.sql?v=' + Date.now())).text()); toast('Script copié : Supabase → SQL Editor → coller → Run'); } catch (e) { toast('Script introuvable'); } };
     const eqs2 = $('#eq-sql2'); if (eqs2) eqs2.onclick = async () => { try { copier(await (await fetch('../outils/equipe-2.sql?v=' + Date.now())).text()); toast('Script copié : Supabase → SQL Editor → coller → Run'); } catch (e) { toast('Script introuvable'); } };
