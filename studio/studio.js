@@ -638,6 +638,12 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-10-5', date: '10 novembre 2026', titre: 'Plus d\'outils, boutons personnalisables, côtés fixes', points: [
+      '<b>Outils (colonne de gauche)</b> : ↖ sélection (V), ✋ main (H ou Espace maintenu, quand on a zoomé), T texte, ▭ rectangle, ◯ ellipse, ╱ ligne, ★ autres formes, photo, illustration, emoji, bouton, compteur, ⬚ rogner, 💧 pipette (I), ⇋ ⇵ miroirs, 🔒 verrouiller, 👁 masquer, ⧉ dupliquer, 🗑 supprimer, ▦ fond, 📏 règles, ? raccourcis, ↶ ↷, zoom.',
+      '<b>Boutons personnalisables</b> (panneau « 🎨 Apparence du bouton ») : forme pilule / arrondi / carré, couleur du fond, du texte et du contour, épaisseur, hauteur, ombre, icône devant le texte (📍 ✅ 📞 💬…), « Couleurs d\'origine ». Aussi dans le film téléchargé.',
+      '<b>Opacité, miroir, verrouillage</b> pour chaque calque (panneau Position).',
+      '<b>Gauche et droite fixes</b> : seule la partie centrale (l\'aperçu) défile ; les plans et les panneaux défilent chacun dans leur colonne.'
+    ] },
     { id: '2026-11-10-4', date: '10 novembre 2026', titre: 'Éditeur disposé comme Photoshop, aux couleurs du studio', points: [
       '<b>En haut</b> : la barre d\'options du calque choisi, sur toute la largeur. <b>À gauche</b> : la colonne d\'outils. <b>Au centre</b> : l\'aperçu.',
       '<b>À droite</b> : la liste des panneaux (icône + nom : Fond, Durée, Texte, Animation, Ordre, Position…) ; on clique un nom pour ouvrir ce panneau seul. <b>Calques</b> reste toujours en bas, comme dans Photoshop.',
@@ -1164,10 +1170,17 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     $('#onglet').innerHTML = `<div class="editeur ps">
         <div class="barre-sel" id="barre-sel"></div>
           <div class="outils" id="outils">
-            <button data-outil="texte" title="Texte">T</button><button data-outil="forme" title="Forme (rectangle, rond, cœur…)">▭</button><button data-outil="photo" title="Photo / vidéo">🖼</button>
-            <button data-outil="illu" title="Illustration">✿</button><button data-outil="emoji" title="Emoji">😊</button><button data-outil="bouton" title="Bouton">⏺</button><button data-outil="compteur" title="Compteur">±</button>
-            <span class="sep"></span><button data-outil="fond" title="Fond du plan">▦</button>
-            <span class="sep"></span><button data-outil="zoom+" title="Zoom avant (Ctrl +)">＋</button><button data-outil="zoom0" title="Ajuster à l'écran (Ctrl 0)" id="zoom-val">100%</button><button data-outil="zoom-" title="Zoom arrière (Ctrl −)">－</button>
+            <button data-outil="select" class="on" title="Sélection / déplacer (V)">↖</button><button data-outil="main" title="Main : faire glisser la vue quand on a zoomé (H, ou maintenir Espace)">✋</button>
+            <span class="sep"></span>
+            <button data-outil="texte" title="Texte (T)">T</button><button data-outil="rect" title="Rectangle (U)">▭</button><button data-outil="ellipse" title="Ellipse / rond">◯</button><button data-outil="ligne" title="Ligne">╱</button><button data-outil="forme" title="Autres formes : cœur, étoile, arche…">★</button>
+            <button data-outil="photo" title="Photo / vidéo">🖼</button><button data-outil="illu" title="Illustration">✿</button><button data-outil="emoji" title="Emoji">😊</button><button data-outil="bouton" title="Bouton">⏺</button><button data-outil="compteur" title="Compteur (adultes / enfants)">±</button>
+            <span class="sep"></span>
+            <button data-outil="rogner" title="Rogner la photo ou le fond (C)">⬚</button><button data-outil="pipette" title="Pipette : prendre une couleur à l'écran (I)">💧</button><button data-outil="miroir" title="Miroir horizontal">⇋</button><button data-outil="miroir-v" title="Miroir vertical">⇵</button>
+            <button data-outil="verrou" title="Verrouiller / déverrouiller le calque">🔒</button><button data-outil="masquer" title="Masquer / afficher le calque">👁</button><button data-outil="dupliquer" title="Dupliquer (Ctrl+D)">⧉</button><button data-outil="supprimer" title="Supprimer (Suppr)">🗑</button>
+            <span class="sep"></span>
+            <button data-outil="fond" title="Fond du plan">▦</button><button data-outil="regles" title="Règles et repères">📏</button><button data-outil="aide" title="Raccourcis clavier">?</button><button data-outil="annuler" title="Annuler (Ctrl+Z)">↶</button><button data-outil="refaire" title="Rétablir (Ctrl+Maj+Z)">↷</button>
+            <span class="sep"></span>
+            <button data-outil="zoom+" title="Zoom avant (Ctrl +)">＋</button><button data-outil="zoom0" title="Ajuster à l'écran (Ctrl 0)" id="zoom-val">100%</button><button data-outil="zoom-" title="Zoom arrière (Ctrl −)">－</button>
           </div>
         <div class="col-plans" id="col-plans"></div>
         <div class="col-apercu">
@@ -1176,7 +1189,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <div class="cadre-regles" id="cadre-regles"><canvas class="regle regle-h" id="regle-h"></canvas><canvas class="regle regle-v" id="regle-v"></canvas><span class="regle-coin" title="Règles"></span>
           <div class="apercu-cadre" id="cadre" tabindex="0"><div id="scene"></div><div class="poignees" id="poignees"></div><div class="aimants" id="aimants"></div></div></div>
           </div></div>
-          <div class="astuce">Maj+clic ou cadre de sélection : choisir plusieurs éléments · Double-clic : écrire dans le texte · Coins : agrandir · Côtés : élargir · Ctrl+C / Ctrl+V : copier-coller (aussi entre plans) · Ctrl+Alt+C / Ctrl+Alt+V : copier-coller la mise en forme · 🖌 : pinceau · Ctrl+D : dupliquer · Suppr : supprimer · Flèches : déplacer · Clic droit : menu</div>
+          <div class="astuce" hidden>Maj+clic ou cadre de sélection : choisir plusieurs éléments · Double-clic : écrire dans le texte · Coins : agrandir · Côtés : élargir · Ctrl+C / Ctrl+V : copier-coller (aussi entre plans) · Ctrl+Alt+C / Ctrl+Alt+V : copier-coller la mise en forme · 🖌 : pinceau · Ctrl+D : dupliquer · Suppr : supprimer · Flèches : déplacer · Clic droit : menu</div>
           <div class="temps"><span id="t-aff">0,0 s</span><input type="range" id="t-curseur" min="0" max="6" step="0.05" value="0"><span id="t-dur"></span></div>
           <div class="commandes">
             <button class="btn petit" id="jouer-plan">▶ Plan</button><button class="btn petit" id="jouer-tout">▶ Toute l'invitation</button><button class="btn petit" id="pause" title="Pause / reprendre (barre d'espace)" disabled>⏸ Pause</button><button class="btn petit" id="stop">■</button>
@@ -1202,9 +1215,48 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       requestAnimationFrame(() => { window.dispatchEvent(new Event('resize')); if (E.rafraichir) E.rafraichir(); });
     };
     $('#zone-zoom').addEventListener('wheel', e => { if (!(e.ctrlKey || e.metaKey)) return; e.preventDefault(); E.zoomer(e.deltaY < 0 ? 1.1 : 1 / 1.1); }, { passive: false });
+    // gauche et droite fixes, seul le centre défile : l'éditeur prend la hauteur de l'écran
+    const ajusterHauteur = () => { const ed = $('.editeur.ps'); if (!ed) return; const haut = ed.getBoundingClientRect().top + window.scrollY; ed.style.setProperty('--h-ed', Math.max(520, window.innerHeight - haut - 12) + 'px'); };
+    ajusterHauteur(); ecouter(window, 'resize', ajusterHauteur); setTimeout(ajusterHauteur, 300);
+    // outil actif (sélection / main), comme Photoshop
+    E.outil = 'select';
+    const choisirOutil = o => { E.outil = o; $$('#outils [data-outil="select"], #outils [data-outil="main"]').forEach(x => x.classList.toggle('on', x.dataset.outil === o)); $('#zone-zoom').classList.toggle('outil-main', o === 'main'); };
+    // Main : faire glisser la vue (outil ✋ ou Espace maintenu)
+    let espace = false;
+    ecouter(document, 'keydown', e => { if (e.code === 'Space' && !e.repeat && !/^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || '') && !(document.activeElement || {}).isContentEditable && $('#zone-zoom') && $('#zone-zoom').classList.contains('zoome')) { espace = true; $('#zone-zoom').classList.add('outil-main'); e.preventDefault(); } });
+    ecouter(document, 'keyup', e => { if (e.code === 'Space' && espace) { espace = false; if (E.outil !== 'main') $('#zone-zoom').classList.remove('outil-main'); } });
+    $('#zone-zoom').addEventListener('pointerdown', e => {
+      if (E.outil !== 'main' && !espace) return;
+      e.stopPropagation(); e.preventDefault();
+      const zz = $('#zone-zoom'), x0 = e.clientX, y0 = e.clientY, l0 = zz.scrollLeft, t0 = zz.scrollTop;
+      const bouger = ev => { zz.scrollLeft = l0 - (ev.clientX - x0); zz.scrollTop = t0 - (ev.clientY - y0); };
+      const fin = () => { window.removeEventListener('pointermove', bouger); window.removeEventListener('pointerup', fin); };
+      window.addEventListener('pointermove', bouger); window.addEventListener('pointerup', fin);
+    }, true);
+    const avecCalque = f => { const c = (plan().calques || []).find(x => x.id === E.sel); if (!c) return toast('Choisissez d\'abord un calque (cliquez-le sur l\'aperçu)'); f(c); };
     $$('#outils [data-outil]').forEach(b => b.onclick = () => {
       const o = b.dataset.outil;
       if (o === 'zoom+') return E.zoomer(1.25); if (o === 'zoom-') return E.zoomer(0.8); if (o === 'zoom0') return E.zoomer(0);
+      if (o === 'select' || o === 'main') return choisirOutil(o);
+      if (o === 'rect' || o === 'ellipse') return E.ajouterCalque('forme', o === 'rect' ? 'rect' : 'rond');
+      if (o === 'ligne') { E.ajouterCalque('forme', 'rect'); const c = (plan().calques || []).find(x => x.id === E.sel); if (c) { c.hauteur = 0.5; c.largeur = 50; E.rafraichir(); E.rendreReglages(); } return; }
+      if (o === 'annuler' || o === 'refaire') { const x = $('#' + o); if (x) x.click(); return; }
+      if (o === 'regles') { const x = $('#regles-btn'); if (x) x.click(); return; }
+      if (o === 'aide') return modale(`<h2>Raccourcis</h2><div class="pile" style="font-size:14px;line-height:1.7">${($('.astuce') || {}).textContent.split(' · ').map(x => '• ' + esc(x)).join('<br>')}<br>• V : sélection · H ou Espace maintenu : main · I : pipette<br>• Ctrl + / Ctrl − / Ctrl 0 : zoom · Ctrl + molette : zoom<br>• Ctrl+] / Ctrl+[ : avancer / reculer · Ctrl+Maj+] / [ : tout devant / tout derrière</div>`);
+      if (o === 'dupliquer') return avecCalque(c => E.dupliquerCalque(c));
+      if (o === 'supprimer') return avecCalque(c => E.supprimerCalque(c));
+      if (o === 'miroir' || o === 'miroir-v') return avecCalque(c => { E.modif(true); const k = o === 'miroir' ? 'miroir_h' : 'miroir_v'; if (c[k]) delete c[k]; else c[k] = true; E.rafraichir(); });
+      if (o === 'verrou') return avecCalque(c => { E.modif(true); c.verrou = !c.verrou; if (!c.verrou) delete c.verrou; toast(c.verrou ? '🔒 Calque verrouillé : il ne bouge plus' : 'Calque déverrouillé'); E.rendreReglages(); });
+      if (o === 'masquer') return avecCalque(c => { E.modif(true); c.masque = !c.masque; E.rafraichir(); E.rendreReglages(); });
+      if (o === 'rogner') { const c = (plan().calques || []).find(x => x.id === E.sel); if (c && (c.type === 'image' || c.type === 'video')) return E.recadrerCalque(c); const fr = $('#fond-rogner'); if (fr) return fr.click(); return toast('Choisissez une photo, ou un plan avec une photo en fond'); }
+      if (o === 'pipette') {
+        if (!window.EyeDropper) return toast('La pipette marche dans Chrome et Edge (ordinateur)');
+        return avecCalque(c => new EyeDropper().open().then(r => {
+          E.modif(true);
+          if (c.type === 'image' || c.type === 'video') c.bordure = r.sRGBHex; else c.couleur = r.sRGBHex;
+          E.rafraichir(); E.rendreReglages(); toast('Couleur ' + r.sRGBHex + ' appliquée');
+        }).catch(() => {}));
+      }
       if (o === 'texte' || o === 'bouton' || o === 'compteur') return E.ajouterCalque(o);
       if (o === 'forme') return E.choisirNouvelleForme(b);
       if (o === 'photo') { const i = $('#imp-calque'); if (i) i.click(); return; }
@@ -1365,6 +1417,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       const gd = e.target.closest('.guide');
       if (gd) { drag = { mode: 'guide', axe: gd.dataset.gv != null ? 'v' : 'h', k: Number(gd.dataset.gv != null ? gd.dataset.gv : gd.dataset.gh), w: r.width, h: r.height, r }; zone.setPointerCapture(e.pointerId); e.preventDefault(); return; }
       const h = e.target.closest('.h');
+      if (h && calqueSel() && calqueSel().verrou) { toast('🔒 Calque verrouillé (outil 🔒 pour le libérer)'); return; }
       if (h && h.dataset.h === 'rot' && calqueSel()) {
         const c = calqueSel(), b = eng.bbox[c.id];
         drag = { mode: 'rotation', c, cx: r.left + (b.x + b.w / 2) / 100 * r.width, cy: r.top + (b.y + b.h / 2) / 100 * r.height, r0: Number(c.rotation) || 0, bouge: false };
@@ -1389,7 +1442,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       if (ajout) { choisir(c.id, true); if (!E.multi.has(c.id)) return; }
       else if (!E.multi.has(c.id) || E.multi.size <= 1) choisir(c.id);
       else { E.sel = c.id; rendreBarre(); }
-      const groupe = selection();
+      const groupe = selection().filter(x => !x.verrou);
+      if (!groupe.length) return;
       drag = { mode: 'deplacer', c, groupe: groupe.map(x => ({ c: x, x: Number(x.x), y: Number(x.y) })), b: Object.assign({}, eng.bbox[c.id] || { x: c.x, y: c.y, w: 0, h: 0 }), x0: e.clientX, y0: e.clientY, w: r.width, h: r.height, bouge: false };
       // boîte qui englobe tout le groupe (c'est elle qu'on aimante)
       const bs = groupe.map(x => eng.bbox[x.id]).filter(Boolean);
@@ -1673,6 +1727,9 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       if (mod && e.altKey && e.code === 'KeyV' && c) { e.preventDefault(); collerStyle(c); return; }
       if (e.key === 'Escape' && pinceau) { pinceau = false; zone.classList.remove('pinceau'); rendreBarre(); return; }
       if (mod && e.key.toLowerCase() === 'd' && c) { e.preventDefault(); dupliquerCalque(c); return; }
+      if (!mod && !e.altKey && e.key === 'v') { const b = $('#outils [data-outil="select"]'); if (b) b.click(); return; }
+      if (!mod && !e.altKey && e.key === 'h') { const b = $('#outils [data-outil="main"]'); if (b) b.click(); return; }
+      if (!mod && !e.altKey && e.key === 'i' && c) { const b = $('#outils [data-outil="pipette"]'); if (b) b.click(); return; }
       if (mod && (e.code === 'BracketRight' || e.code === 'BracketLeft') && c) { e.preventDefault(); ordreCalque(c, e.code === 'BracketRight' ? (e.shiftKey ? 'avant' : 'avance') : (e.shiftKey ? 'arriere' : 'recule')); return; }
       if (mod && (e.key === '=' || e.key === '+')) { e.preventDefault(); E.zoomer(1.2); return; }
       if (mod && (e.key === '-' || e.key === '_')) { e.preventDefault(); E.zoomer(1 / 1.2); return; }
@@ -2234,10 +2291,26 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       if (a === 'calendrier') h += `<div class="muet">Utilise la date, l'heure et le premier lieu de la Fiche (${esc(f.date || 'date à remplir')}${f.heure ? ' à ' + esc(f.heure) : ''}).</div>`;
       return h;
     }
+    // Apparence du bouton : forme, couleurs, contour, ombre, hauteur, icône
+    function blocApparenceBouton(c) {
+      const t = TYPES_BOUTON.find(x => x.a === (c.action || 'suivant'));
+      const coul = c.couleur || '#7a1f2b', plein = (c.style || 'plein') === 'plein';
+      return `<details class="bloc" open><summary>🎨 Apparence du bouton</summary><div class="pile">
+        <div class="seg">${[['pilule', '⬭ Pilule'], ['arrondi', '▢ Arrondi'], ['carre', '□ Carré']].map(([k, n]) => `<button data-bforme="${k}" class="${(c.b_forme || 'pilule') === k ? 'on' : ''}">${n}</button>`).join('')}</div>
+        <div class="trois"><label class="champ">Fond<input type="color" data-k="b_fond" value="${esc(c.b_fond || (plein ? coul : '#ffffff'))}"></label><label class="champ">Texte<input type="color" data-k="b_texte" value="${esc(c.b_texte || (plein ? '#ffffff' : coul))}"></label><label class="champ">Contour<input type="color" data-k="b_bord" value="${esc(c.b_bord || coul)}"></label></div>
+        <div class="deux"><label class="champ">Épaisseur du contour<input type="range" data-k="b_bord_ep" min="0" max="8" step="0.5" value="${c.b_bord_ep != null && c.b_bord_ep !== '' ? c.b_bord_ep : 1.5}"></label><label class="champ">Hauteur<input type="range" data-k="b_hauteur" min="0.7" max="2" step="0.05" value="${Number(c.b_hauteur) || 1}"></label></div>
+        <label class="cases"><input type="checkbox" data-k="b_ombre" ${c.b_ombre ? 'checked' : ''}> Ombre</label>
+        <label class="champ">Icône devant le texte<input type="text" data-k="b_icone" maxlength="4" placeholder="aucune" value="${esc(c.b_icone || '')}"></label>
+        <div class="ligne" style="gap:4px;flex-wrap:wrap">${[t ? t.i : '', '📍', '✅', '❌', '📞', '💬', '📅', '🔗', '❤️', '🎉', '💍', '➜'].filter((x, i, l) => x && l.indexOf(x) === i).map(x => `<button class="btn petit" data-bicone="${x}">${x}</button>`).join('')}<button class="btn petit" data-bicone="">Sans icône</button></div>
+        <button class="btn petit" data-breset>↺ Couleurs d'origine</button>
+      </div></details>`;
+    }
     function formulaireCalque(c) {
       const position = `<details class="bloc" open><summary>Position</summary>
         <div class="trois"><label class="champ">X (%)<input type="number" id="cx" data-k="x" step="0.5" value="${c.x}"></label><label class="champ">Y (%)<input type="number" id="cy" data-k="y" step="0.5" value="${c.y}"></label><label class="champ">Largeur (%)<input type="number" data-k="largeur" step="1" value="${c.largeur || 60}"></label></div>
         <div class="ligne" style="gap:6px;align-items:flex-end;margin-top:8px"><label class="champ" style="flex:1">Rotation (°)<input type="range" data-k="rotation" min="-180" max="180" step="1" value="${Number(c.rotation) || 0}"></label><input type="number" data-k="rotation" min="-180" max="180" step="1" value="${Number(c.rotation) || 0}" style="width:70px"><button class="btn petit" data-rot="-15" title="−15°">⟲</button><button class="btn petit" data-rot="15" title="+15°">⟳</button><button class="btn petit" data-rot="0" title="Remettre droit">0°</button></div>
+        ${c.type !== 'forme' ? `<label class="champ" style="margin-top:8px">Opacité<input type="range" data-k="opacite" min="0" max="1" step="0.05" value="${c.opacite != null && c.opacite !== '' ? c.opacite : 1}"></label>` : ''}
+        <div class="cases" style="margin-top:6px"><label><input type="checkbox" data-k="miroir_h" ${c.miroir_h ? 'checked' : ''}> Miroir ⇋</label><label><input type="checkbox" data-k="miroir_v" ${c.miroir_v ? 'checked' : ''}> Miroir ⇵</label><label><input type="checkbox" data-k="verrou" ${c.verrou ? 'checked' : ''}> 🔒 Verrouillé</label></div>
         <label class="champ" style="margin-top:8px">Visible pour<select data-k="condition">${opts([['', 'Tous'], ['famille', 'Lien personnel'], ['general', 'Lien général']], c.condition || '')}</select></label></details>`;
       let s = `<div class="section-titre">${nomType(c)} choisi${c.illu ? 'e' : ''}</div>`;
       if (c.type === 'texte') s += `<details class="bloc" open><summary>Texte</summary><div class="pile">
@@ -2255,7 +2328,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         ${champsAction(c)}
         <div class="trois"><label class="champ">Style<select data-k="style">${opts([['plein', 'Plein'], ['contour', 'Contour'], ['lien', 'Lien']], c.style || 'plein')}</select></label><label class="champ">Taille<input type="number" data-k="taille" step="0.1" min="1" max="6" value="${c.taille || 2.4}"></label><label class="champ">Couleur<input type="color" data-k="couleur" value="${c.couleur || '#7a1f2b'}"></label></div>
         <label class="champ">Police<button class="btn police-btn" data-police style="font-family:'${esc(c.police || 'Cormorant Garamond')}',serif">${esc(c.police || 'Cormorant Garamond')} ▾</button></label>
-        <label class="champ">Apparaît à (s)<input type="number" data-k="debut" step="0.1" min="0" value="${c.debut || 0}"></label></div></details>` + blocTraductions(c);
+        <label class="champ">Apparaît à (s)<input type="number" data-k="debut" step="0.1" min="0" value="${c.debut || 0}"></label></div></details>` + blocApparenceBouton(c) + blocTraductions(c);
       if (c.type === 'compteur') s += `<details class="bloc" open><summary>Compteur</summary><div class="pile">
         <label class="champ">Libellé<input type="text" data-k="texte" value="${esc(c.texte)}"></label>
         <div class="trois"><label class="champ">Champ<select data-k="champ">${opts(['adultes', 'enfants', 'places_transport'], c.champ)}</select></label><label class="champ">Min<input type="number" data-k="min" value="${c.min || 0}"></label><label class="champ">Max<input type="number" data-k="max" value="${c.max || ''}" placeholder="places"></label></div>
@@ -2297,6 +2370,9 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       return s + ordre + position;
     }
     function lierFormulaire(c) {
+      $$('#props [data-bforme]').forEach(b => b.onclick = () => { E.modif(true); c.b_forme = b.dataset.bforme; E.rafraichir(); rendreReglages(); });
+      $$('#props [data-bicone]').forEach(b => b.onclick = () => { E.modif(true); if (b.dataset.bicone) c.b_icone = b.dataset.bicone; else delete c.b_icone; E.rafraichir(); rendreReglages(); });
+      const br = $('#props [data-breset]'); if (br) br.onclick = () => { E.modif(true); ['b_fond', 'b_texte', 'b_bord', 'b_bord_ep', 'b_hauteur', 'b_ombre', 'b_forme'].forEach(k => delete c[k]); E.rafraichir(); rendreReglages(); };
       $$('#props [data-tbouton]').forEach(b => b.onclick = () => {
         const t = TYPES_BOUTON.find(x => x.a === b.dataset.tbouton), lang = (p.fiche || {}).langue || 'fr';
         E.modif(true);

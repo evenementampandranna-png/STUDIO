@@ -579,14 +579,21 @@
       if (c.type === 'champ') return this._dessinerChamp(c, t, vars, alphaPlan);
       if (c.type !== 'bouton') return;
       const deb = Number(c.debut) || 0; if (t < deb) return;
-      const ctx = this.ctx, fs = (Number(c.taille) || 2.4) / 100 * H, larg = (Number(c.largeur) || 60) / 100 * W, haut = fs * 2.3;
+      const ctx = this.ctx, fs = (Number(c.taille) || 2.4) / 100 * H, larg = (Number(c.largeur) || 60) / 100 * W, haut = fs * 2.3 * (Number(c.b_hauteur) || 1);
       const x = (Number(c.x) || 50) / 100 * W - larg / 2, y = (Number(c.y) || 50) / 100 * H - haut / 2;
       const coul = c.couleur || '#7a1f2b', style = c.style || 'plein';
+      const rayon = { arrondi: fs * 0.6, carre: 0 }[c.b_forme] != null ? { arrondi: fs * 0.6, carre: 0 }[c.b_forme] : haut / 2;
       ctx.save(); ctx.globalAlpha = alphaPlan * clamp((t - deb) / 0.6, 0, 1); tourner(ctx, c);
-      if (style !== 'lien') { arrondi(ctx, x, y, larg, haut, haut / 2); ctx.fillStyle = style === 'plein' ? coul : 'rgba(255,255,255,.85)'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = coul; ctx.stroke(); }
-      ctx.fillStyle = style === 'plein' ? '#fff' : coul; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      if (style !== 'lien') {
+        arrondi(ctx, x, y, larg, haut, rayon);
+        if (c.b_ombre) { ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.3)'; ctx.shadowBlur = fs * 0.8; ctx.shadowOffsetY = fs * 0.25; ctx.fillStyle = c.b_fond || (style === 'plein' ? coul : 'rgba(255,255,255,.85)'); ctx.fill(); ctx.restore(); }
+        ctx.fillStyle = c.b_fond || (style === 'plein' ? coul : 'rgba(255,255,255,.85)'); ctx.fill();
+        const ep = c.b_bord_ep != null && c.b_bord_ep !== '' ? Number(c.b_bord_ep) : 3;
+        if (ep > 0) { ctx.lineWidth = ep; ctx.strokeStyle = c.b_bord || coul; ctx.stroke(); }
+      }
+      ctx.fillStyle = c.b_texte || (style === 'plein' ? '#fff' : coul); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.font = `${c.graisse || 600} ${fs.toFixed(1)}px "${c.police || 'Cormorant Garamond'}", Georgia, serif, ${POLICE_EMOJI}`;
-      ctx.fillText(remplacer(texteDe(c, this.langue), vars), x + larg / 2, y + haut / 2, larg - fs);
+      ctx.fillText((c.b_icone ? c.b_icone + ' ' : '') + remplacer(texteDe(c, this.langue), vars), x + larg / 2, y + haut / 2, larg - fs);
       ctx.restore();
     }
 
@@ -664,7 +671,7 @@
       const larg = (Number(c.largeur) || 80) / 100 * W;
       ctx.save();
       if (c.fusion && c.fusion !== 'normal') ctx.globalCompositeOperation = c.fusion;   // superposition (mode de fusion)
-      const r = { a: (c.opacite != null ? Number(c.opacite) : 1) * alphaPlan, dx: 0, dy: 0, sc: 1, flou: 0 };
+      const r = { a: (c.opacite != null && c.opacite !== '' ? Number(c.opacite) : 1) * alphaPlan, dx: 0, dy: 0, sc: 1, flou: 0 };
       this._effet(e.entree, e.pE, e.brutE, r);
       if (e.brutS < 1) this._effet(e.sortie === 'aucune' ? 'fondu' : e.sortie, e.pS, e.brutS, r);
       let a = r.a, dx = r.dx, dy = r.dy, sc = r.sc;
@@ -673,6 +680,7 @@
       ctx.translate(cx + dx, cy + dy);
       if (Number(c.rotation)) ctx.rotate(Number(c.rotation) * Math.PI / 180);
       if (sc !== 1) ctx.scale(sc, sc);
+      if (c.miroir_h || c.miroir_v) ctx.scale(c.miroir_h ? -1 : 1, c.miroir_v ? -1 : 1);   // miroir (outil ⇋)
 
       if (c.type === 'texte') {
         const taille = (Number(c.taille) || 4) / 100 * H;
@@ -754,7 +762,6 @@
         const haut = c.hauteur ? Number(c.hauteur) / 100 * H : larg;
         const d = cheminForme(Object.assign({}, c, { forme: c.forme || 'rect' }), larg, haut);
         const chemin = new Path2D(); chemin.addPath(new Path2D(d), new DOMMatrix().translate(-larg / 2, -haut / 2));
-        if (c.opacite != null && c.opacite !== '') ctx.globalAlpha *= clamp(Number(c.opacite), 0, 1);
         if (c.couleur2) {
           let g;
           if (c.degrade === 'radial') g = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.max(larg, haut) / 2);
@@ -791,12 +798,23 @@
         el.style.setProperty('--mt-couleur', c.couleur || '#7a1f2b');
         if (c.police) el.style.fontFamily = `"${c.police}", serif`;
         if (Number(c.rotation)) el.style.rotate = Number(c.rotation) + 'deg';
+        if (c.opacite != null && c.opacite !== '' && Number(c.opacite) < 1) el.style.opacity = Number(c.opacite);
+        if (c.miroir_h || c.miroir_v) el.style.scale = (c.miroir_h ? -1 : 1) + ' ' + (c.miroir_v ? -1 : 1);
         const t0 = Number(c.debut) || 0;
         if (this.mode !== 'edition' && t0 > 0) { el.style.animationDelay = t0 + 's'; }
         if (c.type === 'bouton') {
           const b = document.createElement('button');
           b.type = 'button';
-          b.textContent = remplacer(texteDe(c, this.langue), vars);
+          b.textContent = (c.b_icone ? c.b_icone + ' ' : '') + remplacer(texteDe(c, this.langue), vars);
+          // apparence personnalisée (forme, couleurs, contour, ombre, hauteur)
+          const st = b.style;
+          if (c.b_forme) st.borderRadius = { pilule: '999px', arrondi: '.6em', carre: '0' }[c.b_forme] || '';
+          if (c.b_fond) st.background = c.b_fond;
+          if (c.b_texte) st.color = c.b_texte;
+          if (c.b_bord) st.borderColor = c.b_bord;
+          if (c.b_bord_ep != null && c.b_bord_ep !== '') st.borderWidth = Number(c.b_bord_ep) + 'px';
+          if (c.b_ombre === true) st.boxShadow = '0 .35em 1em rgba(0,0,0,.3)'; else if (c.b_ombre === false) st.boxShadow = 'none';
+          if (Number(c.b_hauteur) && Number(c.b_hauteur) !== 1) st.padding = (0.55 * Number(c.b_hauteur)).toFixed(2) + 'em .8em';
           b.addEventListener('click', ev => { ev.stopPropagation(); if (this.mode === 'edition') return; this._action(c); });
           el.appendChild(b);
         } else if (c.type === 'compteur') {

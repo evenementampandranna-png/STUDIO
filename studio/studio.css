@@ -468,3 +468,17 @@ textarea.edition-directe { position: absolute; z-index: 8; resize: none; overflo
 .types-bouton button span { font-size: 14px; }
 .types-bouton button.on { background: var(--vin); border-color: var(--vin); color: #fff; }
 .aide-bouton { font-size: 12px; padding: 7px 9px; border-radius: 5px; background: #f4ede2; }
+
+/* gauche et droite fixes, seul le centre défile */
+@media (min-width: 1251px) {
+  .editeur.ps { height: var(--h-ed, calc(100vh - 240px)); grid-template-rows: auto minmax(0, 1fr); align-items: stretch; }
+  .editeur.ps > .barre-sel { position: static; }
+  .editeur.ps .outils { position: static; align-self: start; max-height: 100%; overflow: auto; }
+  .editeur.ps .col-plans, .editeur.ps .col-reglages, .editeur.ps .col-apercu { position: static; top: auto; max-height: none; height: 100%; min-height: 0; overflow: auto; }
+  .editeur.ps .col-apercu { justify-content: flex-start; padding-bottom: 10px; }
+  .editeur.ps .apercu-cadre { height: calc((var(--h-ed, 700px) - 190px) * var(--zoom, 1)); min-height: calc(360px * var(--zoom, 1)); }
+  .editeur.ps .zone-zoom.zoome { max-height: calc(var(--h-ed, 700px) - 170px); }
+}
+.outils button.on { background: var(--vin); color: #fff; }
+.zone-zoom.outil-main, .zone-zoom.outil-main * { cursor: grab !important; }
+.editeur.ps .outils button { height: 26px; font-size: 14px; }
