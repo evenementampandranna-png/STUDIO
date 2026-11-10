@@ -625,6 +625,14 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-10-2', date: '10 novembre 2026', titre: 'Éditeur façon Photoshop : outils, formes, zoom, ordre des calques, choix du fond', points: [
+      '<b>Barre d\'outils à gauche de l\'aperçu</b> : T texte, ▭ forme, 🖼 photo, ✿ illustration, 😊 emoji, boutons, ▦ fond, et le zoom.',
+      '<b>Panneau de droite</b> : une seule rubrique ouverte à la fois (cliquez son titre pour l\'ouvrir) ; le studio se souvient de la dernière utilisée. « Calques » reste toujours visible.',
+      '<b>▭ Formes</b> : rectangle, rond, cœur, étoile, arche… (+ Forme ou ▭) avec couleur, dégradé, opacité, contour, ombre, forme libre.',
+      '<b>Zoom</b> : ＋ / － et 100 % dans la barre d\'outils, Ctrl + molette, Ctrl + / Ctrl − / Ctrl 0.',
+      '<b>Devant / derrière</b> : rubrique « Ordre » et barre du calque (⤒ ↑ ↓ ⤓), Ctrl+] / Ctrl+[ ; la liste des calques montre en haut ce qui est devant. Une photo ou vidéo peut devenir le <b>fond du plan</b> (« ▣ Mettre en fond du plan »).',
+      '<b>🔍 Choisir un fond…</b> : recherche, classement <b>par événement</b> ou <b>par plan</b> (ouverture, intermédiaires, confirmation…), et appliquer à ce plan, aux plans du même type ou à tous.'
+    ] },
     { id: '2026-11-10-1', date: '10 novembre 2026', titre: 'Rubrique « Vidéos » : tous les films de l\'équipe à publier', points: [
       'Nouveau menu <b>🎬 Vidéos</b> : tous les films terminés de l\'équipe au même endroit, avec qui l\'a fait, la date, et si le film est déjà <b>sur le site</b> ou pas.',
       'Filtres « Pas encore sur le site » / « Sur le site » / par membre ; <b>Publier sur le site</b> un film, une sélection (cases à cocher) ou <b>tout ce qui manque</b> d\'un coup ; « Retirer du site ».',
@@ -1107,7 +1115,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
   const PALETTE_FONDS = [['#f4ede2'], ['#ffffff'], ['#fdf6ec'], ['#f6e1e1'], ['#e9efe4'], ['#e7eef6'], ['#1d1414'], ['#7a1f2b'], ['#b08a4f'], ['#3b4a3a'], ['#1f2a44'],
     ['#fdf6ec', '#ead5b8'], ['#fff5f5', '#f2c4ce'], ['#eef3ea', '#b9cdb0'], ['#f1f5fb', '#b9c9e2'], ['#7a1f2b', '#2b0b10'], ['#1f2a44', '#0b0f1c'], ['#f7e7c6', '#c9a15a'], ['#ffffff', '#e6dccb']];
   const ROLES = { ouverture: 'Ouverture', intermediaire: 'Plan intermédiaire', confirmation: 'Confirmation', remerciement: 'Remerciement' };
-  const NOMS_TYPE = { texte: 'Texte', bouton: 'Bouton', compteur: 'Compteur', champ: 'Champ', image: 'Image', video: 'Vidéo' };
+  const NOMS_TYPE = { texte: 'Texte', bouton: 'Bouton', compteur: 'Compteur', champ: 'Champ', image: 'Image', video: 'Vidéo', forme: 'Forme' };
+  const aHauteur = c => !!c && (c.type === 'image' || c.type === 'video' || c.type === 'forme');
   const nomType = c => c.illu ? 'Illustration' : NOMS_TYPE[c.type];
   const FAMILLE_TEST = { code: 'TEST', nom: 'Fianakaviana Rakoto', places: 4, adultes: 2, enfants: 2 };
 
@@ -1118,8 +1127,17 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <div class="col-plans" id="col-plans"></div>
         <div class="col-apercu">
           <div class="barre-sel" id="barre-sel"></div>
+          <div class="atelier">
+          <div class="outils" id="outils">
+            <button data-outil="texte" title="Texte">T</button><button data-outil="forme" title="Forme (rectangle, rond, cœur…)">▭</button><button data-outil="photo" title="Photo / vidéo">🖼</button>
+            <button data-outil="illu" title="Illustration">✿</button><button data-outil="emoji" title="Emoji">😊</button><button data-outil="bouton" title="Bouton">⏺</button><button data-outil="compteur" title="Compteur">±</button>
+            <span class="sep"></span><button data-outil="fond" title="Fond du plan">▦</button>
+            <span class="sep"></span><button data-outil="zoom+" title="Zoom avant (Ctrl +)">＋</button><button data-outil="zoom0" title="Ajuster à l'écran (Ctrl 0)" id="zoom-val">100%</button><button data-outil="zoom-" title="Zoom arrière (Ctrl −)">－</button>
+          </div>
+          <div class="zone-zoom" id="zone-zoom">
           <div class="cadre-regles" id="cadre-regles"><canvas class="regle regle-h" id="regle-h"></canvas><canvas class="regle regle-v" id="regle-v"></canvas><span class="regle-coin" title="Règles"></span>
           <div class="apercu-cadre" id="cadre" tabindex="0"><div id="scene"></div><div class="poignees" id="poignees"></div><div class="aimants" id="aimants"></div></div></div>
+          </div></div>
           <div class="astuce">Maj+clic ou cadre de sélection : choisir plusieurs éléments · Double-clic : écrire dans le texte · Coins : agrandir · Côtés : élargir · Ctrl+C / Ctrl+V : copier-coller (aussi entre plans) · Ctrl+Alt+C / Ctrl+Alt+V : copier-coller la mise en forme · 🖌 : pinceau · Ctrl+D : dupliquer · Suppr : supprimer · Flèches : déplacer · Clic droit : menu</div>
           <div class="temps"><span id="t-aff">0,0 s</span><input type="range" id="t-curseur" min="0" max="6" step="0.05" value="0"><span id="t-dur"></span></div>
           <div class="commandes">
@@ -1136,6 +1154,26 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     moteurCourant = eng;
     E.eng = eng;
     eng.setProjet(p).then(() => { enregistrer(p); afficher(); });
+    // Zoom de l'aperçu (comme Photoshop) : boutons, Ctrl + molette, Ctrl +/−/0
+    let zoom = 1;
+    E.zoomer = f => {
+      zoom = f === 0 ? 1 : Math.max(0.5, Math.min(4, Math.round(zoom * f * 100) / 100));
+      if (Math.abs(zoom - 1) < 0.04) zoom = 1;
+      $('#cadre').style.setProperty('--zoom', zoom); $('#zone-zoom').classList.toggle('zoome', zoom > 1);
+      $('#zoom-val').textContent = Math.round(zoom * 100) + '%';
+      requestAnimationFrame(() => { window.dispatchEvent(new Event('resize')); if (E.rafraichir) E.rafraichir(); });
+    };
+    $('#zone-zoom').addEventListener('wheel', e => { if (!(e.ctrlKey || e.metaKey)) return; e.preventDefault(); E.zoomer(e.deltaY < 0 ? 1.1 : 1 / 1.1); }, { passive: false });
+    $$('#outils [data-outil]').forEach(b => b.onclick = () => {
+      const o = b.dataset.outil;
+      if (o === 'zoom+') return E.zoomer(1.25); if (o === 'zoom-') return E.zoomer(0.8); if (o === 'zoom0') return E.zoomer(0);
+      if (o === 'texte' || o === 'bouton' || o === 'compteur') return E.ajouterCalque(o);
+      if (o === 'forme') return E.choisirNouvelleForme(b);
+      if (o === 'photo') { const i = $('#imp-calque'); if (i) i.click(); return; }
+      if (o === 'illu') { const i = $('#ajout-illu'); if (i) i.click(); return; }
+      if (o === 'emoji') { const i = $('#ajout-emoji'); if (i) i.click(); return; }
+      if (o === 'fond') { E.sel = null; if (E.multi && E.multi.clear) E.multi.clear(); if (E.rafraichir) E.rafraichir(); E.rendreReglages(); E.ouvrirSection('Fond'); const pf = $('#p-fond-choisir'); if (pf) pf.click(); else E.choisirFond('video'); }
+    });
 
     function snapshot() { E.annuler.push(JSON.stringify(p.plans)); if (E.annuler.length > 60) E.annuler.shift(); E.refaire = []; }
     let tSnap = 0;
@@ -1365,7 +1403,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         if (coin) {
           // agrandir proportionnellement depuis le centre
           const f = Math.max(0.2, Math.min(5, (b.w + 2 * sx * dx) / b.w));
-          if (c.type === 'image' || c.type === 'video') { c.largeur = Math.round(Math.min(100, v.largeur * f) * 10) / 10; c.hauteur = Math.round(Math.min(100, v.hauteur * f) * 10) / 10; }
+          if (aHauteur(c)) { c.largeur = Math.round(Math.min(100, v.largeur * f) * 10) / 10; c.hauteur = Math.round(Math.min(100, v.hauteur * f) * 10) / 10; }
           else { c.taille = Math.round(Math.max(1, Math.min(15, v.taille * f)) * 10) / 10; c.largeur = Math.round(Math.max(8, Math.min(100, v.largeur * f)) * 10) / 10; }
         } else if (sx) {
           c.largeur = Math.round(Math.max(8, Math.min(100, v.largeur + 2 * sx * dx)) * 10) / 10;
@@ -1535,7 +1573,11 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     }
     function ordreCalque(c, sens) {
       if (!c) return; const pl = plan(); const cs = E.multi.size > 1 ? selection() : [c]; E.modif(true);
-      pl.calques = pl.calques.filter(x => !cs.includes(x)); if (sens === 'avant') pl.calques.push(...cs); else pl.calques.unshift(...cs); E.rafraichir(); rendreReglages();
+      if (sens === 'avance' || sens === 'recule') {
+        const l = pl.calques, idx = cs.map(x => l.indexOf(x)).sort((a, b) => sens === 'avance' ? b - a : a - b);
+        idx.forEach(k => { const j = sens === 'avance' ? k + 1 : k - 1; if (j < 0 || j >= l.length || cs.includes(l[j])) return; [l[k], l[j]] = [l[j], l[k]]; });
+      } else { pl.calques = pl.calques.filter(x => !cs.includes(x)); if (sens === 'avant') pl.calques.push(...cs); else pl.calques.unshift(...cs); }
+      E.rafraichir(); rendreReglages();
     }
     // Mise en forme : copier / coller le style d'un calque sur un autre (pinceau)
     const STYLE_TEXTE = ['police', 'graisse', 'rotation', 'taille', 'couleur', 'gras', 'italique', 'majuscules', 'align', 'interligne', 'ombre', 'ombre_couleur', 'ombre_force', 'ombre_opacite', 'ombre_decalage', 'contour', 'contour_epaisseur', 'fond_couleur', 'fond_opacite', 'fond_marge', 'fond_arrondi', 'opacite', 'animation', 'duree_animation', 'sortie', 'duree_sortie'];
@@ -1593,6 +1635,10 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       if (mod && e.altKey && e.code === 'KeyV' && c) { e.preventDefault(); collerStyle(c); return; }
       if (e.key === 'Escape' && pinceau) { pinceau = false; zone.classList.remove('pinceau'); rendreBarre(); return; }
       if (mod && e.key.toLowerCase() === 'd' && c) { e.preventDefault(); dupliquerCalque(c); return; }
+      if (mod && (e.code === 'BracketRight' || e.code === 'BracketLeft') && c) { e.preventDefault(); ordreCalque(c, e.code === 'BracketRight' ? (e.shiftKey ? 'avant' : 'avance') : (e.shiftKey ? 'arriere' : 'recule')); return; }
+      if (mod && (e.key === '=' || e.key === '+')) { e.preventDefault(); E.zoomer(1.2); return; }
+      if (mod && (e.key === '-' || e.key === '_')) { e.preventDefault(); E.zoomer(1 / 1.2); return; }
+      if (mod && e.key === '0') { e.preventDefault(); E.zoomer(0); return; }
       if (mod && e.key.toLowerCase() === 'a') { e.preventDefault(); choisirPlusieurs((plan().calques || []).filter(x => !x.masque).map(x => x.id)); toast('Tout est choisi : glissez pour déplacer ensemble'); return; }
       if (e.key === ' ' && (eng.lecture || E.enPause)) { e.preventDefault(); E.basculerPause(); return; }
       if (!c) return;
@@ -1633,7 +1679,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       menu.onclick = ev => {
         const a = ev.target.dataset.m; if (!a) return; fermerMenu();
         if (a === 'editer') editer(c); if (a === 'copier') copierCalque(c); if (a === 'couper') copierCalque(c, true); if (a === 'coller') collerCalque(null);
-        if (a === 'dupliquer') dupliquerCalque(c); if (a === 'avant' || a === 'arriere') ordreCalque(c, a); if (a === 'suppr') supprimerCalque(c);
+        if (a === 'dupliquer') dupliquerCalque(c); if (a === 'avant' || a === 'arriere' || a === 'avance' || a === 'recule') ordreCalque(c, a); if (a === 'suppr') supprimerCalque(c);
         if (a === 'centrer') { E.modif(true); c.x = 50; E.rafraichir(); majChamps(c); }
         if (a === 'style-c') copierStyle(c); if (a === 'style-v') collerStyle(c);
         if (a === 'style-plan') collerStylePartout(c, 'plan'); if (a === 'style-inv') { if (confirm('Appliquer cette mise en forme à tous les calques du même type dans toute l\'invitation ?')) collerStylePartout(c, 'invitation'); }
@@ -1650,18 +1696,18 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         const cs = selection(), ecrits = cs.filter(x => x.type === 'texte' || x.type === 'bouton' || x.type === 'compteur');
         bar.innerHTML = `<b class="type-sel">${cs.length} éléments</b>${ALIGN}<button class="btn petit icone" data-al="repartir-v" title="Répartir verticalement (espaces égaux)" ${cs.length > 2 ? '' : 'disabled'}>☰</button><button class="btn petit icone" data-al="repartir-h" title="Répartir horizontalement" ${cs.length > 2 ? '' : 'disabled'}>⫼</button><button class="btn petit icone" data-al="page" title="Centrer le groupe sur la page">◎</button>
           <span class="sep"></span>${ecrits.length ? `<input type="color" data-b="couleur" value="${ecrits[0].couleur || '#7a1f2b'}" title="Couleur de tous les textes choisis"><button class="btn petit" data-b="police" title="Police de tous les textes choisis">Police</button>` : ''}<button class="btn petit icone" data-b="moins" title="Tout réduire">−</button><button class="btn petit icone" data-b="plus" title="Tout agrandir">+</button>
-          <span class="sep"></span><button class="btn petit icone" data-b="copier" title="Copier (Ctrl+C)">⧉</button><button class="btn petit icone" data-b="dupliquer" title="Dupliquer (Ctrl+D)">⊕</button><button class="btn petit icone" data-b="avant" title="Premier plan">⬆</button><button class="btn petit icone" data-b="arriere" title="Arrière-plan">⬇</button><button class="btn petit icone danger" data-b="suppr" title="Supprimer (Suppr)">🗑</button>`;
+          <span class="sep"></span><button class="btn petit icone" data-b="copier" title="Copier (Ctrl+C)">⧉</button><button class="btn petit icone" data-b="dupliquer" title="Dupliquer (Ctrl+D)">⊕</button><button class="btn petit icone" data-b="avant" title="Tout devant (premier plan) — Ctrl+Maj+]">⤒</button><button class="btn petit icone" data-b="avance" title="Avancer d'un cran — Ctrl+]">↑</button><button class="btn petit icone" data-b="recule" title="Reculer d'un cran — Ctrl+[">↓</button><button class="btn petit icone" data-b="arriere" title="Tout derrière (arrière-plan) — Ctrl+Maj+[">⤓</button><button class="btn petit icone danger" data-b="suppr" title="Supprimer (Suppr)">🗑</button>`;
         lierBarre(bar, c); return;
       }
       if (!c) { bar.innerHTML = pinceau ? `<span class="muet">🖌 Pinceau actif : cliquez les calques à mettre en forme</span><button class="btn petit" data-b="pinceau">Arrêter</button>` : `<span class="muet">Cliquez un élément de l'aperçu pour le modifier</span>${Stock.lire('studio.presse', null) ? '<button class="btn petit" data-b="coller">Coller</button>' : ''}`; lierBarre(bar, c); return; }
       const ecr = c.type === 'texte' || c.type === 'bouton' || c.type === 'compteur';
       bar.innerHTML = `<b class="type-sel">${esc(nomType(c))}</b>
         ${ecr ? '<button class="btn petit" data-b="editer" title="Modifier le texte (double-clic)">✎ Écrire</button>' : '<button class="btn petit" data-b="remplacer">Remplacer</button>'}
-        ${c.type !== 'image' && c.type !== 'video' ? `<button class="btn petit icone" data-b="moins" title="Plus petit">A−</button><button class="btn petit icone" data-b="plus" title="Plus grand">A+</button>` : `<button class="btn petit icone" data-b="moins" title="Plus petit">−</button><button class="btn petit icone" data-b="plus" title="Plus grand">+</button>`}
-        ${c.type === 'texte' || c.type === 'bouton' || c.type === 'compteur' ? `<input type="color" data-b="couleur" value="${c.couleur || '#7a1f2b'}" title="Couleur">` : ''}
+        ${!aHauteur(c) ? `<button class="btn petit icone" data-b="moins" title="Plus petit">A−</button><button class="btn petit icone" data-b="plus" title="Plus grand">A+</button>` : `<button class="btn petit icone" data-b="moins" title="Plus petit">−</button><button class="btn petit icone" data-b="plus" title="Plus grand">+</button>`}
+        ${c.type === 'texte' || c.type === 'bouton' || c.type === 'compteur' || c.type === 'forme' ? `<input type="color" data-b="couleur" value="${c.couleur || '#7a1f2b'}" title="Couleur">` : ''}
         ${c.type === 'texte' ? `<button class="btn petit icone ${c.gras ? 'on' : ''}" data-b="gras" title="Gras"><b>G</b></button><button class="btn petit icone ${c.italique ? 'on' : ''}" data-b="italique" title="Italique"><i>I</i></button><span class="groupe-align">${[['left', 'Aligner le texte à gauche', '<svg viewBox="0 0 16 16"><path d="M2 3h12M2 6.5h8M2 10h12M2 13.5h7"/></svg>'], ['center', 'Centrer le texte', '<svg viewBox="0 0 16 16"><path d="M2 3h12M4 6.5h8M2 10h12M4.5 13.5h7"/></svg>'], ['right', 'Aligner le texte à droite', '<svg viewBox="0 0 16 16"><path d="M2 3h12M6 6.5h8M2 10h12M7 13.5h7"/></svg>'], ['justify', 'Justifier le texte', '<svg viewBox="0 0 16 16"><path d="M2 3h12M2 6.5h12M2 10h12M2 13.5h7"/></svg>']].map(([k, t, ic]) => `<button class="btn petit icone ${(c.align || 'center') === k ? 'on' : ''}" data-talign="${k}" title="${t}">${ic}</button>`).join('')}</span>` : ''}
         ${ecr ? `<button class="btn petit police-btn" data-b="police" title="Choisir la police" style="font-family:'${esc(c.police || 'Cormorant Garamond')}'">${esc((c.police || 'Cormorant Garamond').slice(0, 16))} ▾</button>` : ''}${c.type === 'texte' ? '<button class="btn petit icone" data-b="emoji" title="Ajouter un emoji">😊</button>' : ''}
-        ${c.type === 'image' || c.type === 'video' ? `<button class="btn petit" data-b="forme" title="Forme du cadre : rond, cœur, arche, étoile… ou forme libre">◇ Forme${c.forme ? ' : ' + esc(((MoteurInfo.FORMES.find(x => x[0] === c.forme) || [0, ''])[1]).replace(/ \(.*\)$/, '')) : ''}</button><button class="btn petit" data-b="recadrer" title="Rogner : garder une partie de la photo ou de la vidéo">⬚ Rogner</button>` : ''}
+        ${aHauteur(c) ? `<button class="btn petit" data-b="forme" title="Forme du cadre : rond, cœur, arche, étoile… ou forme libre">◇ Forme${c.forme ? ' : ' + esc(((MoteurInfo.FORMES.find(x => x[0] === c.forme) || [0, ''])[1]).replace(/ \(.*\)$/, '')) : ''}</button><button class="btn petit" data-b="recadrer" title="Rogner : garder une partie de la photo ou de la vidéo">⬚ Rogner</button>` : ''}
         <span class="sep"></span><button class="btn petit icone" data-al="centre-h" title="Centrer sur la page (horizontal)">⇔</button><button class="btn petit icone" data-al="centre-v" title="Centrer sur la page (vertical)">⇕</button>
         <span class="sep"></span>
         <button class="btn petit icone ${pinceau ? 'on' : ''}" data-b="pinceau" title="Pinceau : copier la mise en forme puis cliquer les calques à mettre en forme">🖌</button><button class="btn petit icone" data-b="style-v" title="Coller la mise en forme (Ctrl+Alt+V)" ${Stock.lire('studio.style', null) ? '' : 'disabled'}>🎨</button>
@@ -1691,7 +1737,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           if (a === 'plus' || a === 'moins') {
             E.modif(); const f = a === 'plus' ? 1.1 : 1 / 1.1;
             groupe().forEach(x => {
-              if (x.type === 'image' || x.type === 'video') { x.largeur = Math.round(Math.min(100, (Number(x.largeur) || 40) * f) * 10) / 10; x.hauteur = Math.round(Math.min(100, (Number(x.hauteur) || 22) * f) * 10) / 10; }
+              if (aHauteur(x)) { x.largeur = Math.round(Math.min(100, (Number(x.largeur) || 40) * f) * 10) / 10; x.hauteur = Math.round(Math.min(100, (Number(x.hauteur) || 22) * f) * 10) / 10; }
               else x.taille = Math.round(Math.max(1, Math.min(15, (Number(x.taille) || 3) * f)) * 10) / 10;
             });
             if (groupe().some(x => I.TYPES_HTML.includes(x.type))) E.rafraichir(); majChamps(c);
@@ -1762,12 +1808,14 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           ${typeF === 'video' || typeF === 'defaut' ? `
           <div class="fond-actuel"><img src="${esc(vignetteDe(pl.fond.media))}" alt=""><div style="min-width:0"><b>${esc(fondActuel ? fondActuel.nom : '—')}</b>
             <div class="muet">${nbMemeFond > 1 ? `Utilisé par ${nbMemeFond} plans` : 'Utilisé par ce plan seulement'}</div></div></div>
-          <label class="champ">Choisir dans la bibliothèque<select id="p-fond">${fonds.map(f => `<option value="${esc(f.src)}" ${pl.fond.media === f.src ? 'selected' : ''}>${esc(f.nom)} (${esc(f.usage)})</option>`).join('')}</select></label>
+          <button class="btn plein" id="p-fond-choisir" data-kind="video" style="width:100%;margin:4px 0 8px">🔍 Choisir un fond… <span class="muet" style="color:inherit;opacity:.8">(recherche, par événement, par plan)</span></button>
+          <label class="champ">Ou dans la liste<select id="p-fond">${fonds.map(f => `<option value="${esc(f.src)}" ${pl.fond.media === f.src ? 'selected' : ''}>${esc(f.nom)} (${esc(f.usage)})</option>`).join('')}</select></label>
           <div class="ligne" style="margin-top:8px"><label class="btn petit">Importer un fond<input type="file" id="imp-fond-plan" accept="video/*" hidden></label><button class="btn petit ia" id="fond-ia" title="S'ouvre dans la Bibliothèque">✨ Créer avec l'IA (Bibliothèque)</button><button class="btn petit" id="fond-couper">✂ Couper${MoteurInfo.plage(pl.fond) ? ' (' + MoteurInfo.plage(pl.fond).map(x => x.toFixed(1)).join(' → ') + ' s)' : ''}</button><button class="btn petit" id="fond-rogner">⬚ Rogner${pl.fond.recadrage ? ' ✓' : ''}</button></div>
           <label class="champ" style="margin-top:8px">Vitesse de la vidéo<select id="p-vitesse">${optsVitesse(pl.fond.vitesse)}</select></label>` : ''}
           ${typeF === 'image' ? `
           <div class="fond-actuel"><img src="${esc(vignettePlan(pl))}" alt=""><div style="min-width:0"><b>${esc(nomMedia(pl.fond.media) || 'Photo')}</b><div class="muet">Photo en fond d'écran (remplit tout l'écran)</div></div></div>
-          <label class="champ">Choisir une photo<select id="p-fond-img"><option value="">—</option>${photosFond.map(m => `<option value="${esc(m.src)}" ${pl.fond.media === m.src ? 'selected' : ''}>${esc(m.nom)}${m.equipe ? ' — équipe' : ''}</option>`).join('')}</select></label>
+          <button class="btn plein" id="p-fond-choisir" data-kind="image" style="width:100%;margin:4px 0 8px">🔍 Choisir une photo… <span class="muet" style="color:inherit;opacity:.8">(recherche, par événement, par plan)</span></button>
+          <label class="champ">Ou dans la liste<select id="p-fond-img"><option value="">—</option>${photosFond.map(m => `<option value="${esc(m.src)}" ${pl.fond.media === m.src ? 'selected' : ''}>${esc(m.nom)}${m.equipe ? ' — équipe' : ''}</option>`).join('')}</select></label>
           <div class="ligne" style="margin-top:8px"><label class="btn petit plein">Importer une photo<input type="file" id="imp-fond-img" accept="image/*" hidden></label><button class="btn petit" id="fond-rogner">⬚ Rogner${pl.fond.recadrage ? ' ✓' : ''}</button></div>
           <label class="champ" style="margin-top:8px">Flou<input type="range" id="p-flou" min="0" max="20" step="1" value="${pl.fond.flou || 0}"></label>` : ''}
           ${typeF === 'couleur' ? `
@@ -1791,11 +1839,12 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <button class="btn petit" id="empiler" style="margin-top:8px">Éviter les chevauchements de textes</button>
         </details>
         <details class="bloc" open><summary>Calques <span class="muet">${(pl.calques || []).length}</span></summary>
-          <div class="ligne" style="gap:4px;margin-bottom:8px"><button class="btn petit" data-ajout="texte">+ Texte</button><button class="btn petit" data-ajout="bouton">+ Bouton</button><button class="btn petit" data-ajout="compteur">+ Compteur</button><label class="btn petit">+ Photo / vidéo<input type="file" id="imp-calque" accept="image/*,video/*" hidden></label><button class="btn petit" id="ajout-illu">+ Illustration</button><button class="btn petit" id="ajout-emoji">+ Emoji</button></div>
-          <div id="liste-calques">${(pl.calques || []).map(x => `
+          <div class="ligne" style="gap:4px;margin-bottom:8px"><button class="btn petit" data-ajout="texte">+ Texte</button><button class="btn petit" data-ajout="bouton">+ Bouton</button><button class="btn petit" data-ajout="compteur">+ Compteur</button><label class="btn petit">+ Photo / vidéo<input type="file" id="imp-calque" accept="image/*,video/*" hidden></label><button class="btn petit" id="ajout-illu">+ Illustration</button><button class="btn petit" id="ajout-emoji">+ Emoji</button><button class="btn petit" id="ajout-forme">+ Forme</button></div>
+          <div class="muet" style="font-size:11.5px;margin:-2px 0 6px">En haut de la liste = devant · glisser ▲▼ pour changer l'ordre</div>
+          <div id="liste-calques">${(pl.calques || []).slice().reverse().map(x => `
             <div class="calque-ligne ${x.id === E.sel || (E.multi.size > 1 && E.multi.has(x.id)) ? 'actif' : ''}" data-id="${x.id}" title="Maj+clic : choisir plusieurs">
               <span class="type">${NOMS_TYPE[x.type] || x.type}</span><span class="t">${esc(x.texte || (x.illu && window.Illustrations ? '✿ ' + Illustrations.nom(x.illu.id) : '') || nomMedia(x.media) || '(vide)')}</span>
-              <button data-a="vis" title="Afficher / masquer">${x.masque ? '○' : '●'}</button><button data-a="haut" title="Monter">▲</button><button data-a="bas" title="Descendre">▼</button><button data-a="suppr" title="Supprimer">✕</button>
+              <button data-a="vis" title="Afficher / masquer">${x.masque ? '○' : '●'}</button><button data-a="avance" title="Avancer (devant)">▲</button><button data-a="recule" title="Reculer (derrière)">▼</button><button data-a="suppr" title="Supprimer">✕</button>
             </div>`).join('') || '<p class="muet">Aucun calque.</p>'}</div>
         </details>
         <div id="props">${E.multi.size > 1 ? formulaireMulti() : c ? formulaireCalque(c) : '<p class="muet" style="margin-top:12px">Cliquez un calque dans la liste ou sur l\'aperçu pour le modifier. Glissez-le sur l\'aperçu pour le déplacer.</p>'}</div>`;
@@ -1820,6 +1869,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       surFond('p-c2', 'oninput', e => { E.modif(); pl.fond.couleur2 = e.target.value; });
       surFond('p-deg-type', 'onchange', e => { E.modif(true); if (e.target.value === 'radial') pl.fond.degrade = 'radial'; else delete pl.fond.degrade; afficher(); });
       surFond('p-angle', 'oninput', e => { E.modif(); pl.fond.angle = Number(e.target.value); });
+      surFond('p-fond-choisir', 'onclick', e => choisirFond(e.currentTarget.dataset.kind));
       surFond('fond-tous', 'onclick', () => { if (!confirm('Mettre ce fond (et ses réglages) sur tous les plans de l\'invitation ?')) return; E.modif(true); const modele = JSON.stringify(pl.fond); p.plans.forEach(x => { x.fond = JSON.parse(modele); }); majFond(true); toast('Fond appliqué à tous les plans (↶ pour annuler)'); });
       surFond('p-fond', 'onchange', e => { E.modif(true); pl.fond.media = e.target.value; eng.precharger().then(() => { eng._entrerPlan(); afficher(); }); });
       if ($('#imp-fond-plan', col)) $('#imp-fond-plan').onchange = async e => {
@@ -1848,19 +1898,35 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       $$('.calque-ligne', col).forEach(l => l.onclick = e => {
         const id = l.dataset.id, a = e.target.dataset.a, k = pl.calques.findIndex(x => x.id === id);
         if (a === 'vis') { E.modif(true); pl.calques[k].masque = !pl.calques[k].masque; E.rafraichir(); rendreReglages(); return; }
-        if (a === 'haut' && k > 0) { E.modif(true); [pl.calques[k - 1], pl.calques[k]] = [pl.calques[k], pl.calques[k - 1]]; E.rafraichir(); rendreReglages(); return; }
-        if (a === 'bas' && k < pl.calques.length - 1) { E.modif(true); [pl.calques[k + 1], pl.calques[k]] = [pl.calques[k], pl.calques[k + 1]]; E.rafraichir(); rendreReglages(); return; }
+        if (a === 'avance' && k < pl.calques.length - 1) { E.modif(true); [pl.calques[k + 1], pl.calques[k]] = [pl.calques[k], pl.calques[k + 1]]; E.rafraichir(); rendreReglages(); return; }
+        if (a === 'recule' && k > 0) { E.modif(true); [pl.calques[k - 1], pl.calques[k]] = [pl.calques[k], pl.calques[k - 1]]; E.rafraichir(); rendreReglages(); return; }
         if (a === 'suppr') { E.modif(true); pl.calques.splice(k, 1); if (E.sel === id) E.sel = null; E.rafraichir(); rendreReglages(); rendrePlans(); return; }
         if (e.shiftKey || e.ctrlKey || e.metaKey) { E.choisir(id, true); return; }
         E.choisir(id);
       });
       const ai = $('#ajout-illu', col); if (ai) ai.onclick = () => ouvrirIllustrations();
+      const af = $('#ajout-forme', col); if (af) af.onclick = () => choisirNouvelleForme(af);
       const ae = $('#ajout-emoji', col); if (ae) ae.onclick = () => ouvrirEmojis(ae, em => { E.modif(true); const n = { id: uid(), type: 'texte', texte: em, x: 50, y: 40, largeur: 30, police: 'Cormorant Garamond', taille: 9, align: 'center', couleur: '#000000', debut: 0.4, animation: 'rebond', sortie: 'aucune' }; plan().calques.push(n); fermerPop(); E.choisir(n.id); E.rafraichir(); rendreReglages(); rendrePlans(); toast('Emoji ajouté : agrandissez-le par les coins'); });
       if (E.multi.size > 1) lierMulti();
       else if (c) lierFormulaire(c);
+      accordeon(col, E.multi.size > 1 ? 'multi' : c ? c.type : 'plan');
       if (E.rendreBarre) E.rendreBarre();
     }
     E.rendreReglages = rendreReglages;
+    // Panneau façon Photoshop : une seule rubrique ouverte à la fois (la dernière utilisée), « Calques » toujours visible
+    const titreBloc = d => { const sm = d.querySelector('summary'); return sm ? (sm.childNodes[0] && sm.childNodes[0].textContent || sm.textContent).trim() : ''; };
+    function accordeon(col, quoi) {
+      const blocs = $$('details.bloc', col).filter(d => !/^Calques/.test(titreBloc(d)));
+      if (!blocs.length) return;
+      const cle = 'studio.panneau.' + quoi;
+      let ouvert = Stock.lire(cle, null);
+      if (!blocs.some(d => titreBloc(d) === ouvert)) ouvert = titreBloc(blocs.find(d => !/^Fond$|^Durée/.test(titreBloc(d))) || blocs[0]);
+      blocs.forEach(d => {
+        d.open = titreBloc(d) === ouvert;
+        d.addEventListener('toggle', () => { if (!d.open) return; blocs.forEach(x => { if (x !== d) x.open = false; }); if (Stock.lire(cle, null) !== titreBloc(d)) Stock.ecrire(cle, titreBloc(d)); });
+      });
+    }
+    E.ouvrirSection = nom => { const d = $$('#col-reglages details.bloc').find(x => titreBloc(x).startsWith(nom)); if (d) { d.open = true; d.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } };
 
     // Police choisie : on la charge puis on redessine (le canvas a besoin de la vraie police)
     ouvrirPolices.projet = p;
@@ -1884,13 +1950,81 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     const ratioCalque = c => ((Number(c.largeur) || 46) * 720) / ((Number(c.hauteur) || 22) * 1280);
     function choisirForme(c, id) {
       E.modif(true);
-      (E.multi.size > 1 ? selection() : [c]).filter(x => x.type === 'image' || x.type === 'video').forEach(x => { if (id) x.forme = id; else delete x.forme; });
+      (E.multi.size > 1 ? selection() : [c]).filter(aHauteur).forEach(x => { if (id) x.forme = id; else if (x.type === 'forme') x.forme = 'rect'; else delete x.forme; });
       if (id === 'libre' && !Array.isArray(c.forme_points)) { formeLibre(c); }
       E.rafraichir(); rendreReglages();
     }
     function formeLibre(c) {
       modaleFormeLibre(c, ratioCalque(c), (pts, lisse) => { E.modif(true); c.forme = 'libre'; c.forme_points = pts; if (lisse) c.forme_lisse = true; else delete c.forme_lisse; E.rafraichir(); rendreReglages(); toast('Forme appliquée'); });
     }
+    /* Choisir un fond : recherche + classement par événement ou par plan */
+    const NOMS_USAGE = { ouverture: 'Ouverture', titre: 'Plan titre', programme: 'Plans intermédiaires', confirmation: 'Confirmation', remerciement: 'Remerciement' };
+    function choisirFond(kind) {
+      const pl = plan(), estVideo = kind !== 'image';
+      const items = (estVideo
+        ? Fabrique.FONDS.map(f => Object.assign({ base: true }, f)).concat(medias.filter(m => m.type === 'fond'), Equipe.medias().filter(m => m.type === 'fond'))
+        : medias.filter(m => m.type === 'image').concat(Equipe.medias().filter(m => m.type === 'image')))
+        .filter((m, i, l) => m.src && l.findIndex(x => x.src === m.src) === i);
+      // où chaque fond est déjà utilisé : dans quels événements, sur quels plans
+      const usages = {};
+      Object.values(projets).forEach(x => (x.plans || []).forEach((q, k) => { const src = q.fond && q.fond.media; if (!src) return; const u = usages[src] = usages[src] || { evts: new Set(), roles: new Set(), ici: [] }; u.evts.add(x.id); u.roles.add(q.role); if (x.id === p.id) u.ici.push(k + 1); }));
+      const titreEvt = id => (projets[id] && projets[id].fiche && projets[id].fiche.titre) || 'Événement supprimé';
+      // fonds déjà posés sur des plans mais absents de la bibliothèque (fichiers publiés, anciens projets…)
+      Object.values(projets).forEach(x => (x.plans || []).forEach((q, k) => {
+        const f = q.fond || {}, t = MoteurInfo.typeFond(f), src = f.media;
+        if (!src || /^data:/.test(src) || items.some(m => m.src === src)) return;
+        const texte = ((q.calques || []).find(c => c.type === 'texte' && c.texte) || {}).texte || '';
+        if (estVideo ? (t === 'video' || t === 'defaut') : t === 'image') items.push({ src, nom: nomMedia(src) || ((ROLES[q.role] || 'Plan') + (texte ? ' · ' + texte.replace(/\s+/g, ' ').slice(0, 24) : ' ' + (k + 1))), evt: x.id, description: (x.fiche && x.fiche.titre) || '' });
+      }));
+      let mode = Stock.lire('studio.choixfond.mode', 'evenement'), q = '', portee = 'plan';
+      const groupes = liste => {
+        const g = new Map(), mettre = (k, m) => { if (!g.has(k)) g.set(k, []); if (!g.get(k).includes(m)) g.get(k).push(m); };
+        if (mode === 'tout') { liste.forEach(m => mettre('Tous les ' + (estVideo ? 'fonds' : 'photos') + ' (' + liste.length + ')', m)); return g; }
+        if (mode === 'evenement') {
+          liste.forEach(m => { const u = usages[m.src]; if ((u && u.evts.has(p.id)) || m.evt === p.id) mettre('★ Cet événement — ' + titreEvt(p.id), m); });
+          liste.forEach(m => { const u = usages[m.src]; const evts = new Set([...(u ? u.evts : []), ...(m.evt ? [m.evt] : [])]); evts.delete(p.id); evts.forEach(id => mettre(titreEvt(id), m)); });
+          liste.forEach(m => { if (m.base) mettre('Fonds de base du studio', m); else if (m.equipe) mettre('Bibliothèque de l\'équipe', m); else if (!(usages[m.src] || m.evt)) mettre('Pas encore utilisés', m); });
+        } else {
+          liste.forEach(m => { const u = usages[m.src]; const roles = new Set([...(u ? u.roles : [])].map(r => r === 'intermediaire' ? 'programme' : r)); if (m.usage) roles.add(m.usage); if (!roles.size) roles.add(''); roles.forEach(r => mettre(r ? (NOMS_USAGE[r] || r) : 'Pour tous les plans', m)); });
+          const ordre = ['Ouverture', 'Plan titre', 'Plans intermédiaires', 'Confirmation', 'Remerciement', 'Pour tous les plans'];
+          return new Map([...g.entries()].sort((a, b) => (ordre.indexOf(a[0]) + 99) % 99 - (ordre.indexOf(b[0]) + 99) % 99));
+        }
+        return g;
+      };
+      const carte = m => { const u = usages[m.src]; return `<button class="cf-carte ${pl.fond.media === m.src ? 'on' : ''}" data-src="${esc(m.src)}" title="${esc(m.nom || '')}"><img src="${esc(m.vignette && !/^idb:/.test(m.vignette) ? m.vignette : vignetteDe(m.src))}" alt="" loading="lazy"><span class="cf-nom">${esc(m.nom || 'Sans nom')}</span>${u && u.ici.length ? `<span class="cf-ici">plan ${u.ici.join(', ')}</span>` : ''}${m.equipe ? '<span class="cf-eq">équipe</span>' : ''}</button>`; };
+      modale(`<h2>${estVideo ? 'Choisir un fond' : 'Choisir une photo de fond'} <span class="muet" style="font-size:14px">— plan ${E.i + 1} · ${esc(ROLES[pl.role] || '')}</span></h2>
+        <div class="ligne" style="gap:8px;flex-wrap:wrap;margin:6px 0 10px"><input type="search" id="cf-q" placeholder="🔍 Rechercher (nom, événement, membre…)" style="flex:1;min-width:200px">
+          <div class="seg" id="cf-mode">${[['evenement', 'Par événement'], ['plan', 'Par plan'], ['tout', 'Tous']].map(([k, n]) => `<button data-m="${k}" class="${mode === k ? 'on' : ''}">${n}</button>`).join('')}</div></div>
+        <div class="ligne muet" style="gap:12px;flex-wrap:wrap;margin-bottom:8px">Appliquer à :<label class="cases" style="margin:0"><input type="radio" name="cf-p" value="plan" checked> ce plan</label><label class="cases" style="margin:0"><input type="radio" name="cf-p" value="role"> tous les plans « ${esc(ROLES[pl.role] || '')} »</label><label class="cases" style="margin:0"><input type="radio" name="cf-p" value="tous"> tous les plans</label></div>
+        <div id="cf-liste" class="cf-liste"></div>`, (box, fermer) => {
+        const rendre = () => {
+          const mots = q.toLowerCase().split(/\s+/).filter(Boolean);
+          const liste = items.filter(m => { if (!mots.length) return true; const u = usages[m.src]; const txt = [m.nom, m.description, m.auteur, m.usage && NOMS_USAGE[m.usage], ...(u ? [...u.evts].map(titreEvt) : []), m.evt && titreEvt(m.evt)].join(' ').toLowerCase(); return mots.every(w => txt.includes(w)); });
+          const g = groupes(liste);
+          $('#cf-liste', box).innerHTML = [...g.entries()].map(([t, l]) => `<h3 class="cf-titre">${esc(t)} <span class="muet">${l.length}</span></h3><div class="cf-grille">${l.map(carte).join('')}</div>`).join('') || '<p class="muet">Aucun résultat.</p>';
+          $$('.cf-carte', box).forEach(b => b.onclick = () => appliquer(b.dataset.src));
+        };
+        const appliquer = src => {
+          E.modif(true);
+          const cibles = portee === 'tous' ? p.plans : portee === 'role' ? p.plans.filter(x => x.role === pl.role) : [pl];
+          cibles.forEach(x => { x.fond = x.fond || {}; if (estVideo) { if (x.fond.type === 'image' || x.fond.type === 'couleur' || x.fond.type === 'aucun') delete x.fond.type; x.fond.media = src; } else { x.fond.type = 'image'; x.fond.media = src; delete x.fond.recadrage; } });
+          fermer(); toast(cibles.length > 1 ? 'Fond mis sur ' + cibles.length + ' plans' : 'Fond changé');
+          eng.precharger().then(() => { eng._entrerPlan(); afficher(); });
+        };
+        $('#cf-q', box).oninput = e => { q = e.target.value; rendre(); };
+        $$('#cf-mode [data-m]', box).forEach(b => b.onclick = () => { mode = b.dataset.m; Stock.ecrire('studio.choixfond.mode', mode); $$('#cf-mode [data-m]', box).forEach(x => x.classList.toggle('on', x === b)); rendre(); });
+        $$('input[name=cf-p]', box).forEach(r => r.onchange = () => { portee = r.value; });
+        rendre(); setTimeout(() => $('#cf-q', box).focus(), 50);
+      });
+    }
+    E.choisirFond = choisirFond;
+    // + Forme : rectangle, rond, cœur, étoile… (calque de couleur)
+    function choisirNouvelleForme(ancre) {
+      const d = pop(ancre, `<b style="display:block;margin:2px 4px 8px">▭ Ajouter une forme</b><div class="formes-grille">${I.FORMES.filter(([id]) => id && id !== 'libre').map(([id, nom]) => `<button class="forme-btn" data-nf="${id}" title="${esc(nom)}">${iconeForme(id, {}, 1)}<span>${esc(nom.replace(/ \(.*\)$/, ''))}</span></button>`).join('')}</div>`);
+      $$('[data-nf]', d).forEach(b => b.onclick = () => { fermerPop(); ajouterCalque('forme', b.dataset.nf); });
+    }
+    E.choisirNouvelleForme = choisirNouvelleForme;
+    E.ajouterCalque = (t, m) => ajouterCalque(t, m);
     function ouvrirFormes(ancre, c) {
       const d = pop(ancre, `<b style="display:block;margin:2px 4px 8px">◇ Forme du cadre</b>${grilleFormes(c, ratioCalque(c))}<button class="btn petit" data-pf-libre style="margin-top:8px;width:100%">✎ Modifier librement la forme (points)</button>`, 'pop-formes');
       $$('[data-forme]', d).forEach(b => b.onclick = () => { choisirForme(c, b.dataset.forme); $$('[data-forme]', d).forEach(x => x.classList.toggle('on', x === b)); });
@@ -1955,11 +2089,13 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       if (type === 'texte') c = Object.assign(base, { type, texte: 'Nouveau texte', police: 'Cormorant Garamond', taille: 4.4, align: 'center', ombre: true, animation: 'fondu-montee', sortie: 'aucune' });
       if (type === 'bouton') c = Object.assign(base, { type, texte: L.confirmer, action: 'suivant', style: 'plein', taille: 2.4, debut: 0 });
       if (type === 'compteur') c = Object.assign(base, { type, texte: L.adultes, champ: 'adultes', min: 0, defaut: 1, taille: 2.3, largeur: 66 });
+      if (type === 'forme') c = Object.assign(base, { type, forme: media || 'rect', largeur: 40, hauteur: Math.round(40 * 720 / 1280 * 10) / 10, couleur: p.style.couleur || '#7a1f2b', opacite: 1, animation: 'fondu', sortie: 'aucune' });
       if (type === 'image' || type === 'video') {
         const ratio = media && media.l && media.h ? media.h / media.l : 1;
         c = Object.assign(base, { type, media: media ? media.src : '', largeur: 46, hauteur: Math.round(Math.min(40, 46 * ratio * 720 / 1280)), y: 32, forme: 'arrondi', animation: 'fondu', sortie: 'aucune', bordure: '' });
       }
-      if (type === 'image' || type === 'video') {
+      if (type === 'forme') pl.calques.unshift(c);   // derrière les textes : à avancer ensuite si besoin
+      else if (type === 'image' || type === 'video') {
         // sous les textes, au-dessus du reste du plan, puis réorganisation sans chevauchement
         pl.calques.unshift(c);
         eng.empilerTextes(pl, 3);
@@ -2055,6 +2191,16 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <div class="trois"><label class="champ">Champ<select data-k="champ">${opts(['adultes', 'enfants', 'places_transport'], c.champ)}</select></label><label class="champ">Min<input type="number" data-k="min" value="${c.min || 0}"></label><label class="champ">Max<input type="number" data-k="max" value="${c.max || ''}" placeholder="places"></label></div>
         <div class="deux"><label class="champ">Taille<input type="number" data-k="taille" step="0.1" min="1" max="6" value="${c.taille || 2.3}"></label><label class="champ">Couleur<input type="color" data-k="couleur" value="${c.couleur || '#7a1f2b'}"></label></div></div></details>`;
       if (c.type === 'compteur') s += blocTraductions(c);
+      if (c.type === 'forme') s += `<details class="bloc" open><summary>▭ Forme</summary><div class="pile">
+        ${grilleFormes(c, ratioCalque(c)).replace(/<button class="forme-btn[^"]*" data-forme=""[\s\S]*?<\/button>/, '')}
+        ${c.forme === 'arrondi' ? `<label class="champ">Arrondi des coins<input type="range" data-k="arrondi" min="0" max="100" step="1" value="${c.arrondi != null && c.arrondi !== '' ? c.arrondi : 16}"></label>` : ''}
+        <button class="btn petit ${c.forme === 'libre' ? 'plein' : ''}" data-forme-libre>✎ ${c.forme === 'libre' ? 'Modifier les points' : 'Dessiner une forme libre'}</button>
+        <div class="trois"><label class="champ">Couleur<input type="color" data-k="couleur" value="${esc(c.couleur || '#7a1f2b')}"></label><label class="champ">Hauteur (%)<input type="number" data-k="hauteur" step="0.5" value="${c.hauteur || 22}"></label><label class="champ">Opacité<input type="range" data-k="opacite" min="0" max="1" step="0.05" value="${c.opacite != null && c.opacite !== '' ? c.opacite : 1}"></label></div>
+        <label class="cases"><input type="checkbox" data-forme-deg ${c.couleur2 ? 'checked' : ''}> Dégradé</label>
+        ${c.couleur2 ? `<div class="trois"><label class="champ">Vers<input type="color" data-k="couleur2" value="${esc(c.couleur2)}"></label><label class="champ">Type<select data-k="degrade">${opts([['lineaire', 'Linéaire'], ['radial', 'Rond']], c.degrade || 'lineaire')}</select></label>${c.degrade === 'radial' ? '' : `<label class="champ">Angle<input type="range" data-k="degrade_angle" min="0" max="360" step="5" value="${Number(c.degrade_angle) || 90}"></label>`}</div>` : ''}
+        <div class="ligne" style="gap:8px;flex-wrap:wrap;align-items:center"><label class="cases"><input type="checkbox" data-k="remplissage" ${c.remplissage !== false ? 'checked' : ''}> Remplie</label><label class="cases"><input type="checkbox" data-bordure-on ${c.bordure ? 'checked' : ''}> Contour</label>${c.bordure ? `<input type="color" data-k="bordure" value="${esc(c.bordure)}"><label class="champ" style="flex:1;min-width:110px">Épaisseur<input type="range" data-k="bordure_epaisseur" min="1" max="30" step="1" value="${Number(c.bordure_epaisseur) || 3}"></label>` : ''}<label class="cases"><input type="checkbox" data-k="ombre_cadre" ${c.ombre_cadre ? 'checked' : ''}> Ombre</label></div>
+        <label class="champ">Superposition (mode de fusion)<select data-k="fusion">${opts(I.FUSIONS, c.fusion || 'normal')}</select></label>
+        </div></details>` + blocAnimation(c);
       if (c.type === 'image' || c.type === 'video') s += `<details class="bloc" open><summary>Photo / vidéo</summary><div class="pile">
         ${c.media ? '' : '<div class="alerte-boite">Ce calque est vide : importez une photo ou une vidéo.</div>'}
         <div class="ligne"><label class="btn petit plein">${c.media ? 'Remplacer le fichier' : 'Importer une photo ou une vidéo'}<input type="file" data-remplacer accept="image/*,video/*" hidden></label></div>
@@ -2074,9 +2220,22 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <div class="ligne" style="gap:6px;flex-wrap:wrap"><button class="btn petit ${c.forme === 'libre' ? 'plein' : ''}" data-forme-libre>✎ ${c.forme === 'libre' ? 'Modifier les points de la forme' : 'Modifier librement cette forme'}</button></div>
         <div class="ligne" style="gap:8px;flex-wrap:wrap;align-items:center"><label class="cases"><input type="checkbox" data-bordure-on ${c.bordure ? 'checked' : ''}> Bordure</label>${c.bordure ? `<input type="color" data-k="bordure" value="${esc(c.bordure)}"><label class="champ" style="flex:1;min-width:120px">Épaisseur<input type="range" data-k="bordure_epaisseur" min="1" max="30" step="1" value="${c.bordure_epaisseur || 3}"></label>` : ''}<label class="cases"><input type="checkbox" data-k="ombre_cadre" ${c.ombre_cadre ? 'checked' : ''}> Ombre</label></div>
         </div></details>` + blocAnimation(c);
-      return s + position;
+      const ordre = `<details class="bloc" open><summary>Ordre (devant / derrière)</summary><div class="ligne" style="gap:6px;flex-wrap:wrap">
+        <button class="btn petit" data-ordre="avant">⤒ Tout devant</button><button class="btn petit" data-ordre="avance">↑ Avancer</button><button class="btn petit" data-ordre="recule">↓ Reculer</button><button class="btn petit" data-ordre="arriere">⤓ Tout derrière</button>
+        ${(c.type === 'image' || c.type === 'video') && c.media ? '<button class="btn petit" data-en-fond title="Cette photo / vidéo devient le fond du plan (derrière tout)">▣ Mettre en fond du plan</button>' : ''}</div>
+        <div class="muet" style="font-size:11.5px;margin-top:4px">Le fond du plan est toujours tout derrière. Ctrl+] / Ctrl+[ : avancer / reculer.</div></details>`;
+      return s + ordre + position;
     }
     function lierFormulaire(c) {
+      $$('#props [data-ordre]').forEach(b => b.onclick = () => ordreCalque(c, b.dataset.ordre));
+      const ef = $('#props [data-en-fond]'); if (ef) ef.onclick = () => {
+        const pl = plan(); E.modif(true);
+        pl.fond = Object.assign({}, pl.fond, { type: c.type === 'video' ? 'video' : 'image', media: c.media, boucle: true });
+        if (c.recadrage) pl.fond.recadrage = c.recadrage; else delete pl.fond.recadrage;
+        pl.calques = pl.calques.filter(x => x !== c); E.sel = null;
+        eng.precharger().then(() => { E.rafraichir(); rendreReglages(); rendrePlans(); toast('C\'est maintenant le fond du plan'); });
+      };
+      const fd = $('#props [data-forme-deg]'); if (fd) fd.onchange = () => { E.modif(true); if (fd.checked) c.couleur2 = '#ffffff'; else delete c.couleur2; E.rafraichir(); rendreReglages(); };
       $$('#props [data-trad]').forEach(t => t.oninput = () => { c.trad = c.trad || {}; if (t.value.trim()) c.trad[t.dataset.trad] = t.value; else delete c.trad[t.dataset.trad]; E.modif(); E.rafraichir(); });
       const rp = $('#props [data-remplacer]');
       if (rp) rp.onchange = async e => { const f = e.target.files[0]; if (!f) return; const m = await importerFichier(f, null, p.id); sauverMedias(); E.modif(true); c.media = m.src; c.type = m.type === 'video' ? 'video' : 'image'; eng.precharger().then(() => { E.rafraichir(); rendreReglages(); }); };

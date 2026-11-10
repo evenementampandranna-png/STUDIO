@@ -749,6 +749,22 @@
           ctx.strokeStyle = 'rgba(122,31,43,.5)'; ctx.setLineDash([8, 6]); ctx.strokeRect(-larg / 2, -haut / 2, larg, haut);
         }
         if (mesurer) this.bbox[c.id] = { x: (cx - larg / 2) / W * 100, y: (cy - haut / 2) / H * 100, w: larg / W * 100, h: haut / H * 100 };
+      } else if (c.type === 'forme') {
+        // forme dessinée : rectangle, rond, cœur, étoile… remplie d'une couleur ou d'un dégradé, avec contour
+        const haut = c.hauteur ? Number(c.hauteur) / 100 * H : larg;
+        const d = cheminForme(Object.assign({}, c, { forme: c.forme || 'rect' }), larg, haut);
+        const chemin = new Path2D(); chemin.addPath(new Path2D(d), new DOMMatrix().translate(-larg / 2, -haut / 2));
+        if (c.opacite != null && c.opacite !== '') ctx.globalAlpha *= clamp(Number(c.opacite), 0, 1);
+        if (c.couleur2) {
+          let g;
+          if (c.degrade === 'radial') g = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.max(larg, haut) / 2);
+          else { const a = (Number(c.degrade_angle) || 90) * Math.PI / 180, dx = Math.cos(a) * larg / 2, dy = Math.sin(a) * haut / 2; g = ctx.createLinearGradient(-dx, -dy, dx, dy); }
+          g.addColorStop(0, c.couleur || '#7a1f2b'); g.addColorStop(1, c.couleur2); ctx.fillStyle = g;
+        } else ctx.fillStyle = c.couleur || '#7a1f2b';
+        if (c.ombre_cadre) { ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 18; ctx.shadowOffsetY = 6; if (c.remplissage !== false) ctx.fill(chemin); ctx.restore(); }
+        if (c.remplissage !== false) ctx.fill(chemin);
+        if (c.bordure) { ctx.strokeStyle = c.bordure; ctx.lineWidth = Number(c.bordure_epaisseur) || 3; ctx.lineJoin = 'round'; ctx.stroke(chemin); }
+        if (mesurer) this.bbox[c.id] = { x: (cx - larg / 2) / W * 100, y: (cy - haut / 2) / H * 100, w: larg / W * 100, h: haut / H * 100 };
       }
       ctx.restore();
     }

@@ -405,3 +405,26 @@ textarea.edition-directe { position: absolute; z-index: 8; resize: none; overflo
 #boite-jeton .bj-carte { background: #fffdf9; border-radius: 16px; padding: 20px 22px; max-width: 520px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,.35); }
 #boite-jeton h3 { margin: 0 0 6px; }
 #boite-jeton input { width: 100%; }
+
+/* Atelier façon Photoshop : barre d'outils verticale + aperçu zoomable */
+.atelier { display: flex; gap: 10px; align-items: flex-start; width: 100%; justify-content: center; }
+.outils { display: flex; flex-direction: column; gap: 3px; padding: 6px; background: #2b2324; border-radius: 12px; box-shadow: 0 6px 20px rgba(0,0,0,.18); position: sticky; top: 80px; flex: none; }
+.outils button { width: 36px; height: 34px; border: 0; border-radius: 8px; background: transparent; color: #f4ede2; font: 600 15px Inter, sans-serif; cursor: pointer; display: grid; place-items: center; }
+.outils button:hover { background: #4a3c3d; }
+.outils #zoom-val { font-size: 10.5px; font-weight: 700; }
+.outils .sep { height: 1px; background: #4a3c3d; margin: 3px 4px; }
+.zone-zoom { min-width: 0; display: flex; }
+.zone-zoom > .cadre-regles { margin: 0 auto; }
+.zone-zoom.zoome { overflow: auto; max-width: min(100%, 900px); max-height: calc(100vh - 210px); border-radius: 12px; background: repeating-conic-gradient(#eee3d6 0% 25%, #f6efe6 0% 50%) 50% / 22px 22px; padding: 12px; }
+.apercu-cadre { height: calc(min(calc(100vh - 230px), 720px) * var(--zoom, 1)); min-height: calc(420px * var(--zoom, 1)); }
+@media (max-width: 700px) { .atelier { flex-direction: column; align-items: stretch; } .outils { flex-direction: row; flex-wrap: wrap; position: static; justify-content: center; } .outils .sep { width: 1px; height: auto; margin: 4px 3px; } }
+/* Choix du fond : recherche, par événement, par plan */
+.cf-liste { max-height: 62vh; overflow: auto; padding-right: 4px; }
+.cf-titre { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--vin); margin: 14px 0 8px; }
+.cf-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+.cf-carte { position: relative; border: 2px solid transparent; border-radius: 10px; padding: 0; background: #f4ede2; cursor: pointer; overflow: hidden; text-align: left; }
+.cf-carte:hover { border-color: #d8b9a0; } .cf-carte.on { border-color: var(--vin); }
+.cf-carte img { width: 100%; aspect-ratio: 9/16; object-fit: cover; display: block; }
+.cf-nom { display: block; font-size: 11.5px; padding: 4px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cf-ici, .cf-eq { position: absolute; top: 5px; left: 5px; font-size: 10px; font-weight: 700; background: var(--vin); color: #fff; border-radius: 6px; padding: 1px 5px; }
+.cf-eq { left: auto; right: 5px; background: #33445c; }
