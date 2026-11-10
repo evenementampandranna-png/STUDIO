@@ -406,18 +406,51 @@ textarea.edition-directe { position: absolute; z-index: 8; resize: none; overflo
 #boite-jeton h3 { margin: 0 0 6px; }
 #boite-jeton input { width: 100%; }
 
-/* Atelier façon Photoshop : barre d'outils verticale + aperçu zoomable */
-.atelier { display: flex; gap: 10px; align-items: flex-start; width: 100%; justify-content: center; }
-.outils { display: flex; flex-direction: column; gap: 3px; padding: 6px; background: #2b2324; border-radius: 12px; box-shadow: 0 6px 20px rgba(0,0,0,.18); position: sticky; top: 80px; flex: none; }
-.outils button { width: 36px; height: 34px; border: 0; border-radius: 8px; background: transparent; color: #f4ede2; font: 600 15px Inter, sans-serif; cursor: pointer; display: grid; place-items: center; }
-.outils button:hover { background: #4a3c3d; }
-.outils #zoom-val { font-size: 10.5px; font-weight: 700; }
-.outils .sep { height: 1px; background: #4a3c3d; margin: 3px 4px; }
-.zone-zoom { min-width: 0; display: flex; }
+/* ===== Éditeur disposé comme Photoshop, aux couleurs du studio =====
+   barre d'options en haut · outils à gauche · aperçu au centre · panneaux à droite (liste d'icônes + un panneau ouvert + Calques en bas) */
+.editeur.ps { grid-template-columns: 46px 220px minmax(320px, 1fr) 430px; gap: 12px; }
+.col-reglages.ps-col #props > p.muet { padding: 0 12px; }
+.editeur.ps > .barre-sel { grid-column: 1 / -1; justify-content: flex-start; position: sticky; top: 62px; z-index: 20; border-radius: 10px; box-shadow: 0 4px 14px rgba(60,20,20,.08); }
+.outils { display: flex; flex-direction: column; gap: 2px; padding: 5px; background: var(--papier); border: 1px solid var(--ligne); border-radius: 10px; box-shadow: var(--ombre); position: sticky; top: 118px; align-self: start; }
+.outils button { width: 34px; height: 32px; border: 0; border-radius: 6px; background: transparent; color: var(--vin); font: 600 15px Inter, sans-serif; cursor: pointer; display: grid; place-items: center; }
+.outils button:hover { background: #f1e5d6; }
+.outils #zoom-val { font-size: 10px; font-weight: 700; color: var(--gris); }
+.outils .sep { height: 1px; background: var(--ligne); margin: 3px 4px; }
+.atelier { display: flex; justify-content: center; width: 100%; }
+.zone-zoom { min-width: 0; display: flex; max-width: 100%; }
 .zone-zoom > .cadre-regles { margin: 0 auto; }
-.zone-zoom.zoome { overflow: auto; max-width: min(100%, 900px); max-height: calc(100vh - 210px); border-radius: 12px; background: repeating-conic-gradient(#eee3d6 0% 25%, #f6efe6 0% 50%) 50% / 22px 22px; padding: 12px; }
-.apercu-cadre { height: calc(min(calc(100vh - 230px), 720px) * var(--zoom, 1)); min-height: calc(420px * var(--zoom, 1)); }
-@media (max-width: 700px) { .atelier { flex-direction: column; align-items: stretch; } .outils { flex-direction: row; flex-wrap: wrap; position: static; justify-content: center; } .outils .sep { width: 1px; height: auto; margin: 4px 3px; } }
+.zone-zoom.zoome { overflow: auto; max-height: calc(100vh - 230px); border-radius: 12px; background: repeating-conic-gradient(#eee3d6 0% 25%, #f6efe6 0% 50%) 50% / 22px 22px; padding: 12px; }
+.apercu-cadre { height: calc(min(calc(100vh - 260px), 720px) * var(--zoom, 1)); min-height: calc(420px * var(--zoom, 1)); }
+.editeur.ps .col-apercu, .editeur.ps .col-plans, .editeur.ps .col-reglages { top: 118px; }
+/* panneaux de droite */
+.col-reglages.ps-col { display: grid; grid-template-columns: minmax(0, 1fr) 118px; align-content: start; padding: 0; overflow: auto; max-height: calc(100vh - 140px); }
+.col-reglages.ps-col > *:not(.ps-liste) { grid-column: 1; min-width: 0; }
+.col-reglages.ps-col > .section-titre { margin: 0; padding: 10px 12px 6px; }
+.col-reglages.ps-col details[hidden] { display: none !important; }
+.col-reglages.ps-col details.bloc { border-top: 0; padding: 0 12px 12px; }
+.col-reglages.ps-col #props > .section-titre { padding: 10px 0 2px; margin: 0; }
+.col-reglages.ps-col details.ps-panneau > summary, .col-reglages.ps-col details.ps-calques > summary { cursor: default; margin: 0 -12px 10px; padding: 7px 12px; background: #f4ece1; border-top: 1px solid var(--ligne); border-bottom: 1px solid var(--ligne); color: var(--vin); }
+.col-reglages.ps-col details.ps-panneau > summary::after, .col-reglages.ps-col details.ps-calques > summary::after { content: ""; }
+.col-reglages.ps-col details.ps-calques { order: 50; margin-top: 6px; }
+.col-reglages.ps-col #props { order: 1; }
+.ps-liste { grid-column: 2; grid-row: 1 / span 60; align-self: stretch; display: flex; flex-direction: column; gap: 1px; padding: 6px 4px; background: #f8f1e8; border-left: 1px solid var(--ligne); position: sticky; top: 0; }
+.ps-liste button { display: flex; align-items: center; gap: 6px; border: 0; background: transparent; padding: 7px 6px; border-radius: 6px; cursor: pointer; text-align: left; font: 600 11.5px Inter, sans-serif; color: #5b4a44; }
+.ps-liste button:hover { background: #efe3d4; }
+.ps-liste button.on { background: #fff; color: var(--vin); box-shadow: 0 1px 4px rgba(60,20,20,.1); }
+.ps-liste .ps-ic { width: 18px; text-align: center; font-size: 13px; flex: none; }
+.ps-liste .ps-nom { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 1250px) {
+  .editeur.ps { grid-template-columns: 46px 200px 1fr; }
+  .editeur.ps .col-reglages { grid-column: 1 / -1; position: static; max-height: none; }
+}
+@media (max-width: 760px) {
+  .editeur.ps { grid-template-columns: 1fr; }
+  .editeur.ps > .barre-sel { position: static; }
+  .outils { flex-direction: row; flex-wrap: wrap; position: static; justify-content: center; }
+  .outils .sep { width: 1px; height: auto; margin: 4px 3px; }
+  .col-reglages.ps-col { grid-template-columns: 1fr; }
+  .ps-liste { grid-column: 1; grid-row: auto; flex-direction: row; flex-wrap: wrap; position: static; order: -1; border-left: 0; border-bottom: 1px solid var(--ligne); }
+}
 /* Choix du fond : recherche, par événement, par plan */
 .cf-liste { max-height: 62vh; overflow: auto; padding-right: 4px; }
 .cf-titre { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--vin); margin: 14px 0 8px; }
@@ -429,50 +462,9 @@ textarea.edition-directe { position: absolute; z-index: 8; resize: none; overflo
 .cf-ici, .cf-eq { position: absolute; top: 5px; left: 5px; font-size: 10px; font-weight: 700; background: var(--vin); color: #fff; border-radius: 6px; padding: 1px 5px; }
 .cf-eq { left: auto; right: 5px; background: #33445c; }
 
-/* ===== Panneau de droite façon Photoshop (sombre, rubriques repliables) ===== */
-.editeur .col-reglages { --ps-fond: #2b2b2b; --ps-panneau: #323232; --ps-titre: #3d3d3d; --ps-champ: #1f1f1f; --ps-bord: #4a4a4a; --ps-texte: #e3e3e3; --ps-muet: #a3a3a3; --ps-accent: #e0606e;
-  background: var(--ps-fond); color: var(--ps-texte); border-color: #1d1d1d; border-radius: 10px; padding: 0 0 8px; font-size: 12.5px; box-shadow: 0 8px 26px rgba(0,0,0,.28); }
-.editeur .col-reglages .section-titre { background: #222; color: #fff; margin: 0; padding: 9px 12px; font-size: 11px; letter-spacing: .08em; border-bottom: 1px solid #111; }
-.editeur .col-reglages details.bloc { border-top: 1px solid #1d1d1d; padding: 0; background: var(--ps-panneau); }
-.editeur .col-reglages details.bloc > summary { margin: 0; padding: 8px 12px; background: var(--ps-titre); color: #f0f0f0; font-size: 11px; letter-spacing: .07em; }
-.editeur .col-reglages details.bloc > summary:hover { background: #474747; }
-.editeur .col-reglages details.bloc[open] > summary { border-bottom: 1px solid #262626; }
-.editeur .col-reglages details.bloc > :not(summary) { margin-left: 12px; margin-right: 12px; }
-.editeur .col-reglages details.bloc[open] { padding-bottom: 12px; }
-.editeur .col-reglages details.bloc[open] > summary + * { margin-top: 10px; }
-.editeur .col-reglages .muet, .editeur .col-reglages .champ { color: var(--ps-muet); }
-.editeur .col-reglages b, .editeur .col-reglages h3 { color: #fff; }
-.editeur .col-reglages input[type=text], .editeur .col-reglages input[type=number], .editeur .col-reglages input[type=date], .editeur .col-reglages input[type=time], .editeur .col-reglages input[type=url], .editeur .col-reglages input[type=tel], .editeur .col-reglages input[type=search], .editeur .col-reglages select, .editeur .col-reglages textarea {
-  background: var(--ps-champ); color: var(--ps-texte); border: 1px solid var(--ps-bord); border-radius: 4px; font-size: 12.5px; }
-.editeur .col-reglages input:focus, .editeur .col-reglages select:focus, .editeur .col-reglages textarea:focus { outline: 1px solid #5b8fd9; border-color: #5b8fd9; }
-.editeur .col-reglages input[type=color] { background: var(--ps-champ); border-color: var(--ps-bord); border-radius: 4px; }
-.editeur .col-reglages input[type=range] { accent-color: #8fb4ec; }
-.editeur .col-reglages .btn { background: #3f3f3f; color: #eee; border: 1px solid #555; border-radius: 4px; font-size: 12px; padding: 5px 10px; }
-.editeur .col-reglages .btn:hover { background: #4b4b4b; border-color: #6a6a6a; }
-.editeur .col-reglages .btn.plein { background: #2f6fd1; border-color: #2f6fd1; color: #fff; }
-.editeur .col-reglages .btn.plein:hover { background: #2a62b8; }
-.editeur .col-reglages .btn.ia { background: linear-gradient(90deg, #6d3fd1, #b0399c); border: 0; color: #fff; }
-.editeur .col-reglages .btn.danger { color: #ff8f99; }
-.editeur .col-reglages .seg button { background: #3a3a3a; color: #ddd; border-color: #555; border-radius: 4px; }
-.editeur .col-reglages .seg button.on { background: #2f6fd1; border-color: #2f6fd1; color: #fff; }
-.editeur .col-reglages .calque-ligne { background: #393939; color: #e8e8e8; border-radius: 3px; margin-bottom: 1px; border: 1px solid transparent; }
-.editeur .col-reglages .calque-ligne:hover { background: #444; }
-.editeur .col-reglages .calque-ligne.actif { background: #2c4f86; border-color: #3d6bb3; }
-.editeur .col-reglages .calque-ligne .type, .editeur .col-reglages .calque-ligne button { color: #b9b9b9; }
-.editeur .col-reglages .forme-btn { background: #3a3a3a; border-color: #555; color: #ddd; }
-.editeur .col-reglages .forme-btn.on { background: #2c4f86; border-color: #3d6bb3; box-shadow: none; }
-.editeur .col-reglages .forme-btn svg path, .editeur .col-reglages .forme-btn svg rect { fill: #cfcfcf; }
-.editeur .col-reglages .alerte-boite { background: #3d3426; border-color: #6b5a3a; color: #f1d9a8; }
-.editeur .col-reglages .fond-actuel img { border-color: #555; }
-.editeur .col-reglages .cases { color: var(--ps-texte); }
-.editeur .col-reglages a { color: #8fb4ec; }
 /* boutons : types et fonctions */
 .types-bouton { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 4px; }
 .types-bouton button { display: flex; align-items: center; gap: 5px; padding: 6px 7px; font: 600 11.5px Inter, sans-serif; border: 1px solid var(--ligne); background: #fff; border-radius: 6px; cursor: pointer; text-align: left; color: inherit; }
 .types-bouton button span { font-size: 14px; }
 .types-bouton button.on { background: var(--vin); border-color: var(--vin); color: #fff; }
-.editeur .col-reglages .types-bouton button { background: #3a3a3a; border-color: #555; color: #e3e3e3; border-radius: 4px; }
-.editeur .col-reglages .types-bouton button:hover { background: #474747; }
-.editeur .col-reglages .types-bouton button.on { background: #2f6fd1; border-color: #2f6fd1; color: #fff; }
 .aide-bouton { font-size: 12px; padding: 7px 9px; border-radius: 5px; background: #f4ede2; }
-.editeur .col-reglages .aide-bouton { background: #262626; color: #cfcfcf; border: 1px solid #444; }

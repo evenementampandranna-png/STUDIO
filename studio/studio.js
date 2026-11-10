@@ -638,6 +638,11 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-10-4', date: '10 novembre 2026', titre: 'Éditeur disposé comme Photoshop, aux couleurs du studio', points: [
+      '<b>En haut</b> : la barre d\'options du calque choisi, sur toute la largeur. <b>À gauche</b> : la colonne d\'outils. <b>Au centre</b> : l\'aperçu.',
+      '<b>À droite</b> : la liste des panneaux (icône + nom : Fond, Durée, Texte, Animation, Ordre, Position…) ; on clique un nom pour ouvrir ce panneau seul. <b>Calques</b> reste toujours en bas, comme dans Photoshop.',
+      'Fond : la liste déroulante « Ou dans la liste » est retirée ; tout passe par « 🔍 Choisir un fond… ».'
+    ] },
     { id: '2026-11-10-3', date: '10 novembre 2026', titre: 'Panneau sombre façon Photoshop, boutons prêts à l\'emploi, vidéos de toute l\'équipe', points: [
       '<b>Panneau de droite</b> au style Photoshop : sombre, rubriques à titre gris, champs compacts.',
       '<b>Boutons</b> : choisissez ce que fait le bouton — ✅ Je confirme (enregistré dans la base, l\'organisateur est prévenu), ❌ Je ne viens pas, 📍 Itinéraire (lieu de la Fiche ou autre adresse / lien Maps), 📞 Appeler, 💬 WhatsApp (contact ou autre numéro), 📅 Calendrier, 📤 Partager, 🔗 Lien web, Messenger, Continuer, Retour… Le texte se met tout seul dans la langue de l\'invitation ; « Ouvrir pour tester ↗ ».',
@@ -1156,17 +1161,17 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
   function ongletPlans(p) {
     const E = { p, i: 0, sel: null, t: 0, vue: 'famille', annuler: [], refaire: [] };
     Stock.ecrire('studio.bib.evt', p.id);
-    $('#onglet').innerHTML = `<div class="editeur">
-        <div class="col-plans" id="col-plans"></div>
-        <div class="col-apercu">
-          <div class="barre-sel" id="barre-sel"></div>
-          <div class="atelier">
+    $('#onglet').innerHTML = `<div class="editeur ps">
+        <div class="barre-sel" id="barre-sel"></div>
           <div class="outils" id="outils">
             <button data-outil="texte" title="Texte">T</button><button data-outil="forme" title="Forme (rectangle, rond, cœur…)">▭</button><button data-outil="photo" title="Photo / vidéo">🖼</button>
             <button data-outil="illu" title="Illustration">✿</button><button data-outil="emoji" title="Emoji">😊</button><button data-outil="bouton" title="Bouton">⏺</button><button data-outil="compteur" title="Compteur">±</button>
             <span class="sep"></span><button data-outil="fond" title="Fond du plan">▦</button>
             <span class="sep"></span><button data-outil="zoom+" title="Zoom avant (Ctrl +)">＋</button><button data-outil="zoom0" title="Ajuster à l'écran (Ctrl 0)" id="zoom-val">100%</button><button data-outil="zoom-" title="Zoom arrière (Ctrl −)">－</button>
           </div>
+        <div class="col-plans" id="col-plans"></div>
+        <div class="col-apercu">
+          <div class="atelier">
           <div class="zone-zoom" id="zone-zoom">
           <div class="cadre-regles" id="cadre-regles"><canvas class="regle regle-h" id="regle-h"></canvas><canvas class="regle regle-v" id="regle-v"></canvas><span class="regle-coin" title="Règles"></span>
           <div class="apercu-cadre" id="cadre" tabindex="0"><div id="scene"></div><div class="poignees" id="poignees"></div><div class="aimants" id="aimants"></div></div></div>
@@ -1841,14 +1846,14 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           ${typeF === 'video' || typeF === 'defaut' ? `
           <div class="fond-actuel"><img src="${esc(vignetteDe(pl.fond.media))}" alt=""><div style="min-width:0"><b>${esc(fondActuel ? fondActuel.nom : '—')}</b>
             <div class="muet">${nbMemeFond > 1 ? `Utilisé par ${nbMemeFond} plans` : 'Utilisé par ce plan seulement'}</div></div></div>
-          <button class="btn plein" id="p-fond-choisir" data-kind="video" style="width:100%;margin:4px 0 8px">🔍 Choisir un fond… <span class="muet" style="color:inherit;opacity:.8">(recherche, par événement, par plan)</span></button>
-          <label class="champ">Ou dans la liste<select id="p-fond">${fonds.map(f => `<option value="${esc(f.src)}" ${pl.fond.media === f.src ? 'selected' : ''}>${esc(f.nom)} (${esc(f.usage)})</option>`).join('')}</select></label>
+          <button class="btn plein" id="p-fond-choisir" data-kind="video" style="width:100%;margin:4px 0 8px" title="Recherche, par événement, par plan">🔍 Choisir un fond…</button>
+
           <div class="ligne" style="margin-top:8px"><label class="btn petit">Importer un fond<input type="file" id="imp-fond-plan" accept="video/*" hidden></label><button class="btn petit ia" id="fond-ia" title="S'ouvre dans la Bibliothèque">✨ Créer avec l'IA (Bibliothèque)</button><button class="btn petit" id="fond-couper">✂ Couper${MoteurInfo.plage(pl.fond) ? ' (' + MoteurInfo.plage(pl.fond).map(x => x.toFixed(1)).join(' → ') + ' s)' : ''}</button><button class="btn petit" id="fond-rogner">⬚ Rogner${pl.fond.recadrage ? ' ✓' : ''}</button></div>
           <label class="champ" style="margin-top:8px">Vitesse de la vidéo<select id="p-vitesse">${optsVitesse(pl.fond.vitesse)}</select></label>` : ''}
           ${typeF === 'image' ? `
           <div class="fond-actuel"><img src="${esc(vignettePlan(pl))}" alt=""><div style="min-width:0"><b>${esc(nomMedia(pl.fond.media) || 'Photo')}</b><div class="muet">Photo en fond d'écran (remplit tout l'écran)</div></div></div>
-          <button class="btn plein" id="p-fond-choisir" data-kind="image" style="width:100%;margin:4px 0 8px">🔍 Choisir une photo… <span class="muet" style="color:inherit;opacity:.8">(recherche, par événement, par plan)</span></button>
-          <label class="champ">Ou dans la liste<select id="p-fond-img"><option value="">—</option>${photosFond.map(m => `<option value="${esc(m.src)}" ${pl.fond.media === m.src ? 'selected' : ''}>${esc(m.nom)}${m.equipe ? ' — équipe' : ''}</option>`).join('')}</select></label>
+          <button class="btn plein" id="p-fond-choisir" data-kind="image" style="width:100%;margin:4px 0 8px" title="Recherche, par événement, par plan">🔍 Choisir une photo…</button>
+
           <div class="ligne" style="margin-top:8px"><label class="btn petit plein">Importer une photo<input type="file" id="imp-fond-img" accept="image/*" hidden></label><button class="btn petit" id="fond-rogner">⬚ Rogner${pl.fond.recadrage ? ' ✓' : ''}</button></div>
           <label class="champ" style="margin-top:8px">Flou<input type="range" id="p-flou" min="0" max="20" step="1" value="${pl.fond.flou || 0}"></label>` : ''}
           ${typeF === 'couleur' ? `
@@ -1948,18 +1953,31 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     E.rendreReglages = rendreReglages;
     // Panneau façon Photoshop : une seule rubrique ouverte à la fois (la dernière utilisée), « Calques » toujours visible
     const titreBloc = d => { const sm = d.querySelector('summary'); return sm ? (sm.childNodes[0] && sm.childNodes[0].textContent || sm.textContent).trim() : ''; };
+    const ICONES_PANNEAU = [[/^Fond/, '▦'], [/^Durée/, '⏱'], [/^Calques/, '☰'], [/^Texte/, 'T'], [/^Style|^Arrière|^Ombre|^Contour/, '🎨'], [/^⏱|^Compte/, '⏳'], [/^Traduction/, '🌐'], [/^Animation/, '✦'], [/^Position/, '✥'], [/^Ordre/, '⇅'], [/^Bouton/, '⏺'], [/^Compteur/, '±'], [/^▭/, '▭'], [/^◇/, '◇'], [/^Photo/, '🖼'], [/^Alignement|^Plusieurs|^Sélection/, '⊞']];
+    const iconePanneau = t => (ICONES_PANNEAU.find(([r]) => r.test(t)) || [0, '•'])[1];
+    // Panneaux façon Photoshop : liste d'icônes à droite, un seul panneau ouvert à la fois ; « Calques » toujours visible en bas
     function accordeon(col, quoi) {
       const blocs = $$('details.bloc', col).filter(d => !/^Calques/.test(titreBloc(d)));
+      const calques = $$('details.bloc', col).find(d => /^Calques/.test(titreBloc(d)));
+      if (calques) { calques.open = true; calques.classList.add('ps-calques'); const sm = calques.querySelector('summary'); if (sm) sm.onclick = e => e.preventDefault(); }
       if (!blocs.length) return;
       const cle = 'studio.panneau.' + quoi;
       let ouvert = Stock.lire(cle, null);
       if (!blocs.some(d => titreBloc(d) === ouvert)) ouvert = titreBloc(blocs.find(d => !/^Fond$|^Durée/.test(titreBloc(d))) || blocs[0]);
-      blocs.forEach(d => {
-        d.open = titreBloc(d) === ouvert;
-        d.addEventListener('toggle', () => { if (!d.open) return; blocs.forEach(x => { if (x !== d) x.open = false; }); if (Stock.lire(cle, null) !== titreBloc(d)) Stock.ecrire(cle, titreBloc(d)); });
-      });
+      const montrer = t => {
+        ouvert = t;
+        blocs.forEach(d => { const on = titreBloc(d) === t; d.open = true; d.hidden = !on; d.classList.add('ps-panneau'); });
+        $$('.ps-liste button', col).forEach(b => b.classList.toggle('on', b.dataset.p === t));
+        if (Stock.lire(cle, null) !== t) Stock.ecrire(cle, t);
+      };
+      blocs.forEach(d => { const sm = d.querySelector('summary'); if (sm) sm.onclick = e => e.preventDefault(); });
+      const liste = document.createElement('div'); liste.className = 'ps-liste';
+      liste.innerHTML = blocs.map(d => { const t = titreBloc(d); return `<button type="button" data-p="${esc(t)}" title="${esc(t)}"><span class="ps-ic">${iconePanneau(t)}</span><span class="ps-nom">${esc(t.replace(/^[^\wÀ-ÿ]+\s*/, ''))}</span></button>`; }).join('');
+      col.classList.add('ps-col'); col.appendChild(liste);
+      $$('button', liste).forEach(b => b.onclick = () => montrer(b.dataset.p));
+      montrer(ouvert);
     }
-    E.ouvrirSection = nom => { const d = $$('#col-reglages details.bloc').find(x => titreBloc(x).startsWith(nom)); if (d) { d.open = true; d.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } };
+    E.ouvrirSection = nom => { const b = $$('#col-reglages .ps-liste button').find(x => x.dataset.p.startsWith(nom)); if (b) b.click(); const d = $$('#col-reglages details.bloc').find(x => titreBloc(x).startsWith(nom)); if (d) { d.open = true; d.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } };
 
     // Police choisie : on la charge puis on redessine (le canvas a besoin de la vraie police)
     ouvrirPolices.projet = p;
