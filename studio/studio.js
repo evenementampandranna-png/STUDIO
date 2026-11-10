@@ -237,8 +237,21 @@
     },
     // après chaque ajout de fond ou de vidéo : partage automatique (sans bloquer)
     apresAjout(m, p) {
-      if (!this.actif() || reglages.equipe.auto === false || !m || !(m.type === 'fond' || m.anime)) return;
+      if (!this.actif() || reglages.equipe.auto === false || !m || !(m.type === 'fond' || m.type === 'video' || m.anime)) return;
       this.partager(m, p && p.fiche && p.fiche.titre).then(() => toast('Partagé avec l\'équipe : ' + m.nom)).catch(e => toast('Partage avec l\'équipe impossible : ' + e.message));
+    },
+    // rattrapage : toutes mes vidéos et mes fonds pas encore partagés partent vers l'équipe (un par un, sans bloquer)
+    async rattraper() {
+      if (!this.actif() || reglages.equipe.auto === false || this._rattrapage) return;
+      this._rattrapage = true; let n = 0;
+      try {
+        const l = medias.filter(m => (m.type === 'fond' || m.type === 'video' || m.anime) && !m.equipe_id && !m.brouillon && /^idb:/.test(m.src || ''));
+        for (const m of l) {
+          if (!navigator.onLine) break;
+          try { await this.partager(m, projets[m.evt] && projets[m.evt].fiche && projets[m.evt].fiche.titre); n++; } catch (e) { console.warn('partage', m.nom, e.message); if (/fetch|network|402|quota|restrict/i.test(e.message)) break; }
+        }
+        if (n) toast(n + ' vidéo(s) / fond(s) partagé(s) avec l\'équipe');
+      } finally { this._rattrapage = false; }
     },
     // temps de fabrication d'une vidéo, envoyé à l'admin
     noter(type, nom, secondes, p) {
@@ -625,6 +638,11 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-10-3', date: '10 novembre 2026', titre: 'Panneau sombre façon Photoshop, boutons prêts à l\'emploi, vidéos de toute l\'équipe', points: [
+      '<b>Panneau de droite</b> au style Photoshop : sombre, rubriques à titre gris, champs compacts.',
+      '<b>Boutons</b> : choisissez ce que fait le bouton — ✅ Je confirme (enregistré dans la base, l\'organisateur est prévenu), ❌ Je ne viens pas, 📍 Itinéraire (lieu de la Fiche ou autre adresse / lien Maps), 📞 Appeler, 💬 WhatsApp (contact ou autre numéro), 📅 Calendrier, 📤 Partager, 🔗 Lien web, Messenger, Continuer, Retour… Le texte se met tout seul dans la langue de l\'invitation ; « Ouvrir pour tester ↗ ».',
+      '<b>🎬 Vidéos</b> : films terminés <b>et</b> fonds vidéo de tous les membres. Toutes vos vidéos et fonds non partagés partent automatiquement vers l\'équipe (ou bouton « Les partager maintenant »).'
+    ] },
     { id: '2026-11-10-2', date: '10 novembre 2026', titre: 'Éditeur façon Photoshop : outils, formes, zoom, ordre des calques, choix du fond', points: [
       '<b>Barre d\'outils à gauche de l\'aperçu</b> : T texte, ▭ forme, 🖼 photo, ✿ illustration, 😊 emoji, boutons, ▦ fond, et le zoom.',
       '<b>Panneau de droite</b> : une seule rubrique ouverte à la fois (cliquez son titre pour l\'ouvrir) ; le studio se souvient de la dernière utilisée. « Calques » reste toujours visible.',
@@ -1115,6 +1133,21 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
   const PALETTE_FONDS = [['#f4ede2'], ['#ffffff'], ['#fdf6ec'], ['#f6e1e1'], ['#e9efe4'], ['#e7eef6'], ['#1d1414'], ['#7a1f2b'], ['#b08a4f'], ['#3b4a3a'], ['#1f2a44'],
     ['#fdf6ec', '#ead5b8'], ['#fff5f5', '#f2c4ce'], ['#eef3ea', '#b9cdb0'], ['#f1f5fb', '#b9c9e2'], ['#7a1f2b', '#2b0b10'], ['#1f2a44', '#0b0f1c'], ['#f7e7c6', '#c9a15a'], ['#ffffff', '#e6dccb']];
   const ROLES = { ouverture: 'Ouverture', intermediaire: 'Plan intermédiaire', confirmation: 'Confirmation', remerciement: 'Remerciement' };
+  const TYPES_BOUTON = [
+    { a: 'confirmer', i: '✅', n: 'Je confirme', fr: 'Je confirme ma présence', mg: 'Ho tonga aho', en: 'I will attend', aide: 'Enregistre la présence dans la base (organisateur prévenu), puis remerciement.' },
+    { a: 'refuser', i: '❌', n: 'Je ne viens pas', fr: 'Je ne pourrai pas venir', mg: 'Tsy ho afaka aho', en: 'I can\'t come', aide: 'Enregistre l\'absence dans la base (organisateur prévenu), puis remerciement.' },
+    { a: 'map', i: '📍', n: 'Itinéraire', fr: 'Voir le lieu', mg: 'Jereo ny toerana', en: 'See the place', aide: 'Ouvre Google Maps sur le lieu choisi.' },
+    { a: 'appeler', i: '📞', n: 'Appeler', fr: 'Appeler', mg: 'Antsoy', en: 'Call', aide: 'Appelle le numéro choisi.' },
+    { a: 'whatsapp', i: '💬', n: 'WhatsApp', fr: 'Écrire sur WhatsApp', mg: 'Hafatra WhatsApp', en: 'WhatsApp', aide: 'Ouvre WhatsApp avec un message prêt.' },
+    { a: 'calendrier', i: '📅', n: 'Calendrier', fr: 'Ajouter au calendrier', mg: 'Ampidiro amin\'ny tetiandro', en: 'Add to calendar', aide: 'Ajoute l\'événement dans le calendrier du téléphone.' },
+    { a: 'partager', i: '📤', n: 'Partager', fr: 'Partager l\'invitation', mg: 'Zarao', en: 'Share', aide: 'Partage le lien de l\'invitation.' },
+    { a: 'lien', i: '🔗', n: 'Lien web', fr: 'Ouvrir le lien', mg: 'Sokafy', en: 'Open link', aide: 'Ouvre une page web (Facebook, YouTube, cagnotte, programme…).' },
+    { a: 'messenger', i: '💭', n: 'Messenger', fr: 'Écrire sur Messenger', mg: 'Hafatra Messenger', en: 'Messenger', aide: 'Ouvre une conversation Messenger.' },
+    { a: 'suivant', i: '▶', n: 'Continuer', fr: 'Continuer', mg: 'Manaraka', en: 'Continue', aide: 'Passe au plan suivant.' },
+    { a: 'precedent', i: '◀', n: 'Retour', fr: 'Retour', mg: 'Hiverina', en: 'Back', aide: 'Revient au plan précédent.' },
+    { a: 'passer', i: '⏭', n: 'Passer le film', fr: 'Passer', mg: 'Dinganina', en: 'Skip', aide: 'Va directement à la confirmation.' },
+    { a: 'revoir', i: '↺', n: 'Revoir', fr: 'Revoir le film', mg: 'Avereno jerena', en: 'Watch again', aide: 'Relance le film depuis le début.' }
+  ];
   const NOMS_TYPE = { texte: 'Texte', bouton: 'Bouton', compteur: 'Compteur', champ: 'Champ', image: 'Image', video: 'Vidéo', forme: 'Forme' };
   const aHauteur = c => !!c && (c.type === 'image' || c.type === 'video' || c.type === 'forme');
   const nomType = c => c.illu ? 'Illustration' : NOMS_TYPE[c.type];
@@ -2164,6 +2197,25 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         ${ls.map(l => `<label class="champ">${esc(MoteurInfo.LANGUES[l] || l)}${c.trad && c.trad[l] ? '' : ' <span class="badge alerte">à traduire</span>'}<textarea data-trad="${l}" rows="2">${esc((c.trad && c.trad[l]) || '')}</textarea></label>`).join('')}
         <span class="muet">Vide = le texte d'origine s'affiche. Pour tout traduire d'un coup : 🌐 Traduire sous l'aperçu.</span></div></details>`;
     }
+    // Ce que fait chaque bouton, et ce qu'il faut régler
+    function champsAction(c) {
+      const a = c.action || 'suivant', f = p.fiche || {}, lieux = f.lieux || [], contacts = f.contacts || [];
+      const t = TYPES_BOUTON.find(x => x.a === a) || TYPES_BOUTON[0];
+      let h = `<div class="aide-bouton">${t.i} ${esc(t.aide)}</div>`;
+      if (a === 'map') h += `<label class="champ">Lieu<select data-k="cible">${lieux.map((l, i) => `<option value="${i}" ${Number(c.cible || 0) === i ? 'selected' : ''}>${esc(l.nom || 'Lieu ' + (i + 1))}</option>`).join('') || '<option value="0">— aucun lieu dans la Fiche —</option>'}</select></label>
+        <label class="champ">Ou une autre adresse / un lien Google Maps<input type="text" data-k="lien" placeholder="ex. Hôtel Colbert Antananarivo, ou https://maps.app.goo.gl/…" value="${esc(c.lien || '')}"></label>
+        <button class="btn petit" data-tester-bouton>Ouvrir pour tester ↗</button>`;
+      if (a === 'appeler' || a === 'whatsapp') h += `<label class="champ">Contact<select data-k="cible">${contacts.map((k, i) => `<option value="${i}" ${Number(c.cible || 0) === i ? 'selected' : ''}>${esc((k.nom || 'Contact ' + (i + 1)) + ' — ' + (k.telephone || ''))}</option>`).join('') || '<option value="0">— aucun contact dans la Fiche —</option>'}</select></label>
+        <label class="champ">Ou un autre numéro<input type="tel" data-k="tel" placeholder="ex. 034 12 345 67" value="${esc(c.tel || '')}"></label>
+        <button class="btn petit" data-tester-bouton>${a === 'whatsapp' ? 'Ouvrir WhatsApp pour tester ↗' : 'Tester le numéro'}</button>`;
+      if (a === 'lien' || a === 'messenger') h += `<label class="champ">${a === 'messenger' ? 'Lien Messenger (m.me/…)' : 'Adresse du lien'}<input type="url" data-k="lien" placeholder="https://…" value="${esc(c.lien || '')}"></label><button class="btn petit" data-tester-bouton>Ouvrir pour tester ↗</button>`;
+      if (a === 'confirmer' || a === 'refuser') {
+        const base = reglages.supabase && reglages.supabase.url;
+        h += `<div class="alerte-boite" style="background:${base ? '#eef7ee;border-color:#bfe0bf;color:#245a24' : '#fdecec;border-color:#efc2c2;color:#7a1f2b'}">${base ? '✓ Relié à la base : la réponse ' + (a === 'confirmer' ? '(avec le nombre d\'adultes et d\'enfants) ' : '') + 'arrive tout de suite dans l\'espace de l\'organisateur, puis l\'invité voit le plan Remerciement.' : '⚠ Base non reliée : Réglages → Supabase. Sans elle, la réponse ne peut pas être enregistrée.'}</div>`;
+      }
+      if (a === 'calendrier') h += `<div class="muet">Utilise la date, l'heure et le premier lieu de la Fiche (${esc(f.date || 'date à remplir')}${f.heure ? ' à ' + esc(f.heure) : ''}).</div>`;
+      return h;
+    }
     function formulaireCalque(c) {
       const position = `<details class="bloc" open><summary>Position</summary>
         <div class="trois"><label class="champ">X (%)<input type="number" id="cx" data-k="x" step="0.5" value="${c.x}"></label><label class="champ">Y (%)<input type="number" id="cy" data-k="y" step="0.5" value="${c.y}"></label><label class="champ">Largeur (%)<input type="number" data-k="largeur" step="1" value="${c.largeur || 60}"></label></div>
@@ -2179,10 +2231,10 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <label class="champ">Épaisseur des lettres<select data-k="graisse">${opts([['', c.gras ? 'Gras (auto)' : 'Normale (auto)'], ['100', 'Très fine (100)'], ['300', 'Fine (300)'], ['400', 'Normale (400)'], ['500', 'Moyenne (500)'], ['600', 'Demi-grasse (600)'], ['700', 'Grasse (700)'], ['800', 'Extra-grasse (800)'], ['900', 'Noire (900)']], c.graisse || '')}</select></label>
         <label class="champ">Superposition (mode de fusion)<select data-k="fusion">${opts(I.FUSIONS, c.fusion || 'normal')}</select></label>
         </div></details>` + blocCompte(c) + blocStyleTexte(c) + blocTraductions(c) + blocAnimation(c);
-      if (c.type === 'bouton') s += `<details class="bloc" open><summary>Bouton</summary><div class="pile">
-        <label class="champ">Libellé<input type="text" data-k="texte" value="${esc(c.texte)}"></label>
-        <div class="deux"><label class="champ">Action<select data-k="action">${opts(I.ACTIONS, c.action)}</select></label><label class="champ">N° du lieu / contact<input type="number" data-k="cible" min="0" value="${c.cible || 0}"></label></div>
-        ${c.action === 'lien' || c.action === 'messenger' ? `<label class="champ">Adresse du lien<input type="url" data-k="lien" value="${esc(c.lien || '')}"></label>` : ''}
+      if (c.type === 'bouton') s += `<details class="bloc" open><summary>Bouton : ce qu'il fait</summary><div class="pile">
+        <div class="types-bouton">${TYPES_BOUTON.map(t => `<button class="${(c.action || 'suivant') === t.a ? 'on' : ''}" data-tbouton="${t.a}" title="${esc(t.aide)}"><span>${t.i}</span>${esc(t.n)}</button>`).join('')}</div>
+        <label class="champ">Texte du bouton<input type="text" data-k="texte" value="${esc(c.texte)}"></label>
+        ${champsAction(c)}
         <div class="trois"><label class="champ">Style<select data-k="style">${opts([['plein', 'Plein'], ['contour', 'Contour'], ['lien', 'Lien']], c.style || 'plein')}</select></label><label class="champ">Taille<input type="number" data-k="taille" step="0.1" min="1" max="6" value="${c.taille || 2.4}"></label><label class="champ">Couleur<input type="color" data-k="couleur" value="${c.couleur || '#7a1f2b'}"></label></div>
         <label class="champ">Police<button class="btn police-btn" data-police style="font-family:'${esc(c.police || 'Cormorant Garamond')}',serif">${esc(c.police || 'Cormorant Garamond')} ▾</button></label>
         <label class="champ">Apparaît à (s)<input type="number" data-k="debut" step="0.1" min="0" value="${c.debut || 0}"></label></div></details>` + blocTraductions(c);
@@ -2227,6 +2279,21 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       return s + ordre + position;
     }
     function lierFormulaire(c) {
+      $$('#props [data-tbouton]').forEach(b => b.onclick = () => {
+        const t = TYPES_BOUTON.find(x => x.a === b.dataset.tbouton), lang = (p.fiche || {}).langue || 'fr';
+        E.modif(true);
+        const ancien = TYPES_BOUTON.some(x => [x.fr, x.mg, x.en].includes(c.texte)) || !c.texte || c.texte === (Fabrique.LIB[lang] || {}).confirmer;
+        c.action = t.a; if (ancien) c.texte = t[lang] || t.fr;
+        E.rafraichir(); rendreReglages(); E.ouvrirSection('Bouton');
+      });
+      const tb = $('#props [data-tester-bouton]'); if (tb) tb.onclick = () => {
+        const f = p.fiche || {}, a = c.action, k = Number(c.cible) || 0;
+        const tel = String(c.tel || ((f.contacts || [])[k] || {}).telephone || '').replace(/[^\d+]/g, '');
+        if (a === 'map') { const l = (f.lieux || [])[k] || {}; const u = c.lien ? (/^https?:/.test(c.lien) ? c.lien : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(c.lien)) : (l.maps || 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(l.nom || '')); window.open(u, '_blank'); }
+        else if (a === 'whatsapp') { if (!tel) return toast('Aucun numéro'); window.open('https://wa.me/' + tel.replace(/^0/, '261').replace(/^\+/, ''), '_blank'); }
+        else if (a === 'appeler') { if (!tel) return toast('Aucun numéro'); toast('Le bouton appellera : ' + tel); }
+        else if (c.lien) window.open(c.lien, '_blank'); else toast('Mettez d\'abord l\'adresse du lien');
+      };
       $$('#props [data-ordre]').forEach(b => b.onclick = () => ordreCalque(c, b.dataset.ordre));
       const ef = $('#props [data-en-fond]'); if (ef) ef.onclick = () => {
         const pl = plan(); E.modif(true);
@@ -3937,7 +4004,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
   }
 
   /* ---------- Rubrique « Vidéos » : tous les films terminés de l'équipe, à publier sur le site ---------- */
-  const vpFiltre = Object.assign({ etat: 'tout', membre: '' }, Stock.lire('studio.vp.filtre', {}));
+  const vpFiltre = Object.assign({ etat: 'tout', membre: '', type: 'film' }, Stock.lire('studio.vp.filtre', {}));
   async function vueVideos() {
     const app = $('#app');
     app.innerHTML = `<div class="entete"><div><h1>🎬 Vidéos de l'équipe</h1><p>Tous les films terminés de l'équipe, au même endroit : regardez-les, téléchargez-les et publiez-les sur le site, dans la rubrique « Nos vidéos réalisées ».</p></div>
@@ -3955,17 +4022,23 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     };
     let films = [], surSite = new Set(), horsLigne = '';
     try { await Equipe.charger(); } catch (err) { horsLigne = err.message; Equipe.items = Stock.lire('studio.equipe.biblio', []); }
-    films = (Equipe.items || []).filter(x => x.type === 'film').sort((a, b) => String(b.cree || '').localeCompare(String(a.cree || '')));
+    const tout = (Equipe.items || []).filter(x => x.type === 'film' || x.type === 'fond' || x.type === 'video').sort((a, b) => String(b.cree || '').localeCompare(String(a.cree || '')));
+    films = tout.filter(x => x.type === 'film');
+    const fondsEq = tout.filter(x => x.type !== 'film');
+    const aPartager = medias.filter(m => (m.type === 'fond' || m.type === 'video' || m.anime) && !m.equipe_id && !m.brouillon && /^idb:/.test(m.src || '')).length;
     try { const r = await fetch(urlSite() + 'vitrine/index.json?v=' + Date.now(), { cache: 'no-store' }); if (r.ok) surSite = new Set((await r.json()).map(x => x.slug)); } catch (e) {}
     if (horsLigne && !films.length) { zone.textContent = 'Impossible de lire les vidéos de l\'équipe : ' + horsLigne; return; }
     const pub = f => surSite.has('film-' + f.id);
     const g = reglages.github || {}, peutPublier = !!(g.owner && g.repo && g.token);
-    const membres = [...new Set(films.map(x => x.auteur || '—'))].sort();
-    const visibles = films.filter(f => (vpFiltre.etat === 'tout' || (vpFiltre.etat === 'oui' ? pub(f) : !pub(f))) && (!vpFiltre.membre || (f.auteur || '—') === vpFiltre.membre));
+    const membres = [...new Set(tout.map(x => x.auteur || '—'))].sort();
+    const base = vpFiltre.type === 'fond' ? fondsEq : vpFiltre.type === 'tout' ? tout : films;
+    const visibles = base.filter(f => (f.type !== 'film' || vpFiltre.etat === 'tout' || (vpFiltre.etat === 'oui' ? pub(f) : !pub(f))) && (!vpFiltre.membre || (f.auteur || '—') === vpFiltre.membre));
     const date = x => x ? new Date(x).toLocaleString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
     const nPub = films.filter(pub).length;
     zone.classList.remove('muet');
-    zone.innerHTML = `<div class="stats"><div class="stat"><b>${films.length}</b><span>films terminés</span></div><div class="stat"><b>${nPub}</b><span>sur le site</span></div><div class="stat"><b>${films.length - nPub}</b><span>pas encore publiés</span></div><div class="stat"><b>${membres.length}</b><span>membres</span></div></div>
+    zone.innerHTML = `<div class="seg" style="margin-bottom:12px">${[['film', '🎬 Films terminés', films.length], ['fond', '🎞 Fonds vidéo de l\'équipe', fondsEq.length], ['tout', 'Tout', tout.length]].map(([k, n, c]) => `<button data-vpt="${k}" class="${vpFiltre.type === k ? 'on' : ''}">${n} (${c})</button>`).join('')}</div>
+      ${aPartager ? `<div class="carte ligne" style="padding:10px 12px;margin-bottom:10px;background:#fbf4ec;justify-content:space-between"><span><b>${aPartager}</b> de vos vidéos / fonds ne sont pas encore visibles par l'équipe.</span><button class="btn petit plein" id="vp-rattraper">Les partager maintenant</button></div>` : ''}
+      <div class="stats"><div class="stat"><b>${films.length}</b><span>films terminés</span></div><div class="stat"><b>${fondsEq.length}</b><span>fonds vidéo partagés</span></div><div class="stat"><b>${nPub}</b><span>sur le site</span></div><div class="stat"><b>${films.length - nPub}</b><span>pas encore publiés</span></div><div class="stat"><b>${membres.length}</b><span>membres</span></div></div>
       ${horsLigne ? `<div class="carte" style="padding:10px 12px;margin-top:10px;background:#fdecec">Serveur de l'équipe injoignable (${esc(horsLigne)}) : dernière liste connue. Les vidéos se liront et se publieront de nouveau quand il répondra.</div>` : ''}
       ${peutPublier ? '' : '<div class="carte" style="padding:10px 12px;margin-top:10px;background:#fbf4ec">La publication sur le site se fait depuis le studio relié à GitHub (Réglages → GitHub), en général celui de l\'admin. Vous pouvez quand même regarder et télécharger toutes les vidéos.</div>'}
       <div class="ligne" style="margin:14px 0 10px;gap:6px;flex-wrap:wrap">
@@ -3973,12 +4046,14 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <select id="vp-membre"><option value="">Tous les membres</option>${membres.map(m => `<option ${vpFiltre.membre === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select>
         ${peutPublier ? `<span style="margin-left:auto" class="ligne"><label class="cases" style="margin:0"><input type="checkbox" id="vp-tous"> Tout cocher</label><button class="btn petit plein" id="vp-pub-sel" disabled>Publier la sélection</button><button class="btn petit" id="vp-pub-tout">Publier tout ce qui manque (${films.length - nPub})</button></span>` : ''}</div>
       <div class="muet" id="vp-etat" style="margin:0 0 8px"></div>
-      <div class="grille" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr))">${visibles.map(f => { const u = Equipe.url(f.chemin), sv = pub(f); return `<div class="carte pile" style="padding:10px">
+      <div class="grille" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr))">${visibles.map(f => { const u = Equipe.url(f.chemin), sv = pub(f), estFilm = f.type === 'film'; return `<div class="carte pile" style="padding:10px">
         <video src="${esc(u)}" poster="${esc(f.vignette || '')}" controls preload="none" playsinline style="width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:8px;background:#000"></video>
-        <div class="ligne" style="justify-content:space-between">${sv ? '<span class="badge ok">✓ sur le site</span>' : '<span class="badge">pas encore publié</span>'}${peutPublier && !sv ? `<input type="checkbox" data-vp-sel="${esc(f.id)}" title="Sélectionner">` : ''}</div>
+        <div class="ligne" style="justify-content:space-between">${!estFilm ? '<span class="badge">🎞 fond vidéo</span>' : sv ? '<span class="badge ok">✓ sur le site</span>' : '<span class="badge">pas encore publié</span>'}${peutPublier && estFilm && !sv ? `<input type="checkbox" data-vp-sel="${esc(f.id)}" title="Sélectionner">` : ''}</div>
         <b style="font-size:13px">${esc((f.evenement || f.nom || '').replace(/^Film — /, ''))}</b><div class="muet" style="font-size:12px">par <b>${esc(f.auteur || '—')}</b> · ${date(f.cree)}${f.duree ? ' · ' + Math.round(f.duree) + ' s' : ''}</div>
-        <div class="ligne"><a class="btn petit" href="${esc(u)}" download target="_blank">Télécharger</a>${peutPublier ? (sv ? `<button class="btn petit danger" data-vp-retirer="${esc(f.id)}">Retirer du site</button>` : `<button class="btn petit plein" data-vp-pub="${esc(f.id)}">Publier sur le site</button>`) : ''}</div></div>`; }).join('') || '<p class="muet">Aucune vidéo ici. Les films fabriqués par l\'équipe arrivent tout seuls ; on peut aussi en ajouter avec « + Ajouter un film terminé ».</p>'}</div>`;
+        <div class="ligne"><a class="btn petit" href="${esc(u)}" download target="_blank">Télécharger</a>${!estFilm ? '<a class="btn petit" href="#/bibliotheque">Dans la bibliothèque</a>' : peutPublier ? (sv ? `<button class="btn petit danger" data-vp-retirer="${esc(f.id)}">Retirer du site</button>` : `<button class="btn petit plein" data-vp-pub="${esc(f.id)}">Publier sur le site</button>`) : ''}</div></div>`; }).join('') || '<p class="muet">Aucune vidéo ici. Les films fabriqués par l\'équipe arrivent tout seuls ; on peut aussi en ajouter avec « + Ajouter un film terminé ».</p>'}</div>`;
     $$('[data-vpf]', zone).forEach(b => b.onclick = () => { vpFiltre.etat = b.dataset.vpf; Stock.ecrire('studio.vp.filtre', vpFiltre); vueVideos(); });
+    $$('[data-vpt]', zone).forEach(b => b.onclick = () => { vpFiltre.type = b.dataset.vpt; Stock.ecrire('studio.vp.filtre', vpFiltre); vueVideos(); });
+    const vr = $('#vp-rattraper', zone); if (vr) vr.onclick = async () => { vr.disabled = true; vr.textContent = 'Partage en cours…'; await Equipe.rattraper(); vueVideos(); };
     $('#vp-membre', zone).onchange = e => { vpFiltre.membre = e.target.value; Stock.ecrire('studio.vp.filtre', vpFiltre); vueVideos(); };
     if (!peutPublier) return;
     const etat = $('#vp-etat', zone);
@@ -4461,5 +4536,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
   Sauve.reprendreTout().then(n => { if (n) { toast('Bibliothèque et réglages repris depuis la sauvegarde automatique'); setTimeout(() => location.reload(), 1200); } else Sauve.toutMaintenant(); });
   if (Sauve.accAttente) setTimeout(() => Sauve.accEnLigne(0), 6000);
   else if (Equipe.actif()) { const der = Stock.lire('studio.sauve.acc.date', 0); if (Date.now() - der > 24 * 3600e3) setTimeout(() => Sauve.accEnLigne(0), 20000); }
+  if (Equipe.actif()) setTimeout(() => Equipe.rattraper(), 25000);
+  window.addEventListener('online', () => setTimeout(() => Equipe.rattraper(), 8000));
   Sauve.reprendre().then(n => { if (n) { toast(n + ' invitation(s) reprise(s) depuis la sauvegarde automatique'); route(); } });
 })();
