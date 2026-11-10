@@ -625,6 +625,12 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-10-1', date: '10 novembre 2026', titre: 'Rubrique « Vidéos » : tous les films de l\'équipe à publier', points: [
+      'Nouveau menu <b>🎬 Vidéos</b> : tous les films terminés de l\'équipe au même endroit, avec qui l\'a fait, la date, et si le film est déjà <b>sur le site</b> ou pas.',
+      'Filtres « Pas encore sur le site » / « Sur le site » / par membre ; <b>Publier sur le site</b> un film, une sélection (cases à cocher) ou <b>tout ce qui manque</b> d\'un coup ; « Retirer du site ».',
+      'Sur le site, les films ont maintenant leur propre rubrique <b>« Nos vidéos réalisées »</b>, séparée des modèles d\'invitation (lien « Vidéos » en haut de la page).',
+      'Corrigé : depuis le 4 novembre, « Publier sur la vitrine » et « ⇪ pour toute l\'équipe » (polices) échouaient à la lecture du site. Rien n\'a été abîmé ; ça remarche.'
+    ] },
     { id: '2026-11-09-1', date: '9 novembre 2026', titre: 'Sauvegarde automatique de tout, même si le PC s\'éteint ou si la connexion coupe', points: [
       '<b>Les invitations</b> : enregistrées à chaque modification sur cet ordinateur (copie de secours « sûre », qui résiste à une coupure de courant), une version toutes les 2 minutes (« 🕘 Versions »), et en ligne avec l\'équipe. Rien à faire.',
       '<b>Tout le reste aussi</b> : bibliothèque (fonds, photos, vidéos importés), mes polices, styles, règles, préférences, réglages. Copie de secours sur cet ordinateur ; s\'il a perdu ses données, tout est remis à l\'ouverture du studio.',
@@ -794,6 +800,7 @@
     if (h[0] === 'nouveautes') return vueNouveautes();
     if (h[0] === 'rejoindre') return vueRejoindre(h[1], h[2]);
     if (h[0] === 'equipe') return vueEquipe();
+    if (h[0] === 'videos') return vueVideos();
     if (h[0] === 'commandes') return vueCommandes(h[1]);
     if (h[0] === 'p' && projets[h[1]]) return vueProjet(projets[h[1]], h[2] || 'plans');
     return vueAccueil();
@@ -3518,8 +3525,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     entetes() { return { Authorization: 'Bearer ' + (this.frais().token || '').trim(), Accept: 'application/vnd.github+json' }; },
     // appel à GitHub ; jeton refusé (401) → on demande le nouveau jeton sur place, puis on réessaie
     async appel(url, opts) {
-      let r = await fetch(url, Object.assign({}, opts, { headers: Object.assign({}, (opts || {}).headers, this.entetes()) }));
-      if (r.status === 401 && await demanderJeton()) r = await fetch(url, Object.assign({}, opts, { headers: Object.assign({}, (opts || {}).headers, this.entetes()) }));
+      let r = await fetch(url, Object.assign({}, opts, { headers: Object.assign({}, this.entetes(), (opts || {}).headers) }));
+      if (r.status === 401 && await demanderJeton()) r = await fetch(url, Object.assign({}, opts, { headers: Object.assign({}, this.entetes(), (opts || {}).headers) }));
       return r;
     },
     async sha(chemin) {
@@ -3767,6 +3774,74 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     $$('[data-film-retirer]', zone).forEach(b => b.onclick = async () => {
       if (!githubPret() || !confirm('Retirer ce film de la vitrine du site ?')) return;
       try { const index = (await lireVitrine()).filter(x => x.slug !== 'film-' + b.dataset.filmRetirer); await ecrireVitrine(index, 'Vitrine : retrait film'); toast('Film retiré de la vitrine'); modelesEtFilms(zone, admin, filmsSeuls); } catch (err) { toast(err.message); }
+    });
+  }
+
+  /* ---------- Rubrique « Vidéos » : tous les films terminés de l'équipe, à publier sur le site ---------- */
+  const vpFiltre = Object.assign({ etat: 'tout', membre: '' }, Stock.lire('studio.vp.filtre', {}));
+  async function vueVideos() {
+    const app = $('#app');
+    app.innerHTML = `<div class="entete"><div><h1>🎬 Vidéos de l'équipe</h1><p>Tous les films terminés de l'équipe, au même endroit : regardez-les, téléchargez-les et publiez-les sur le site, dans la rubrique « Nos vidéos réalisées ».</p></div>
+      <div class="ligne"><a class="btn" target="_blank" href="${esc(urlSite())}#films">Voir la rubrique sur le site ↗</a><label class="btn plein">+ Ajouter un film terminé<input type="file" id="vp-ajout" accept="video/mp4,video/webm,video/quicktime,.mp4,.mov,.webm" multiple hidden></label></div></div>
+      <div id="vp-zone" class="muet">Chargement des vidéos de l'équipe…</div>`;
+    if (!Equipe.actif()) { $('#vp-zone').innerHTML = `<div class="carte pile" style="max-width:640px"><p>Les vidéos de l'équipe apparaissent ici quand vous êtes dans une équipe. Ouvrez le lien d'équipe reçu, ou créez l'équipe dans <a href="#/reglages">Réglages</a>.</p></div>`; return; }
+    const zone = $('#vp-zone');
+    const va = $('#vp-ajout'); va.onchange = async () => {
+      for (const f of [...va.files]) {
+        const titre = f.name.replace(/\.\w+$/, '').replace(/[-_]+/g, ' ').replace(/\s*film\s*$/i, '').trim();
+        toast('Envoi de « ' + titre + ' » à l\'équipe…');
+        try { await Equipe.ajouterFilm(f, { titre }); toast('« ' + titre + ' » ajouté aux vidéos de l\'équipe'); } catch (err) { toast('« ' + titre + ' » non envoyé : ' + err.message); }
+      }
+      vueVideos();
+    };
+    let films = [], surSite = new Set(), horsLigne = '';
+    try { await Equipe.charger(); } catch (err) { horsLigne = err.message; Equipe.items = Stock.lire('studio.equipe.biblio', []); }
+    films = (Equipe.items || []).filter(x => x.type === 'film').sort((a, b) => String(b.cree || '').localeCompare(String(a.cree || '')));
+    try { const r = await fetch(urlSite() + 'vitrine/index.json?v=' + Date.now(), { cache: 'no-store' }); if (r.ok) surSite = new Set((await r.json()).map(x => x.slug)); } catch (e) {}
+    if (horsLigne && !films.length) { zone.textContent = 'Impossible de lire les vidéos de l\'équipe : ' + horsLigne; return; }
+    const pub = f => surSite.has('film-' + f.id);
+    const g = reglages.github || {}, peutPublier = !!(g.owner && g.repo && g.token);
+    const membres = [...new Set(films.map(x => x.auteur || '—'))].sort();
+    const visibles = films.filter(f => (vpFiltre.etat === 'tout' || (vpFiltre.etat === 'oui' ? pub(f) : !pub(f))) && (!vpFiltre.membre || (f.auteur || '—') === vpFiltre.membre));
+    const date = x => x ? new Date(x).toLocaleString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+    const nPub = films.filter(pub).length;
+    zone.classList.remove('muet');
+    zone.innerHTML = `<div class="stats"><div class="stat"><b>${films.length}</b><span>films terminés</span></div><div class="stat"><b>${nPub}</b><span>sur le site</span></div><div class="stat"><b>${films.length - nPub}</b><span>pas encore publiés</span></div><div class="stat"><b>${membres.length}</b><span>membres</span></div></div>
+      ${horsLigne ? `<div class="carte" style="padding:10px 12px;margin-top:10px;background:#fdecec">Serveur de l'équipe injoignable (${esc(horsLigne)}) : dernière liste connue. Les vidéos se liront et se publieront de nouveau quand il répondra.</div>` : ''}
+      ${peutPublier ? '' : '<div class="carte" style="padding:10px 12px;margin-top:10px;background:#fbf4ec">La publication sur le site se fait depuis le studio relié à GitHub (Réglages → GitHub), en général celui de l\'admin. Vous pouvez quand même regarder et télécharger toutes les vidéos.</div>'}
+      <div class="ligne" style="margin:14px 0 10px;gap:6px;flex-wrap:wrap">
+        ${[['tout', 'Toutes', films.length], ['non', 'Pas encore sur le site', films.length - nPub], ['oui', 'Sur le site', nPub]].map(([k, n, c]) => `<button class="btn petit ${vpFiltre.etat === k ? 'plein' : ''}" data-vpf="${k}">${n} (${c})</button>`).join('')}
+        <select id="vp-membre"><option value="">Tous les membres</option>${membres.map(m => `<option ${vpFiltre.membre === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select>
+        ${peutPublier ? `<span style="margin-left:auto" class="ligne"><label class="cases" style="margin:0"><input type="checkbox" id="vp-tous"> Tout cocher</label><button class="btn petit plein" id="vp-pub-sel" disabled>Publier la sélection</button><button class="btn petit" id="vp-pub-tout">Publier tout ce qui manque (${films.length - nPub})</button></span>` : ''}</div>
+      <div class="muet" id="vp-etat" style="margin:0 0 8px"></div>
+      <div class="grille" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr))">${visibles.map(f => { const u = Equipe.url(f.chemin), sv = pub(f); return `<div class="carte pile" style="padding:10px">
+        <video src="${esc(u)}" poster="${esc(f.vignette || '')}" controls preload="none" playsinline style="width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:8px;background:#000"></video>
+        <div class="ligne" style="justify-content:space-between">${sv ? '<span class="badge ok">✓ sur le site</span>' : '<span class="badge">pas encore publié</span>'}${peutPublier && !sv ? `<input type="checkbox" data-vp-sel="${esc(f.id)}" title="Sélectionner">` : ''}</div>
+        <b style="font-size:13px">${esc((f.evenement || f.nom || '').replace(/^Film — /, ''))}</b><div class="muet" style="font-size:12px">par <b>${esc(f.auteur || '—')}</b> · ${date(f.cree)}${f.duree ? ' · ' + Math.round(f.duree) + ' s' : ''}</div>
+        <div class="ligne"><a class="btn petit" href="${esc(u)}" download target="_blank">Télécharger</a>${peutPublier ? (sv ? `<button class="btn petit danger" data-vp-retirer="${esc(f.id)}">Retirer du site</button>` : `<button class="btn petit plein" data-vp-pub="${esc(f.id)}">Publier sur le site</button>`) : ''}</div></div>`; }).join('') || '<p class="muet">Aucune vidéo ici. Les films fabriqués par l\'équipe arrivent tout seuls ; on peut aussi en ajouter avec « + Ajouter un film terminé ».</p>'}</div>`;
+    $$('[data-vpf]', zone).forEach(b => b.onclick = () => { vpFiltre.etat = b.dataset.vpf; Stock.ecrire('studio.vp.filtre', vpFiltre); vueVideos(); });
+    $('#vp-membre', zone).onchange = e => { vpFiltre.membre = e.target.value; Stock.ecrire('studio.vp.filtre', vpFiltre); vueVideos(); };
+    if (!peutPublier) return;
+    const etat = $('#vp-etat', zone);
+    const publierListe = async liste => {
+      if (!liste.length) return toast('Rien à publier');
+      $$('button', zone).forEach(b => b.disabled = true); let ok = 0; const rates = [];
+      for (const [k, f] of liste.entries()) { etat.textContent = `Publication ${k + 1}/${liste.length} : ${f.evenement || f.nom}…`; try { await publierFilmVitrine(f); ok++; } catch (err) { rates.push((f.evenement || f.nom) + ' (' + err.message + ')'); } }
+      toast(ok + ' vidéo(s) publiée(s) sur le site (visibles dans quelques minutes)');
+      etat.innerHTML = `${ok} publiée(s).${rates.length ? ' Non publiées : ' + esc(rates.join(' · ')) : ''}`;
+      setTimeout(vueVideos, rates.length ? 4000 : 1200);
+    };
+    const sel = () => $$('[data-vp-sel]', zone).filter(c => c.checked).map(c => films.find(f => f.id === c.dataset.vpSel));
+    const majSel = () => { const n = sel().length, b = $('#vp-pub-sel', zone); b.disabled = !n; b.textContent = n ? `Publier la sélection (${n})` : 'Publier la sélection'; };
+    $$('[data-vp-sel]', zone).forEach(c => c.onchange = majSel);
+    $('#vp-tous', zone).onchange = e => { $$('[data-vp-sel]', zone).forEach(c => c.checked = e.target.checked); majSel(); };
+    $('#vp-pub-sel', zone).onclick = () => publierListe(sel());
+    $('#vp-pub-tout', zone).onclick = () => { const l = films.filter(f => !pub(f)); if (l.length && confirm(`Publier sur le site les ${l.length} vidéo(s) de l'équipe qui n'y sont pas encore ?`)) publierListe(l); };
+    $$('[data-vp-pub]', zone).forEach(b => b.onclick = () => publierListe([films.find(f => f.id === b.dataset.vpPub)]));
+    $$('[data-vp-retirer]', zone).forEach(b => b.onclick = async () => {
+      if (!confirm('Retirer cette vidéo du site ?')) return;
+      b.disabled = true;
+      try { const index = (await lireVitrine()).filter(x => x.slug !== 'film-' + b.dataset.vpRetirer); await ecrireVitrine(index, 'Vitrine : retrait film'); toast('Vidéo retirée du site (dans quelques minutes)'); setTimeout(vueVideos, 800); } catch (err) { toast(err.message); b.disabled = false; }
     });
   }
 

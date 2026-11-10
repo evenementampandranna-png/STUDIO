@@ -98,7 +98,7 @@
 </style>
 </head>
 <body>
-<header><a class="logo" href="./">Invitations <em>vidéo</em></a><a class="studio" href="studio/">Studio ›</a></header>
+<header><a class="logo" href="./">Invitations <em>vidéo</em></a><a class="studio" id="lien-films" href="#films" hidden style="margin-left:auto;margin-right:14px">🎬 Vidéos</a><a class="studio" href="studio/">Studio ›</a></header>
 <div class="hero">
   <div>
     <h1>Votre invitation, <span>en film</span> et en lien à partager</h1>
@@ -116,6 +116,7 @@
   </div>
 </section>
 <section id="modeles"><h2>Modèles à essayer</h2><div class="modeles" id="liste"><p style="color:var(--gris)">Chargement…</p></div></section>
+<section id="films" hidden><h2>🎬 Nos vidéos réalisées <small style="font-size:.5em;color:var(--gris);font-weight:500">(<span id="nb-films">0</span>)</small></h2><p style="color:var(--gris);margin-top:-6px">Les films d'invitation faits par notre équipe. Touchez une vidéo pour la regarder en entier.</p><div class="modeles" id="liste-films"></div></section>
 <section><h2>Formules</h2>
   <div class="formules">
     <div class="formule"><h3>Film</h3><ul><li>Film vertical avec musique</li><li>Format WhatsApp, Facebook, TikTok</li></ul></div>
@@ -126,10 +127,10 @@
 <section id="contact"><h2>Contact</h2><p id="contact-texte" style="color:var(--gris)">Écrivez-nous pour un devis.</p></section>
 <footer>Invitations vidéo interactives</footer>
 <div id="boite"><button id="fermer" aria-label="Fermer">×</button><div class="lecteur" id="lecteur"><div class="fin-film" id="fin"><button id="revoir">↺ Revoir le film</button><a id="essayer" target="_blank">Essayer l'invitation interactive</a></div></div><div class="barre-lecture"><div id="progression"></div></div></div>
-<script src="config.js?v=202611101245"></script>
-<script src="moteur/moteur.js?v=202611101245"></script>
-<script src="moteur/fabrique.js?v=202611101245"></script>
-<script src="vitrine/index.js?v=202611101245"></script>
+<script src="config.js?v=202611101257"></script>
+<script src="moteur/moteur.js?v=202611101257"></script>
+<script src="moteur/fabrique.js?v=202611101257"></script>
+<script src="vitrine/index.js?v=202611101257"></script>
 <script>
 (async function () {
   const $ = s => document.querySelector(s);
@@ -153,9 +154,14 @@
   const clone = p => JSON.parse(JSON.stringify(p));
 
   const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  box.innerHTML = liste.map((m, i) => `<div class="modele" data-i="${i}"><div class="vignette" id="v${i}">${m.film ? `<video src="${esc(m.video)}" poster="${esc(m.vignette || '')}" muted loop playsinline preload="metadata" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"></video>` : ''}</div><span class="lire">▶</span><div><b>${esc(m.titre)}</b><br><span>${esc(m.type || '')}</span></div>
-    <div class="liens"><button data-voir="${i}">▶ Regarder le film</button>${m.film ? '' : `<a href="i/?p=${encodeURIComponent(m.slug)}&f=DEMO" target="_blank" onclick="event.stopPropagation()">Essayer</a>`}</div></div>`).join('');
-  box.querySelectorAll('.modele video').forEach(v => { const c = v.closest('.modele'); c.addEventListener('mouseenter', () => v.play().catch(() => {})); c.addEventListener('mouseleave', () => v.pause()); });
+  // deux rubriques : modèles d'invitation, et films réalisés par l'équipe (data-i garde l'indice dans la liste complète)
+  const carteDe = (m, i) => `<div class="modele" data-i="${i}"><div class="vignette" id="v${i}">${m.film ? `<video src="${esc(m.video)}" poster="${esc(m.vignette || '')}" muted loop playsinline preload="metadata" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"></video>` : ''}</div><span class="lire">▶</span><div><b>${esc(m.titre)}</b><br><span>${esc(m.type || '')}</span></div>
+    <div class="liens"><button data-voir="${i}">▶ Regarder le film</button>${m.film ? '' : `<a href="i/?p=${encodeURIComponent(m.slug)}&f=DEMO" target="_blank" onclick="event.stopPropagation()">Essayer</a>`}</div></div>`;
+  const htmlDe = filtre => liste.map((m, i) => filtre(m) ? carteDe(m, i) : '').join('');
+  box.innerHTML = htmlDe(m => !m.film) || '<p style="color:var(--gris)">Les premiers modèles arrivent bientôt.</p>';
+  const nbFilms = liste.filter(m => m.film).length;
+  if (nbFilms) { $('#films').hidden = false; $('#nb-films').textContent = nbFilms; $('#liste-films').innerHTML = htmlDe(m => m.film); const lf = $('#lien-films'); if (lf) lf.hidden = false; }
+  document.querySelectorAll('#liste .modele video, #liste-films .modele video').forEach(v => { const c = v.closest('.modele'); c.addEventListener('mouseenter', () => v.play().catch(() => {})); c.addEventListener('mouseleave', () => v.pause()); });
 
   /* Vignettes : la page titre de chaque modèle */
   liste.forEach(async (m, i) => {
@@ -221,7 +227,7 @@
   $('#fermer').onclick = fermer;
   $('#boite').onclick = e => { if (e.target.id === 'boite') fermer(); };
   document.addEventListener('keydown', e => { if (e.key === 'Escape') fermer(); });
-  box.querySelectorAll('.modele').forEach(el => el.onclick = () => ouvrir(Number(el.dataset.i)));
+  document.querySelectorAll('#liste .modele, #liste-films .modele').forEach(el => el.onclick = () => ouvrir(Number(el.dataset.i)));
 })();
 </script>
 <script>
