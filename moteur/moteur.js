@@ -33,7 +33,7 @@
     persoChargees[nom] = { url, p }; return p;
   }
   // Icône « Maps » des boutons d'itinéraire (épingle de carte aux couleurs de Google Maps)
-  const SVG_MAPS = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path fill="#1a73e8" d="M24 2C15.2 2 8 9.1 8 18c0 3.1.9 6 2.4 8.4L24 46l13.6-19.6C39.1 24 40 21.1 40 18 40 9.1 32.8 2 24 2z"/><path fill="#ea4335" d="M24 2c-5.1 0-9.6 2.4-12.5 6.1L24 18l12.5-9.9C33.6 4.4 29.1 2 24 2z"/><path fill="#fbbc04" d="M11.5 8.1C9.3 10.8 8 14.3 8 18c0 3.1.9 6 2.4 8.4L24 18z"/><path fill="#34a853" d="M24 18 10.4 26.4 24 46l6.8-9.8z"/><circle cx="24" cy="18" r="6.2" fill="#fff"/></svg>';
+  const SVG_MAPS = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 56"><defs><radialGradient id="g" cx="35%" cy="28%" r="75%"><stop offset="0" stop-color="#ff6b5f"/><stop offset=".55" stop-color="#e3261b"/><stop offset="1" stop-color="#a5130c"/></radialGradient></defs><ellipse cx="24" cy="52" rx="9" ry="2.6" fill="rgba(0,0,0,.25)"/><path fill="url(#g)" d="M24 2C13.5 2 5 10.4 5 20.8 5 34.6 24 51 24 51s19-16.4 19-30.2C43 10.4 34.5 2 24 2z"/><circle cx="24" cy="20.5" r="7.4" fill="#fff"/><path fill="rgba(255,255,255,.35)" d="M13 13c2.6-5 7.4-7.6 12.4-7.4-4.2 1.4-8 4.2-10 8.6z"/></svg>';
   const ICONE_MAPS = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(SVG_MAPS);
   let imgMaps = null; try { imgMaps = new Image(); imgMaps.src = ICONE_MAPS; } catch (e) {}
   const POLICE_EMOJI = '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji"';
@@ -777,8 +777,11 @@
           else { const a = (Number(c.degrade_angle) || 90) * Math.PI / 180, dx = Math.cos(a) * larg / 2, dy = Math.sin(a) * haut / 2; g = ctx.createLinearGradient(-dx, -dy, dx, dy); }
           g.addColorStop(0, c.couleur || '#7a1f2b'); g.addColorStop(1, c.couleur2); ctx.fillStyle = g;
         } else ctx.fillStyle = c.couleur || '#7a1f2b';
-        if (c.ombre_cadre) { ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 18; ctx.shadowOffsetY = 6; if (c.remplissage !== false) ctx.fill(chemin); ctx.restore(); }
-        if (c.remplissage !== false) ctx.fill(chemin);
+        // angles arrondis (toutes les formes) : la forme est légèrement réduite puis bordée de sa propre couleur, joints ronds
+        const rc = clamp(Number(c.coins) || 0, 0, 100) / 100 * Math.min(larg, haut) * 0.45;
+        if (rc > 0.5) { const fx = Math.max(0.05, (larg - rc) / larg), fy = Math.max(0.05, (haut - rc) / haut); ctx.scale(fx, fy); ctx.lineJoin = 'round'; ctx.lineWidth = rc / Math.min(fx, fy); ctx.strokeStyle = ctx.fillStyle; }
+        if (c.ombre_cadre) { ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 18; ctx.shadowOffsetY = 6; if (c.remplissage !== false) { ctx.fill(chemin); if (rc > 0.5) ctx.stroke(chemin); } ctx.restore(); }
+        if (c.remplissage !== false) { ctx.fill(chemin); if (rc > 0.5) ctx.stroke(chemin); }
         if (c.bordure) { ctx.strokeStyle = c.bordure; ctx.lineWidth = Number(c.bordure_epaisseur) || 3; ctx.lineJoin = 'round'; ctx.stroke(chemin); }
         if (mesurer) this.bbox[c.id] = { x: (cx - larg / 2) / W * 100, y: (cy - haut / 2) / H * 100, w: larg / W * 100, h: haut / H * 100 };
       }

@@ -673,6 +673,13 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-10-10', date: '10 novembre 2026', titre: 'Aperçu en grand, angles arrondis, couleurs utilisées, recherche', points: [
+      '<b>Aperçu en grand</b> : il remplit maintenant toute la largeur du centre (on fait défiler le centre pour voir le bas). Bouton <b>↔ / ↕</b> dans la colonne d\'outils pour le faire tenir en hauteur ; ⛶ plein écran ; zoom.',
+      '<b>Icône Maps</b> : épingle rouge, comme demandé.',
+      '<b>Formes</b> : « Arrondir les angles » pour toutes les formes (étoile, triangle, rectangle, losange…).',
+      '<b>Couleurs</b> : chaque sélecteur de couleur propose les couleurs déjà utilisées dans l\'invitation (pastilles sous le premier sélecteur, et dans la palette) ; un nouveau texte, bouton ou forme prend la dernière couleur choisie.',
+      '<b>Recherche</b> : barre 🔍 dans Événements et dans la Bibliothèque.'
+    ] },
     { id: '2026-11-10-9', date: '10 novembre 2026', titre: 'Aperçu plus grand, plein écran, bouton Maps', points: [
       '<b>⛶ Plein écran</b> (colonne d\'outils, ou touche F) : l\'en-tête disparaît et le navigateur passe en plein écran ; l\'aperçu devient le plus grand possible. Échap pour sortir.',
       'Sur les écrans moyens, la liste des plans devient une colonne de vignettes et les panneaux de droite n\'affichent que leurs icônes : l\'aperçu au centre est plus large.',
@@ -901,13 +908,28 @@
   window.addEventListener('hashchange', route);
 
   /* ================= Accueil ================= */
+  // Barre de recherche : filtre les cartes d'une page (nom, date, valeurs des champs…)
+  function rechercheCartes(champ, selecteur, cleMemo) {
+    const filtrer = () => {
+      const mots = champ.value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/\s+/).filter(Boolean);
+      let n = 0;
+      $$(selecteur).forEach(el => {
+        const txt = (el.textContent + ' ' + $$('input,select', el).map(i => i.value).join(' ') + ' ' + (el.dataset.recherche || '')).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const ok = mots.every(m => txt.includes(m)); el.style.display = ok ? '' : 'none'; if (ok) n++;
+      });
+      champ.title = n + ' résultat(s)';
+      try { if (cleMemo) sessionStorage.setItem(cleMemo, champ.value); } catch (e) {}
+    };
+    try { if (cleMemo && sessionStorage.getItem(cleMemo)) champ.value = sessionStorage.getItem(cleMemo); } catch (e) {}
+    champ.addEventListener('input', filtrer); filtrer();
+  }
   function vueAccueil() {
     const liste = Object.values(projets).sort((a, b) => (b.modifie || '').localeCompare(a.modifie || ''));
     $('#app').innerHTML = `
       <div class="entete"><div><h1>Vos événements</h1><p>Chaque invitation part d'un texte et de quelques fonds vidéo vierges.</p></div>
         <div class="ligne">${Equipe.actif() ? '<button class="btn" id="recup-ligne" title="Après une panne ou sur un autre ordinateur">☁ Récupérer depuis la copie en ligne</button>' : ''}<label class="btn">Importer un projet<input type="file" accept=".json" id="imp-projet" hidden></label><button class="btn" id="corbeille" title="Événements supprimés">🗑 Corbeille</button><a class="btn plein" href="#/nouveau">+ Nouvel événement</a></div></div>
-      ${liste.length ? `<div class="grille">${liste.map(p => `
-        <div class="carte projet-carte" data-id="${p.id}">
+      ${liste.length ? `<input type="search" class="recherche-liste" id="evt-recherche" placeholder="🔍 Rechercher un événement (nom, date, type…)"><div class="grille">${liste.map(p => `
+        <div class="carte projet-carte" data-id="${p.id}" data-recherche="${esc([p.fiche.type, p.fiche.date, (p.fiche.lieux || []).map(l => l.nom).join(' '), (p.fiche.celebres || '')].join(' '))}">
           <img src="${esc(vignettePlan(p.plans.find(x => x.role !== 'ouverture') || p.plans[0] || {}))}" alt="">
           <div><h3>${esc(p.fiche.titre)}</h3>
             <div class="muet">${esc(MoteurInfo.dateLisible(p.fiche.date, p.fiche.langue))}</div>
@@ -919,6 +941,7 @@
         <p style="margin-top:14px"><button class="btn" id="demo">Charger l'exemple « Jobily faha-10 taona mariazy — Batemy »</button></p></div>`}`;
     $$('.projet-carte').forEach(c => c.onclick = e => { if (e.target.closest('.evt-actions')) return; location.hash = '#/p/' + c.dataset.id + '/plans'; });
     $$('[data-evt-ouvrir]').forEach(b => b.onclick = () => { location.hash = '#/p/' + b.dataset.evtOuvrir + '/plans'; });
+    const er = $('#evt-recherche'); if (er) rechercheCartes(er, '.projet-carte', 'recherche.evt');
     $$('[data-evt-fiche]').forEach(b => b.onclick = () => { location.hash = '#/p/' + b.dataset.evtFiche + '/fiche'; });
     $$('[data-evt-dup]').forEach(b => b.onclick = () => {
       const src = projets[b.dataset.evtDup]; const c = JSON.parse(JSON.stringify(src)); c.id = uid(); c.slug = (c.slug || 'evenement').replace(/-[a-z0-9]{4}$/, '') + '-' + c.id.slice(0, 4);
@@ -1275,7 +1298,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
             <span class="sep"></span>
             <button data-outil="fond" title="Fond du plan">▦</button><button data-outil="regles" title="Règles et repères">📏</button><button data-outil="aide" title="Raccourcis clavier">?</button><button data-outil="annuler" title="Annuler (Ctrl+Z)">↶</button><button data-outil="refaire" title="Rétablir (Ctrl+Maj+Z)">↷</button>
             <span class="sep"></span>
-            <button data-outil="plein" title="Plein écran : aperçu le plus grand possible (F) — Échap pour sortir">⛶</button><button data-outil="zoom+" title="Zoom avant (Ctrl +)">＋</button><button data-outil="zoom0" title="Ajuster à l'écran (Ctrl 0)" id="zoom-val">100%</button><button data-outil="zoom-" title="Zoom arrière (Ctrl −)">－</button>
+            <button data-outil="plein" title="Plein écran : aperçu le plus grand possible (F) — Échap pour sortir">⛶</button><button data-outil="ajuster" title="Taille de l'aperçu">↔</button><button data-outil="zoom+" title="Zoom avant (Ctrl +)">＋</button><button data-outil="zoom0" title="Ajuster à l'écran (Ctrl 0)" id="zoom-val">100%</button><button data-outil="zoom-" title="Zoom arrière (Ctrl −)">－</button>
           </div>
         <div class="col-plans" id="col-plans"></div>
         <div class="col-apercu">
@@ -1319,7 +1342,15 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     };
     $('#zone-zoom').addEventListener('wheel', e => { if (!(e.ctrlKey || e.metaKey)) return; e.preventDefault(); E.zoomer(e.deltaY < 0 ? 1.1 : 1 / 1.1); }, { passive: false });
     // gauche et droite fixes, seul le centre défile : l'éditeur prend la hauteur de l'écran
-    const ajusterHauteur = () => { const ed = $('.editeur.ps'); if (!ed) return; const haut = ed.getBoundingClientRect().top + window.scrollY; ed.style.setProperty('--h-ed', Math.max(520, window.innerHeight - haut - 12) + 'px'); };
+    const ajusterHauteur = () => {
+      const ed = $('.editeur.ps'); if (!ed) return; const haut = ed.getBoundingClientRect().top + window.scrollY;
+      const hEd = Math.max(520, window.innerHeight - haut - 12); ed.style.setProperty('--h-ed', hEd + 'px');
+      // taille de l'aperçu : « hauteur » = tient dans l'écran ; « largeur » = remplit la colonne du centre (plus grand, on fait défiler le centre)
+      const col = $('.col-apercu'); const mode = Stock.lire('studio.ajuster', 'largeur');
+      const hHaut = hEd - 64, hLarg = col ? Math.min((col.clientWidth - 36) * 16 / 9, 1400) : hHaut;
+      ed.style.setProperty('--h-cadre', Math.round(Math.max(360, mode === 'largeur' ? Math.max(hHaut, hLarg) : hHaut)) + 'px');
+      const b = $('#outils [data-outil="ajuster"]'); if (b) { b.textContent = mode === 'largeur' ? '↔' : '↕'; b.title = mode === 'largeur' ? 'Aperçu : remplit la largeur (cliquer pour le faire tenir en hauteur)' : 'Aperçu : tient en hauteur (cliquer pour remplir la largeur)'; }
+    };
     ajusterHauteur(); ecouter(window, 'resize', ajusterHauteur); setTimeout(ajusterHauteur, 300);
     // Plein écran : on cache l'en-tête du site et de l'événement, et le navigateur passe en plein écran
     E.pleinEcran = () => {
@@ -1346,7 +1377,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     let plume = null;
     function annulerPlume() { plume = null; traceSvg.innerHTML = ''; }
     const enPct = e => { const r = $('#poignees').getBoundingClientRect(); return [Math.max(0, Math.min(100, (e.clientX - r.left) / r.width * 100)), Math.max(0, Math.min(100, (e.clientY - r.top) / r.height * 100))]; };
-    const coul = () => p.style.couleur || '#7a1f2b';
+    const coul = () => couleurParDefaut();
     function poserForme(c) { E.modif(true); const pl = plan(); c.id = uid(); pl.calques.push(c); E.sel = c.id; if (E.multi) E.multi.clear(); E.rafraichir(); rendreReglages(); rendrePlans(); choisirOutil('select'); }
     function formeDePoints(pts, lisse) {
       const xs = pts.map(q => q[0]), ys = pts.map(q => q[1]), x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
@@ -1409,6 +1440,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       const o = b.dataset.outil;
       if (o === 'zoom+') return E.zoomer(1.25); if (o === 'zoom-') return E.zoomer(0.8); if (o === 'zoom0') return E.zoomer(0);
       if (o === 'plein') return E.pleinEcran();
+      if (o === 'ajuster') { Stock.ecrire('studio.ajuster', Stock.lire('studio.ajuster', 'largeur') === 'largeur' ? 'hauteur' : 'largeur'); ajusterHauteur(); window.dispatchEvent(new Event('resize')); return; }
       if (OUTILS_MODE.includes(o)) return choisirOutil(E.outil === o && o !== 'select' ? 'select' : o);
       if (o === 'annuler' || o === 'refaire') { const x = $('#' + o); if (x) x.click(); return; }
       if (o === 'regles') { const x = $('#regles-btn'); if (x) x.click(); return; }
@@ -2008,6 +2040,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       lierBarre(bar, c);
     }
     function lierBarre(bar, c) {
+      try { $$('input[type=color]', bar).forEach(i => { i.setAttribute('list', 'couleurs-projet'); i.addEventListener('change', () => Stock.ecrire('studio.couleur.' + p.id, i.value)); }); } catch (e) {}
       $$('[data-al]', bar).forEach(el => el.onclick = () => aligner(el.dataset.al));
       $$('[data-talign]', bar).forEach(el => el.onclick = () => { E.modif(true); (E.multi.size > 1 ? selection() : [c]).filter(x => x.type === 'texte').forEach(x => { x.align = el.dataset.talign; }); E.rafraichir(); rendreReglages(); });
       const groupe = () => E.multi.size > 1 ? selection() : (c ? [c] : []);
@@ -2200,6 +2233,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       if (E.multi.size > 1) lierMulti();
       else if (c) lierFormulaire(c);
       accordeon(col, E.multi.size > 1 ? 'multi' : c ? c.type : 'plan');
+      try { brancherCouleurs(col); brancherCouleurs($('#barre-sel')); } catch (e) {}
       if (E.rendreBarre) E.rendreBarre();
     }
     E.rendreReglages = rendreReglages;
@@ -2398,13 +2432,13 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     function ajouterCalque(type, media) {
       const pl = plan();
       E.modif(true);
-      const base = { id: uid(), x: 50, y: 50, largeur: 60, debut: 0.4, couleur: p.style.couleur || '#7a1f2b' };
+      const base = { id: uid(), x: 50, y: 50, largeur: 60, debut: 0.4, couleur: couleurParDefaut() };
       let c;
       const L = Fabrique.LIB[p.fiche.langue] || Fabrique.LIB.en;
       if (type === 'texte') c = Object.assign(base, { type, texte: 'Nouveau texte', police: 'Cormorant Garamond', taille: 4.4, align: 'center', ombre: true, animation: 'fondu-montee', sortie: 'aucune' });
       if (type === 'bouton') c = Object.assign(base, { type, texte: L.confirmer, action: 'suivant', style: 'plein', taille: 2.4, debut: 0 });
       if (type === 'compteur') c = Object.assign(base, { type, texte: L.adultes, champ: 'adultes', min: 0, defaut: 1, taille: 2.3, largeur: 66 });
-      if (type === 'forme') c = Object.assign(base, { type, forme: media || 'rect', largeur: 40, hauteur: Math.round(40 * 720 / 1280 * 10) / 10, couleur: p.style.couleur || '#7a1f2b', opacite: 1, animation: 'fondu', sortie: 'aucune' });
+      if (type === 'forme') c = Object.assign(base, { type, forme: media || 'rect', largeur: 40, hauteur: Math.round(40 * 720 / 1280 * 10) / 10, couleur: couleurParDefaut(), opacite: 1, animation: 'fondu', sortie: 'aucune' });
       if (type === 'image' || type === 'video') {
         const ratio = media && media.l && media.h ? media.h / media.l : 1;
         c = Object.assign(base, { type, media: media ? media.src : '', largeur: 46, hauteur: Math.round(Math.min(40, 46 * ratio * 720 / 1280)), y: 32, forme: 'arrondi', animation: 'fondu', sortie: 'aucune', bordure: '' });
@@ -2512,6 +2546,34 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <button class="btn petit" data-breset>↺ Couleurs d'origine</button>
       </div></details>`;
     }
+    // Couleurs déjà utilisées dans l'invitation (proposées dans chaque sélecteur de couleur) ; la dernière choisie sert par défaut
+    function couleursUtilisees() {
+      const vues = new Map(), ajout = v => { if (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v)) vues.set(v.toLowerCase(), (vues.get(v.toLowerCase()) || 0) + 1); };
+      ajout(p.style && p.style.couleur);
+      (p.plans || []).forEach(pl => { ajout(pl.fond && pl.fond.couleur); ajout(pl.fond && pl.fond.couleur2); (pl.calques || []).forEach(c => ['couleur', 'couleur2', 'bordure', 'b_fond', 'b_texte', 'b_bord', 'contour', 'ombre_couleur', 'fond_couleur'].forEach(k => ajout(c[k]))); });
+      return [...vues.entries()].sort((a, b) => b[1] - a[1]).map(x => x[0]).slice(0, 24);
+    }
+    function couleurParDefaut() { const d = Stock.lire('studio.couleur.' + p.id, null); return d || (p.style && p.style.couleur) || '#7a1f2b'; }
+    E.couleurParDefaut = couleurParDefaut;
+    function brancherCouleurs(racine) {
+      let dl = $('#couleurs-projet'); if (!dl) { dl = document.createElement('datalist'); dl.id = 'couleurs-projet'; document.body.appendChild(dl); }
+      dl.innerHTML = couleursUtilisees().map(c => `<option value="${c}"></option>`).join('');
+      $$('input[type=color]', racine).forEach(i => {
+        i.setAttribute('list', 'couleurs-projet');
+        if (i._couleurBranchee) return; i._couleurBranchee = true;
+        i.addEventListener('change', () => Stock.ecrire('studio.couleur.' + p.id, i.value));
+      });
+      // pastilles des couleurs déjà utilisées sous le premier sélecteur des panneaux
+      $$('#props .pastilles-utilisees').forEach(x => x.remove());
+      const premier = $('#props input[type=color]');
+      if (premier) {
+        const z = document.createElement('div'); z.className = 'pastilles-utilisees'; z.title = 'Couleurs déjà utilisées dans cette invitation';
+        z.innerHTML = couleursUtilisees().slice(0, 14).map(c => `<button type="button" style="background:${c}" data-pc="${c}" title="${c}"></button>`).join('');
+        (premier.closest('.trois, .deux, .ligne, label') || premier).insertAdjacentElement('afterend', z);
+        $$('[data-pc]', z).forEach(b => b.onclick = () => { premier.value = b.dataset.pc; premier.dispatchEvent(new Event('input', { bubbles: true })); premier.dispatchEvent(new Event('change', { bubbles: true })); });
+      }
+    }
+    E.brancherCouleurs = brancherCouleurs;
     function formulaireCalque(c) {
       const position = `<details class="bloc" open><summary>Position</summary>
         <div class="trois"><label class="champ">X (%)<input type="number" id="cx" data-k="x" step="0.5" value="${c.x}"></label><label class="champ">Y (%)<input type="number" id="cy" data-k="y" step="0.5" value="${c.y}"></label><label class="champ">Largeur (%)<input type="number" data-k="largeur" step="1" value="${c.largeur || 60}"></label></div>
@@ -2544,6 +2606,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       if (c.type === 'forme') s += `<details class="bloc" open><summary>▭ Forme</summary><div class="pile">
         ${grilleFormes(c, ratioCalque(c)).replace(/<button class="forme-btn[^"]*" data-forme=""[\s\S]*?<\/button>/, '')}
         ${c.forme === 'arrondi' ? `<label class="champ">Arrondi des coins<input type="range" data-k="arrondi" min="0" max="100" step="1" value="${c.arrondi != null && c.arrondi !== '' ? c.arrondi : 16}"></label>` : ''}
+        ${c.forme !== 'arrondi' && c.forme !== 'rond' && c.forme !== 'pilule' ? `<label class="champ">Arrondir les angles<input type="range" data-k="coins" min="0" max="100" step="1" value="${Number(c.coins) || 0}"></label>` : ''}
         <button class="btn petit ${c.forme === 'libre' ? 'plein' : ''}" data-forme-libre>✎ ${c.forme === 'libre' ? 'Modifier les points' : 'Dessiner une forme libre'}</button>
         <div class="trois"><label class="champ">Couleur<input type="color" data-k="couleur" value="${esc(c.couleur || '#7a1f2b')}"></label><label class="champ">Hauteur (%)<input type="number" data-k="hauteur" step="0.5" value="${c.hauteur || 22}"></label><label class="champ">Opacité<input type="range" data-k="opacite" min="0" max="1" step="0.05" value="${c.opacite != null && c.opacite !== '' ? c.opacite : 1}"></label></div>
         <label class="cases"><input type="checkbox" data-forme-deg ${c.couleur2 ? 'checked' : ''}> Dégradé</label>
@@ -4124,6 +4187,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <option value="" ${evt === '' ? 'selected' : ''}>Commun à tous les événements</option>
         <option value="*" ${evt === '*' ? 'selected' : ''}>Tout afficher</option></select>
         <span class="muet">Les fichiers importés ici sont rangés dans ${evt === '*' ? 'les fichiers communs' : esc(evt ? '« ' + titre(evt) + ' »' : 'les fichiers communs')}. Ceux créés dans un plan (fond IA, image animée) vont dans leur événement.</span></div>
+      <input type="search" class="recherche-liste" id="bib-recherche" placeholder="🔍 Rechercher dans la bibliothèque (nom, membre, événement…)" style="margin-top:12px">
       <h3>Fonds vidéo ${evt === '*' ? '' : evt ? 'de cet événement' : 'communs'} <span class="muet" style="font-weight:400">(${fondsEvt.length})</span></h3>
       ${fondsEvt.length ? `<div class="grille" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr))">${fondsEvt.map(carteFond).join('')}</div>` : '<p class="muet">Aucun fond ici pour l\'instant. Créez-en un depuis un plan (✨ Créer un fond sur mesure) ou importez-en un.</p>'}
       <h3 style="margin-top:24px">Photos et vidéos ${evt === '*' ? '' : evt ? 'de cet événement' : 'communes'} <span class="muet" style="font-weight:400">(${autres.length})</span></h3>
@@ -4142,6 +4206,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       <h3 style="margin-top:24px">Fonds de base <span class="muet" style="font-weight:400">(pour tous les événements)</span></h3>
       <div class="grille" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">${Fabrique.FONDS.map(carteFond).join('')}</div>
       <p class="muet" style="margin-top:20px">Les fichiers importés restent dans ce navigateur jusqu'à la publication, qui les envoie sur GitHub.</p>`;
+    rechercheCartes($('#bib-recherche'), '#app .grille > .carte', 'recherche.bib');
     // Télécharger un fond / une photo / une vidéo de la bibliothèque
     $$('[data-dl]').forEach(b => b.onclick = async () => {
       const src = b.dataset.dl, nom = (b.dataset.dlNom || 'fond').replace(/[\\/:*?"<>|]+/g, '-').trim() || 'fond';

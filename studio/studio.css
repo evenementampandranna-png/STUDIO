@@ -478,7 +478,7 @@ textarea.edition-directe { position: absolute; z-index: 8; resize: none; overflo
   .editeur.ps .outils { position: static; align-self: start; max-height: 100%; overflow: auto; }
   .editeur.ps .col-plans, .editeur.ps .col-reglages, .editeur.ps .col-apercu { position: static; top: auto; max-height: none; height: 100%; min-height: 0; overflow: auto; }
   .editeur.ps .col-apercu { justify-content: flex-start; padding-bottom: 10px; }
-  .editeur.ps .apercu-cadre { height: calc((var(--h-ed, 700px) - 120px) * var(--zoom, 1)); min-height: calc(360px * var(--zoom, 1)); }
+  .editeur.ps .apercu-cadre { height: calc(var(--h-cadre, calc(var(--h-ed, 700px) - 120px)) * var(--zoom, 1)); min-height: calc(360px * var(--zoom, 1)); }
   .editeur.ps .zone-zoom.zoome { max-height: calc(var(--h-ed, 700px) - 170px); }
 }
 .outils button.on { background: var(--vin); color: #fff; }
@@ -503,7 +503,7 @@ body.atelier-plein .entete.compact h1 { font-size: 19px; }
 body.atelier-plein .entete.compact .btn { padding: 5px 12px; font-size: 13px; }
 @media (min-width: 1001px) {
   body.atelier-plein .editeur.ps { grid-template-columns: 46px minmax(150px, 200px) minmax(300px, 1fr) minmax(340px, 420px); }
-  body.atelier-plein .editeur.ps .apercu-cadre { height: calc((var(--h-ed, 700px) - 64px) * var(--zoom, 1)); }
+  body.atelier-plein .editeur.ps .apercu-cadre { height: calc(var(--h-cadre, calc(var(--h-ed, 700px) - 64px)) * var(--zoom, 1)); }
 }
 .evt-actions { margin-top: 8px; gap: 4px; flex-wrap: wrap; }
 .evt-actions .btn { padding: 3px 9px; font-size: 12px; }
@@ -527,3 +527,8 @@ body.atelier-max main { padding: 6px 8px 0 !important; }
   body.atelier-plein .ps-liste button { justify-content: center; padding: 8px 2px; }
   body.atelier-plein .outils button { width: 30px; }
 }
+
+.pastilles-utilisees { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 6px; }
+.pastilles-utilisees button { width: 20px; height: 20px; border-radius: 50%; border: 1px solid rgba(0,0,0,.15); cursor: pointer; padding: 0; }
+.pastilles-utilisees button:hover { transform: scale(1.15); }
+.recherche-liste { width: 100%; max-width: 420px; padding: 9px 14px; border-radius: 999px; border: 1px solid var(--ligne); background: #fff; font: inherit; margin: 0 0 14px; }
