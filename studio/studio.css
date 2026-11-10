@@ -507,3 +507,23 @@ body.atelier-plein .entete.compact .btn { padding: 5px 12px; font-size: 13px; }
 }
 .evt-actions { margin-top: 8px; gap: 4px; flex-wrap: wrap; }
 .evt-actions .btn { padding: 3px 9px; font-size: 12px; }
+
+/* Plein écran de l'atelier (⛶ ou F) */
+body.atelier-max .barre, body.atelier-max .entete, body.atelier-max .onglets { display: none !important; }
+body.atelier-max main { padding: 6px 8px 0 !important; }
+/* écrans moyens : colonnes plus fines pour un aperçu plus grand */
+@media (min-width: 1001px) and (max-width: 1500px) {
+  body.atelier-plein .editeur.ps { grid-template-columns: 42px 118px minmax(280px, 1fr) minmax(300px, 360px); }
+  body.atelier-plein .col-plans .plan-carte .resume, body.atelier-plein .col-plans .plan-carte .muet { display: none; }
+  body.atelier-plein .col-plans .plan-carte { padding: 5px; gap: 4px; flex-direction: column; align-items: stretch; position: relative; }
+  body.atelier-plein .col-plans .plan-carte img { width: 100%; height: 74px; object-fit: cover; border-radius: 6px; }
+  body.atelier-plein .col-plans .plan-carte .role { font-size: 10px; line-height: 1.25; word-break: break-word; }
+  body.atelier-plein .col-plans .plan-carte .role.fixe::after { content: ""; }
+  body.atelier-plein .col-plans .plan-carte .actions { position: absolute; top: 4px; right: 4px; flex-direction: row; background: rgba(255,255,255,.92); border-radius: 6px; display: none; }
+  body.atelier-plein .col-plans .plan-carte:hover .actions { display: flex; }
+  body.atelier-plein .col-plans #finaliser-tout, body.atelier-plein .col-plans #ajout-plan { font-size: 11px; padding: 4px 6px; }
+  body.atelier-plein .col-reglages.ps-col { grid-template-columns: minmax(0, 1fr) 42px; }
+  body.atelier-plein .ps-liste .ps-nom { display: none; }
+  body.atelier-plein .ps-liste button { justify-content: center; padding: 8px 2px; }
+  body.atelier-plein .outils button { width: 30px; }
+}

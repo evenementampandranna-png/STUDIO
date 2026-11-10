@@ -673,6 +673,11 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-10-9', date: '10 novembre 2026', titre: 'Aperçu plus grand, plein écran, bouton Maps', points: [
+      '<b>⛶ Plein écran</b> (colonne d\'outils, ou touche F) : l\'en-tête disparaît et le navigateur passe en plein écran ; l\'aperçu devient le plus grand possible. Échap pour sortir.',
+      'Sur les écrans moyens, la liste des plans devient une colonne de vignettes et les panneaux de droite n\'affichent que leurs icônes : l\'aperçu au centre est plus large.',
+      '<b>Bouton Maps</b> : icône Google Maps et texte « Maps » ; les anciens boutons « Jereo ny toerana / Sarintany · … » sont mis à jour à l\'ouverture de l\'invitation (republiez-la pour les invités).'
+    ] },
     { id: '2026-11-10-8', date: '10 novembre 2026', titre: 'Fini « Mémoire du navigateur pleine »', points: [
       'Les invitations, la bibliothèque et les listes de l\'équipe sont maintenant gardées dans la grande mémoire du navigateur (IndexedDB, plusieurs Go) au lieu de la petite (5 Mo). Le passage se fait tout seul à l\'ouverture du studio, sans rien perdre.',
       'Ce message bloquait les enregistrements (ex. suppression d\'un événement qui revenait) : c\'est réglé.'
@@ -877,7 +882,7 @@
 
   function route() {
     nettoyer();
-    document.body.classList.remove('atelier-plein');
+    document.body.classList.remove('atelier-plein'); document.body.classList.remove('atelier-max');
     const h = location.hash.replace(/^#\/?/, '').split('/');
     $$('.barre nav a').forEach(a => a.classList.toggle('actif', a.dataset.nav === (h[0] || 'accueil') || (h[0] === 'p' && a.dataset.nav === 'accueil')));
     window.scrollTo(0, 0);
@@ -1236,7 +1241,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
   const TYPES_BOUTON = [
     { a: 'confirmer', i: '✅', n: 'Je confirme', fr: 'Je confirme ma présence', mg: 'Ho tonga aho', en: 'I will attend', aide: 'Enregistre la présence dans la base (organisateur prévenu), puis remerciement.' },
     { a: 'refuser', i: '❌', n: 'Je ne viens pas', fr: 'Je ne pourrai pas venir', mg: 'Tsy ho afaka aho', en: 'I can\'t come', aide: 'Enregistre l\'absence dans la base (organisateur prévenu), puis remerciement.' },
-    { a: 'map', i: '📍', n: 'Itinéraire', fr: 'Voir le lieu', mg: 'Jereo ny toerana', en: 'See the place', aide: 'Ouvre Google Maps sur le lieu choisi.' },
+    { a: 'map', i: '📍', icone: 'gmaps', n: 'Maps', fr: 'Maps', mg: 'Maps', en: 'Maps', anciens: ['Voir le lieu', 'Jereo ny toerana', 'See the place'], aide: 'Ouvre Google Maps sur le lieu choisi.' },
     { a: 'appeler', i: '📞', n: 'Appeler', fr: 'Appeler', mg: 'Antsoy', en: 'Call', aide: 'Appelle le numéro choisi.' },
     { a: 'whatsapp', i: '💬', n: 'WhatsApp', fr: 'Écrire sur WhatsApp', mg: 'Hafatra WhatsApp', en: 'WhatsApp', aide: 'Ouvre WhatsApp avec un message prêt.' },
     { a: 'calendrier', i: '📅', n: 'Calendrier', fr: 'Ajouter au calendrier', mg: 'Ampidiro amin\'ny tetiandro', en: 'Add to calendar', aide: 'Ajoute l\'événement dans le calendrier du téléphone.' },
@@ -1270,7 +1275,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
             <span class="sep"></span>
             <button data-outil="fond" title="Fond du plan">▦</button><button data-outil="regles" title="Règles et repères">📏</button><button data-outil="aide" title="Raccourcis clavier">?</button><button data-outil="annuler" title="Annuler (Ctrl+Z)">↶</button><button data-outil="refaire" title="Rétablir (Ctrl+Maj+Z)">↷</button>
             <span class="sep"></span>
-            <button data-outil="zoom+" title="Zoom avant (Ctrl +)">＋</button><button data-outil="zoom0" title="Ajuster à l'écran (Ctrl 0)" id="zoom-val">100%</button><button data-outil="zoom-" title="Zoom arrière (Ctrl −)">－</button>
+            <button data-outil="plein" title="Plein écran : aperçu le plus grand possible (F) — Échap pour sortir">⛶</button><button data-outil="zoom+" title="Zoom avant (Ctrl +)">＋</button><button data-outil="zoom0" title="Ajuster à l'écran (Ctrl 0)" id="zoom-val">100%</button><button data-outil="zoom-" title="Zoom arrière (Ctrl −)">－</button>
           </div>
         <div class="col-plans" id="col-plans"></div>
         <div class="col-apercu">
@@ -1294,6 +1299,14 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     const eng = new Moteur($('#scene'), { mode: 'edition', resolveur: resoudre, famille: FAMILLE_TEST });
     moteurCourant = eng;
     E.eng = eng;
+    // anciens boutons d'itinéraire : texte « Maps » et icône Google Maps
+    (p.plans || []).forEach(pl => (pl.calques || []).forEach(c => {
+      if (c.type !== 'bouton' || c.action !== 'map') return;
+      const tx = String(c.texte || '').trim();
+      if (['Voir le lieu', 'Jereo ny toerana', 'See the place', 'Itinéraire', 'Toerana', 'Sarintany', 'Plan', 'Map'].includes(tx) || !tx) c.texte = 'Maps';
+      else { const m = tx.match(/^(Sarintany|Plan|Map|Toerana)\s*·\s*(.+)$/); if (m) c.texte = 'Maps · ' + m[2]; }
+      if (!c.b_icone || c.b_icone === '📍') c.b_icone = 'gmaps';
+    }));
     eng.setProjet(p).then(() => { enregistrer(p); afficher(); });
     // Zoom de l'aperçu (comme Photoshop) : boutons, Ctrl + molette, Ctrl +/−/0
     let zoom = 1;
@@ -1308,6 +1321,14 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     // gauche et droite fixes, seul le centre défile : l'éditeur prend la hauteur de l'écran
     const ajusterHauteur = () => { const ed = $('.editeur.ps'); if (!ed) return; const haut = ed.getBoundingClientRect().top + window.scrollY; ed.style.setProperty('--h-ed', Math.max(520, window.innerHeight - haut - 12) + 'px'); };
     ajusterHauteur(); ecouter(window, 'resize', ajusterHauteur); setTimeout(ajusterHauteur, 300);
+    // Plein écran : on cache l'en-tête du site et de l'événement, et le navigateur passe en plein écran
+    E.pleinEcran = () => {
+      const on = !document.body.classList.contains('atelier-max');
+      document.body.classList.toggle('atelier-max', on);
+      try { if (on && document.documentElement.requestFullscreen && !document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {}); else if (!on && document.fullscreenElement) document.exitFullscreen().catch(() => {}); } catch (e) {}
+      setTimeout(() => { window.scrollTo(0, 0); ajusterHauteur(); }, 120); setTimeout(ajusterHauteur, 500);
+    };
+    ecouter(document, 'fullscreenchange', () => { if (!document.fullscreenElement && document.body.classList.contains('atelier-max')) { document.body.classList.remove('atelier-max'); setTimeout(ajusterHauteur, 100); } });
     // outil actif (sélection / main), comme Photoshop
     E.outil = 'select';
     const OUTILS_MODE = ['select', 'main', 'rect', 'ellipse', 'ligne', 'plume', 'crayon'];
@@ -1387,6 +1408,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     $$('#outils [data-outil]').forEach(b => b.onclick = () => {
       const o = b.dataset.outil;
       if (o === 'zoom+') return E.zoomer(1.25); if (o === 'zoom-') return E.zoomer(0.8); if (o === 'zoom0') return E.zoomer(0);
+      if (o === 'plein') return E.pleinEcran();
       if (OUTILS_MODE.includes(o)) return choisirOutil(E.outil === o && o !== 'select' ? 'select' : o);
       if (o === 'annuler' || o === 'refaire') { const x = $('#' + o); if (x) x.click(); return; }
       if (o === 'regles') { const x = $('#regles-btn'); if (x) x.click(); return; }
@@ -1888,6 +1910,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       if (mod && e.key.toLowerCase() === 'd' && c) { e.preventDefault(); dupliquerCalque(c); return; }
       if (!mod && !e.altKey && e.key === 'v') { const b = $('#outils [data-outil="select"]'); if (b) b.click(); return; }
       if (!mod && !e.altKey && (e.key === 'u' || e.key === 'p')) { const b = $('#outils [data-outil="' + (e.key === 'u' ? 'rect' : 'plume') + '"]'); if (b) b.click(); return; }
+      if (!mod && !e.altKey && e.key === 'f') { E.pleinEcran(); return; }
       if (!mod && !e.altKey && e.key === 'h') { const b = $('#outils [data-outil="main"]'); if (b) b.click(); return; }
       if (!mod && !e.altKey && e.key === 'i' && c) { const b = $('#outils [data-outil="pipette"]'); if (b) b.click(); return; }
       if (mod && (e.code === 'BracketRight' || e.code === 'BracketLeft') && c) { e.preventDefault(); ordreCalque(c, e.code === 'BracketRight' ? (e.shiftKey ? 'avant' : 'avance') : (e.shiftKey ? 'arriere' : 'recule')); return; }
@@ -2312,7 +2335,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         fermerPop(); const t = TYPES_BOUTON.find(x => x.a === b.dataset.nb), lang = (p.fiche || {}).langue || 'fr';
         ajouterCalque('bouton');
         const c = (plan().calques || []).find(x => x.id === E.sel);
-        if (c) { c.action = t.a; c.texte = t[lang] || t.fr; if (!['suivant', 'precedent', 'passer', 'revoir'].includes(t.a)) c.b_icone = t.i; E.rafraichir(); rendreReglages(); E.ouvrirSection('Bouton'); }
+        if (c) { c.action = t.a; c.texte = t[lang] || t.fr; if (!['suivant', 'precedent', 'passer', 'revoir'].includes(t.a)) c.b_icone = t.icone || t.i; E.rafraichir(); rendreReglages(); E.ouvrirSection('Bouton'); }
       });
     }
     E.menuBouton = menuBouton;
@@ -2484,8 +2507,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <div class="trois"><label class="champ">Fond<input type="color" data-k="b_fond" value="${esc(c.b_fond || (plein ? coul : '#ffffff'))}"></label><label class="champ">Texte<input type="color" data-k="b_texte" value="${esc(c.b_texte || (plein ? '#ffffff' : coul))}"></label><label class="champ">Contour<input type="color" data-k="b_bord" value="${esc(c.b_bord || coul)}"></label></div>
         <div class="deux"><label class="champ">Épaisseur du contour<input type="range" data-k="b_bord_ep" min="0" max="8" step="0.5" value="${c.b_bord_ep != null && c.b_bord_ep !== '' ? c.b_bord_ep : 1.5}"></label><label class="champ">Hauteur<input type="range" data-k="b_hauteur" min="0.7" max="2" step="0.05" value="${Number(c.b_hauteur) || 1}"></label></div>
         <label class="cases"><input type="checkbox" data-k="b_ombre" ${c.b_ombre ? 'checked' : ''}> Ombre</label>
-        <label class="champ">Icône devant le texte<input type="text" data-k="b_icone" maxlength="4" placeholder="aucune" value="${esc(c.b_icone || '')}"></label>
-        <div class="ligne" style="gap:4px;flex-wrap:wrap">${[t ? t.i : '', '📍', '✅', '❌', '📞', '💬', '📅', '🔗', '❤️', '🎉', '💍', '➜'].filter((x, i, l) => x && l.indexOf(x) === i).map(x => `<button class="btn petit" data-bicone="${x}">${x}</button>`).join('')}<button class="btn petit" data-bicone="">Sans icône</button></div>
+        <label class="champ">Icône devant le texte<input type="text" data-k="b_icone" maxlength="5" placeholder="aucune" value="${esc(c.b_icone === 'gmaps' ? '' : c.b_icone || '')}"${c.b_icone === 'gmaps' ? ' placeholder="icône Maps"' : ''}></label>
+        <div class="ligne" style="gap:4px;flex-wrap:wrap"><button class="btn petit" data-bicone="gmaps" title="Icône Google Maps"><img src="${MoteurInfo.ICONE_MAPS}" alt="Maps" style="height:16px;vertical-align:-3px"></button>${[t ? t.i : '', '📍', '✅', '❌', '📞', '💬', '📅', '🔗', '❤️', '🎉', '💍', '➜'].filter((x, i, l) => x && l.indexOf(x) === i).map(x => `<button class="btn petit" data-bicone="${x}">${x}</button>`).join('')}<button class="btn petit" data-bicone="">Sans icône</button></div>
         <button class="btn petit" data-breset>↺ Couleurs d'origine</button>
       </div></details>`;
     }
@@ -2560,8 +2583,9 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       $$('#props [data-tbouton]').forEach(b => b.onclick = () => {
         const t = TYPES_BOUTON.find(x => x.a === b.dataset.tbouton), lang = (p.fiche || {}).langue || 'fr';
         E.modif(true);
-        const ancien = TYPES_BOUTON.some(x => [x.fr, x.mg, x.en].includes(c.texte)) || !c.texte || c.texte === (Fabrique.LIB[lang] || {}).confirmer;
+        const ancien = TYPES_BOUTON.some(x => [x.fr, x.mg, x.en].concat(x.anciens || []).includes(c.texte)) || !c.texte || c.texte === (Fabrique.LIB[lang] || {}).confirmer;
         c.action = t.a; if (ancien) c.texte = t[lang] || t.fr;
+        if (t.icone) c.b_icone = t.icone; else if (c.b_icone === 'gmaps') delete c.b_icone;
         E.rafraichir(); rendreReglages(); E.ouvrirSection('Bouton');
       });
       const tb = $('#props [data-tester-bouton]'); if (tb) tb.onclick = () => {

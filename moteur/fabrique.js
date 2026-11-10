@@ -239,7 +239,7 @@
     cc.push(bouton(L.whatsapp, 'whatsapp', zc.x, yC + 5, { condition: 'general', largeur: 66, cible: 0 }));
     const yM = Math.max(71, yC + 28);
     (fiche.lieux || []).slice(0, 2).forEach((l, i, arr) => {
-      cc.push(bouton(L.map + ' · ' + l.nom.split(',')[0].split(' ').slice(0, 2).join(' '), 'map', arr.length === 1 ? zc.x : (i ? zc.x + 17 : zc.x - 17), yM, { largeur: arr.length === 1 ? 60 : 33, style: 'contour', taille: 1.8, cible: i }));
+      cc.push(bouton(arr.length === 1 ? 'Maps' : 'Maps · ' + l.nom.split(',')[0].split(' ').slice(0, 2).join(' '), 'map', arr.length === 1 ? zc.x : (i ? zc.x + 17 : zc.x - 17), yM, { largeur: arr.length === 1 ? 60 : 33, style: 'contour', taille: 1.8, cible: i, b_icone: 'gmaps' }));
     });
     (fiche.contacts || []).slice(0, 2).forEach((c, i, arr) => {
       cc.push(bouton(L.appeler + ' ' + c.nom, 'appeler', arr.length === 1 ? zc.x : (i ? zc.x + 17 : zc.x - 17), yM + 6.5, { largeur: arr.length === 1 ? 60 : 33, style: 'contour', taille: 1.8, cible: i }));

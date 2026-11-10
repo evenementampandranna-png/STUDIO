@@ -32,6 +32,10 @@
     const p = new FontFace(nom, `url("${url}")`).load().then(f => { document.fonts.add(f); }).catch(e => console.warn('police', nom, e));
     persoChargees[nom] = { url, p }; return p;
   }
+  // Icône « Maps » des boutons d'itinéraire (épingle de carte aux couleurs de Google Maps)
+  const SVG_MAPS = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path fill="#1a73e8" d="M24 2C15.2 2 8 9.1 8 18c0 3.1.9 6 2.4 8.4L24 46l13.6-19.6C39.1 24 40 21.1 40 18 40 9.1 32.8 2 24 2z"/><path fill="#ea4335" d="M24 2c-5.1 0-9.6 2.4-12.5 6.1L24 18l12.5-9.9C33.6 4.4 29.1 2 24 2z"/><path fill="#fbbc04" d="M11.5 8.1C9.3 10.8 8 14.3 8 18c0 3.1.9 6 2.4 8.4L24 18z"/><path fill="#34a853" d="M24 18 10.4 26.4 24 46l6.8-9.8z"/><circle cx="24" cy="18" r="6.2" fill="#fff"/></svg>';
+  const ICONE_MAPS = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(SVG_MAPS);
+  let imgMaps = null; try { imgMaps = new Image(); imgMaps.src = ICONE_MAPS; } catch (e) {}
   const POLICE_EMOJI = '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji"';
   // Charge les polices demandées depuis Google Fonts (une seule fois chacune)
   const policesChargees = new Set();
@@ -593,7 +597,12 @@
       }
       ctx.fillStyle = c.b_texte || (style === 'plein' ? '#fff' : coul); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.font = `${c.graisse || 600} ${fs.toFixed(1)}px "${c.police || 'Cormorant Garamond'}", Georgia, serif, ${POLICE_EMOJI}`;
-      ctx.fillText((c.b_icone ? c.b_icone + ' ' : '') + remplacer(texteDe(c, this.langue), vars), x + larg / 2, y + haut / 2, larg - fs);
+      const libelle = remplacer(texteDe(c, this.langue), vars);
+      if (c.b_icone === 'gmaps' && imgMaps && imgMaps.complete) {
+        const ti = fs * 1.25, tw = Math.min(ctx.measureText(libelle).width, larg - fs - ti), x0 = x + larg / 2 - (ti + fs * 0.35 + tw) / 2;
+        ctx.drawImage(imgMaps, x0, y + haut / 2 - ti / 2, ti, ti);
+        ctx.textAlign = 'left'; ctx.fillText(libelle, x0 + ti + fs * 0.35, y + haut / 2, larg - fs - ti);
+      } else ctx.fillText((c.b_icone ? c.b_icone + ' ' : '') + libelle, x + larg / 2, y + haut / 2, larg - fs);
       ctx.restore();
     }
 
@@ -805,7 +814,8 @@
         if (c.type === 'bouton') {
           const b = document.createElement('button');
           b.type = 'button';
-          b.textContent = (c.b_icone ? c.b_icone + ' ' : '') + remplacer(texteDe(c, this.langue), vars);
+          if (c.b_icone === 'gmaps') { b.innerHTML = `<img src="${ICONE_MAPS}" alt="" style="height:1.25em;width:auto;vertical-align:-.28em;margin-right:.35em">`; b.appendChild(document.createTextNode(remplacer(texteDe(c, this.langue), vars))); }
+          else b.textContent = (c.b_icone ? c.b_icone + ' ' : '') + remplacer(texteDe(c, this.langue), vars);
           // apparence personnalisée (forme, couleurs, contour, ombre, hauteur)
           const st = b.style;
           if (c.b_forme) st.borderRadius = { pilule: '999px', arrondi: '.6em', carre: '0' }[c.b_forme] || '';
@@ -1105,5 +1115,5 @@
   // Langues proposées pour les invitations
   const LANGUES = { mg: 'Malagasy', fr: 'Français', en: 'English', de: 'Deutsch', it: 'Italiano', es: 'Español', pt: 'Português', zh: '中文', ar: 'العربية', ru: 'Русский', ja: '日本語' };
   const FUSIONS = [['normal', 'Normale'], ['multiply', 'Produit (assombrit, garde les ombres)'], ['screen', 'Écran (éclaircit, garde les lumières)'], ['overlay', 'Superposition'], ['soft-light', 'Lumière douce'], ['hard-light', 'Lumière crue'], ['color-dodge', 'Densité couleur −'], ['color-burn', 'Densité couleur +'], ['darken', 'Obscurcir'], ['lighten', 'Éclaircir'], ['difference', 'Différence'], ['luminosity', 'Luminosité'], ['color', 'Couleur']];
-  global.MoteurInfo = { FORMES: FORMES.map(x => [x[0], x[1]]), cheminForme, CATALOGUE_POLICES, chargerPolices, chargerPolicePerso, typeFond, fondMedia, FUSIONS, plage, positionVideo, LANGUES, texteDe, W, H, POLICES, ANIMATIONS, SORTIES, NOMS_EFFETS, ACTIONS, TYPES_HTML, uid, variablesDe, dateLisible, remplacer, MOIS_MG, MOIS_FR };
+  global.MoteurInfo = { ICONE_MAPS, FORMES: FORMES.map(x => [x[0], x[1]]), cheminForme, CATALOGUE_POLICES, chargerPolices, chargerPolicePerso, typeFond, fondMedia, FUSIONS, plage, positionVideo, LANGUES, texteDe, W, H, POLICES, ANIMATIONS, SORTIES, NOMS_EFFETS, ACTIONS, TYPES_HTML, uid, variablesDe, dateLisible, remplacer, MOIS_MG, MOIS_FR };
 })(window);
