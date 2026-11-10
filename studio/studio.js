@@ -638,6 +638,12 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-10-6', date: '10 novembre 2026', titre: 'Tracer des formes, boutons au choix, aperçu plus grand', points: [
+      '<b>Formes</b> : on peut maintenant les déplacer, les agrandir / rétrécir (poignées) et les tourner (⟳). Le calque déjà choisi s\'attrape en premier, même s\'il est derrière un autre.',
+      '<b>Tracer</b> : ▭ rectangle, ◯ ellipse, ╱ ligne — faites glisser sur l\'aperçu ; ✒ plume — cliquez des points, double-clic ou Entrée pour fermer ; ✎ crayon — dessinez à main levée.',
+      '<b>⏺ Bouton</b> (ou + Bouton) : on choisit d\'abord ce qu\'il fait (Je confirme, Itinéraire, Appeler, WhatsApp…) ; texte et icône se mettent tout seuls. Dans l\'aperçu (▶ Plan), Itinéraire / WhatsApp / lien s\'ouvrent vraiment.',
+      '<b>Aperçu plus grand</b> : en-tête réduit sur l\'onglet Plans. <b>Panneau de droite</b> : il ne passe plus sous l\'aperçu sur les écrans moyens.'
+    ] },
     { id: '2026-11-10-5', date: '10 novembre 2026', titre: 'Plus d\'outils, boutons personnalisables, côtés fixes', points: [
       '<b>Outils (colonne de gauche)</b> : ↖ sélection (V), ✋ main (H ou Espace maintenu, quand on a zoomé), T texte, ▭ rectangle, ◯ ellipse, ╱ ligne, ★ autres formes, photo, illustration, emoji, bouton, compteur, ⬚ rogner, 💧 pipette (I), ⇋ ⇵ miroirs, 🔒 verrouiller, 👁 masquer, ⧉ dupliquer, 🗑 supprimer, ▦ fond, 📏 règles, ? raccourcis, ↶ ↷, zoom.',
       '<b>Boutons personnalisables</b> (panneau « 🎨 Apparence du bouton ») : forme pilule / arrondi / carré, couleur du fond, du texte et du contour, épaisseur, hauteur, ombre, icône devant le texte (📍 ✅ 📞 💬…), « Couleurs d\'origine ». Aussi dans le film téléchargé.',
@@ -1046,7 +1052,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
   let boucleUI = null;
   function vueProjet(p, onglet) {
     $('#app').innerHTML = `
-      <div class="entete"><div><a href="#/" class="muet" style="text-decoration:none">‹ Événements</a><h1 style="margin-top:4px">${esc(p.fiche.titre)}</h1><p>${esc(MoteurInfo.dateLisible(p.fiche.date, p.fiche.langue))}${p.fiche.heure ? ' · ' + esc(p.fiche.heure) : ''}</p></div>
+      <div class="entete ${onglet === 'plans' || !onglet ? 'compact' : ''}"><div><a href="#/" class="muet" style="text-decoration:none">‹ Événements</a><h1 style="margin-top:4px">${esc(p.fiche.titre)}</h1><p>${esc(MoteurInfo.dateLisible(p.fiche.date, p.fiche.langue))}${p.fiche.heure ? ' · ' + esc(p.fiche.heure) : ''}</p></div>
         <div class="ligne"><a class="btn ${p.publie ? 'plein' : ''}" href="#/p/${p.id}/publier" title="Les 2 liens à donner au client">🔗 Liens du client</a><button class="btn petit" id="btn-versions" title="Versions enregistrées automatiquement (revenir en arrière)">🕘 Versions</button><span class="muet" id="etat-sauve">Enregistré</span></div></div>
       <div class="onglets">
         <a href="#/p/${p.id}/plans" class="${onglet === 'plans' ? 'actif' : ''}">Plans</a>
@@ -1172,7 +1178,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <div class="outils" id="outils">
             <button data-outil="select" class="on" title="Sélection / déplacer (V)">↖</button><button data-outil="main" title="Main : faire glisser la vue quand on a zoomé (H, ou maintenir Espace)">✋</button>
             <span class="sep"></span>
-            <button data-outil="texte" title="Texte (T)">T</button><button data-outil="rect" title="Rectangle (U)">▭</button><button data-outil="ellipse" title="Ellipse / rond">◯</button><button data-outil="ligne" title="Ligne">╱</button><button data-outil="forme" title="Autres formes : cœur, étoile, arche…">★</button>
+            <button data-outil="texte" title="Texte (T)">T</button><button data-outil="rect" title="Rectangle : tracer sur l'aperçu (U)">▭</button><button data-outil="ellipse" title="Ellipse : tracer sur l'aperçu">◯</button><button data-outil="ligne" title="Ligne : tracer sur l'aperçu">╱</button><button data-outil="plume" title="Plume : cliquer des points, double-clic pour fermer la forme (P)">✒</button><button data-outil="crayon" title="Crayon : dessiner une forme à main levée">✎</button><button data-outil="forme" title="Autres formes : cœur, étoile, arche…">★</button>
             <button data-outil="photo" title="Photo / vidéo">🖼</button><button data-outil="illu" title="Illustration">✿</button><button data-outil="emoji" title="Emoji">😊</button><button data-outil="bouton" title="Bouton">⏺</button><button data-outil="compteur" title="Compteur (adultes / enfants)">±</button>
             <span class="sep"></span>
             <button data-outil="rogner" title="Rogner la photo ou le fond (C)">⬚</button><button data-outil="pipette" title="Pipette : prendre une couleur à l'écran (I)">💧</button><button data-outil="miroir" title="Miroir horizontal">⇋</button><button data-outil="miroir-v" title="Miroir vertical">⇵</button>
@@ -1220,7 +1226,67 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     ajusterHauteur(); ecouter(window, 'resize', ajusterHauteur); setTimeout(ajusterHauteur, 300);
     // outil actif (sélection / main), comme Photoshop
     E.outil = 'select';
-    const choisirOutil = o => { E.outil = o; $$('#outils [data-outil="select"], #outils [data-outil="main"]').forEach(x => x.classList.toggle('on', x.dataset.outil === o)); $('#zone-zoom').classList.toggle('outil-main', o === 'main'); };
+    const OUTILS_MODE = ['select', 'main', 'rect', 'ellipse', 'ligne', 'plume', 'crayon'];
+    const choisirOutil = o => {
+      E.outil = o; annulerPlume();
+      $$('#outils [data-outil]').forEach(x => x.classList.toggle('on', x.dataset.outil === o && OUTILS_MODE.includes(o)));
+      $('#zone-zoom').classList.toggle('outil-main', o === 'main'); $('#zone-zoom').classList.toggle('outil-trace', ['rect', 'ellipse', 'ligne', 'plume', 'crayon'].includes(o));
+      if (o === 'plume') toast('Plume : cliquez des points sur l\'aperçu, double-clic (ou Entrée) pour fermer la forme · Échap pour annuler');
+      else if (o === 'crayon') toast('Crayon : dessinez la forme à main levée sur l\'aperçu');
+      else if (['rect', 'ellipse', 'ligne'].includes(o)) toast('Tracez la forme sur l\'aperçu en faisant glisser');
+    };
+    E.choisirOutil = choisirOutil;
+    // ---- Tracer des formes sur l'aperçu (rectangle, ellipse, ligne, plume, crayon)
+    const traceSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); traceSvg.id = 'trace-apercu'; traceSvg.setAttribute('viewBox', '0 0 100 100'); traceSvg.setAttribute('preserveAspectRatio', 'none'); $('#cadre').appendChild(traceSvg);
+    let plume = null;
+    function annulerPlume() { plume = null; traceSvg.innerHTML = ''; }
+    const enPct = e => { const r = $('#poignees').getBoundingClientRect(); return [Math.max(0, Math.min(100, (e.clientX - r.left) / r.width * 100)), Math.max(0, Math.min(100, (e.clientY - r.top) / r.height * 100))]; };
+    const coul = () => p.style.couleur || '#7a1f2b';
+    function poserForme(c) { E.modif(true); const pl = plan(); c.id = uid(); pl.calques.push(c); E.sel = c.id; if (E.multi) E.multi.clear(); E.rafraichir(); rendreReglages(); rendrePlans(); choisirOutil('select'); }
+    function formeDePoints(pts, lisse) {
+      const xs = pts.map(q => q[0]), ys = pts.map(q => q[1]), x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+      const w = Math.max(1, x1 - x0), h = Math.max(0.6, y1 - y0);
+      poserForme({ type: 'forme', forme: 'libre', forme_points: pts.map(q => [Math.round((q[0] - x0) / w * 1000) / 1000, Math.round((q[1] - y0) / h * 1000) / 1000]), forme_lisse: !!lisse, x: Math.round((x0 + w / 2) * 10) / 10, y: Math.round((y0 + h / 2) * 10) / 10, largeur: Math.round(w * 10) / 10, hauteur: Math.round(h * 10) / 10, couleur: coul(), opacite: 1, debut: 0.4, animation: 'fondu', sortie: 'aucune' });
+    }
+    function finirPlume() { if (plume && plume.length >= 3) formeDePoints(plume, false); else annulerPlume(); }
+    const dessinerPlume = (extra) => { const l = plume.concat(extra ? [extra] : []); traceSvg.innerHTML = `<polyline points="${l.map(q => q.join(',')).join(' ')}" fill="rgba(195,58,76,.12)" stroke="#c33a4c" stroke-width="0.4" vector-effect="non-scaling-stroke"/>` + plume.map((q, i) => `<circle cx="${q[0]}" cy="${q[1]}" r="${i === 0 ? 1.2 : 0.8}" fill="${i === 0 ? '#c33a4c' : '#fff'}" stroke="#c33a4c" stroke-width="0.3"/>`).join(''); };
+    ecouter(document, 'keydown', e => { if (!plume) return; if (e.key === 'Enter') { e.preventDefault(); finirPlume(); } if (e.key === 'Escape') { annulerPlume(); } });
+    $('#zone-zoom').addEventListener('pointermove', e => { if (E.outil === 'plume' && plume && plume.length) dessinerPlume(enPct(e)); });
+    $('#zone-zoom').addEventListener('dblclick', e => { if (E.outil !== 'plume' || !plume) return; e.stopPropagation(); e.preventDefault(); finirPlume(); }, true);
+    $('#zone-zoom').addEventListener('pointerdown', e => {
+      const o = E.outil; if (!['rect', 'ellipse', 'ligne', 'plume', 'crayon'].includes(o) || espace) return;
+      if (!e.target.closest('#cadre')) return;
+      e.stopPropagation(); e.preventDefault();
+      const a = enPct(e);
+      if (o === 'plume') {
+        plume = plume || [];
+        if (plume.length >= 3 && Math.hypot(a[0] - plume[0][0], (a[1] - plume[0][1]) * 1.78) < 2.5) return finirPlume();   // clic sur le 1er point : on ferme
+        const der = plume[plume.length - 1]; if (der && Math.hypot(a[0] - der[0], a[1] - der[1]) < 0.8) return;   // double-clic au même endroit
+        plume.push(a); dessinerPlume(); return;
+      }
+      const pts = [a]; let b = a;
+      const bouger = ev => {
+        b = enPct(ev);
+        if (o === 'crayon') { pts.push(b); traceSvg.innerHTML = `<polyline points="${pts.map(q => q.join(',')).join(' ')}" fill="rgba(195,58,76,.12)" stroke="#c33a4c" stroke-width="0.5" vector-effect="non-scaling-stroke"/>`; return; }
+        const x = Math.min(a[0], b[0]), y = Math.min(a[1], b[1]), w = Math.abs(b[0] - a[0]), h = Math.abs(b[1] - a[1]);
+        traceSvg.innerHTML = o === 'ligne' ? `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="#c33a4c" stroke-width="0.6" vector-effect="non-scaling-stroke"/>`
+          : o === 'ellipse' ? `<ellipse cx="${x + w / 2}" cy="${y + h / 2}" rx="${w / 2}" ry="${h / 2}" fill="rgba(195,58,76,.15)" stroke="#c33a4c" stroke-width="0.4" vector-effect="non-scaling-stroke"/>`
+          : `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="rgba(195,58,76,.15)" stroke="#c33a4c" stroke-width="0.4" vector-effect="non-scaling-stroke"/>`;
+      };
+      const fin = () => {
+        window.removeEventListener('pointermove', bouger); window.removeEventListener('pointerup', fin); traceSvg.innerHTML = '';
+        if (o === 'crayon') { if (pts.length < 4) return; const pas = Math.max(1, Math.floor(pts.length / 60)); return formeDePoints(pts.filter((q, i) => i % pas === 0), true); }
+        let w = Math.abs(b[0] - a[0]), h = Math.abs(b[1] - a[1]);
+        if (o === 'ligne') {
+          const dx = (b[0] - a[0]) / 100 * 720, dy = (b[1] - a[1]) / 100 * 1280, L = Math.hypot(dx, dy);
+          if (L < 6) return;
+          return poserForme({ type: 'forme', forme: 'rect', x: Math.round((a[0] + b[0]) / 2 * 10) / 10, y: Math.round((a[1] + b[1]) / 2 * 10) / 10, largeur: Math.round(L / 720 * 1000) / 10, hauteur: 0.4, rotation: Math.round(Math.atan2(dy, dx) * 180 / Math.PI), couleur: coul(), opacite: 1, debut: 0.4, animation: 'fondu', sortie: 'aucune' });
+        }
+        if (w < 1.5 && h < 1) { w = 40; h = 40 * 720 / 1280; }   // simple clic : taille par défaut
+        poserForme({ type: 'forme', forme: o === 'ellipse' ? 'rond' : 'rect', x: Math.round((Math.min(a[0], b[0]) + Math.abs(b[0] - a[0]) / 2 || a[0]) * 10) / 10, y: Math.round((Math.min(a[1], b[1]) + Math.abs(b[1] - a[1]) / 2 || a[1]) * 10) / 10, largeur: Math.round(w * 10) / 10, hauteur: Math.round(h * 10) / 10, couleur: coul(), opacite: 1, debut: 0.4, animation: 'fondu', sortie: 'aucune' });
+      };
+      window.addEventListener('pointermove', bouger); window.addEventListener('pointerup', fin);
+    }, true);
     // Main : faire glisser la vue (outil ✋ ou Espace maintenu)
     let espace = false;
     ecouter(document, 'keydown', e => { if (e.code === 'Space' && !e.repeat && !/^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || '') && !(document.activeElement || {}).isContentEditable && $('#zone-zoom') && $('#zone-zoom').classList.contains('zoome')) { espace = true; $('#zone-zoom').classList.add('outil-main'); e.preventDefault(); } });
@@ -1237,9 +1303,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     $$('#outils [data-outil]').forEach(b => b.onclick = () => {
       const o = b.dataset.outil;
       if (o === 'zoom+') return E.zoomer(1.25); if (o === 'zoom-') return E.zoomer(0.8); if (o === 'zoom0') return E.zoomer(0);
-      if (o === 'select' || o === 'main') return choisirOutil(o);
-      if (o === 'rect' || o === 'ellipse') return E.ajouterCalque('forme', o === 'rect' ? 'rect' : 'rond');
-      if (o === 'ligne') { E.ajouterCalque('forme', 'rect'); const c = (plan().calques || []).find(x => x.id === E.sel); if (c) { c.hauteur = 0.5; c.largeur = 50; E.rafraichir(); E.rendreReglages(); } return; }
+      if (OUTILS_MODE.includes(o)) return choisirOutil(E.outil === o && o !== 'select' ? 'select' : o);
       if (o === 'annuler' || o === 'refaire') { const x = $('#' + o); if (x) x.click(); return; }
       if (o === 'regles') { const x = $('#regles-btn'); if (x) x.click(); return; }
       if (o === 'aide') return modale(`<h2>Raccourcis</h2><div class="pile" style="font-size:14px;line-height:1.7">${($('.astuce') || {}).textContent.split(' · ').map(x => '• ' + esc(x)).join('<br>')}<br>• V : sélection · H ou Espace maintenu : main · I : pipette<br>• Ctrl + / Ctrl − / Ctrl 0 : zoom · Ctrl + molette : zoom<br>• Ctrl+] / Ctrl+[ : avancer / reculer · Ctrl+Maj+] / [ : tout devant / tout derrière</div>`);
@@ -1257,7 +1321,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           E.rafraichir(); E.rendreReglages(); toast('Couleur ' + r.sRGBHex + ' appliquée');
         }).catch(() => {}));
       }
-      if (o === 'texte' || o === 'bouton' || o === 'compteur') return E.ajouterCalque(o);
+      if (o === 'bouton') return E.menuBouton(b);
+      if (o === 'texte' || o === 'compteur') return E.ajouterCalque(o);
       if (o === 'forme') return E.choisirNouvelleForme(b);
       if (o === 'photo') { const i = $('#imp-calque'); if (i) i.click(); return; }
       if (o === 'illu') { const i = $('#ajout-illu'); if (i) i.click(); return; }
@@ -1327,9 +1392,17 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       if (eng.planFixe == null && pc && pc.role === 'confirmation' && !Number(pc.duree) && t > 8 && !E._versMerci) { E._versMerci = true; toast('Aperçu : suite vers le remerciement (sur l\'invitation, il vient après la réponse de l\'invité)'); eng.allerRemerciement(); setTimeout(() => { E._versMerci = false; }, 1000); }
     };
     eng.onFin = () => { eng.mode = 'edition'; E.enPause = false; majPause(); afficher(); };
-    eng.onAction = (a) => {
+    eng.onAction = (a, cB) => {
       if (a === 'whatsapp' && eng.planCourant() && eng.planCourant().role === 'confirmation') { toast('Réponse par WhatsApp (simulée) : suite du film'); return eng.allerRemerciement(); }
       if (a === 'confirmer' || a === 'refuser') { toast(a === 'confirmer' ? 'Réponse « vient » (simulée) : suite du film' : 'Réponse « ne vient pas » (simulée) : suite du film'); return eng.allerRemerciement(); }
+      const c = cB || {}, f = p.fiche || {}, k = Number(c.cible) || 0;
+      const tel = String(c.tel || ((f.contacts || [])[k] || {}).telephone || '').replace(/[^\d+]/g, '');
+      if (a === 'map') { const l = (f.lieux || [])[k] || (f.lieux || [])[0] || {}; return window.open(c.lien ? (/^https?:/.test(c.lien) ? c.lien : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(c.lien)) : (l.maps || 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(l.nom || '')), '_blank'); }
+      if (a === 'whatsapp') return tel ? window.open('https://wa.me/' + tel.replace(/^\+/, '').replace(/^0/, '261'), '_blank') : toast('Aucun numéro pour ce bouton');
+      if (a === 'appeler') return toast(tel ? '📞 Sur le téléphone de l\'invité, ce bouton appelle ' + tel : 'Aucun numéro pour ce bouton');
+      if (a === 'lien' || a === 'messenger') return c.lien ? window.open(c.lien, '_blank') : toast('Ce bouton n\'a pas encore de lien');
+      if (a === 'calendrier') return toast('📅 Sur la page d\'invitation, ajoute l\'événement au calendrier du téléphone');
+      if (a === 'partager') return toast('📤 Sur la page d\'invitation, partage le lien');
       toast('Action « ' + a + ' » (active sur la page d\'invitation)');
     };
     $('#vue').onchange = e => { E.vue = e.target.value; eng.famille = E.vue === 'famille' ? FAMILLE_TEST : null; eng.form = { adultes: null, enfants: null }; if (eng.famille) { eng.form.adultes = 2; eng.form.enfants = 2; } E.rafraichir(); };
@@ -1341,7 +1414,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     const zone = $('#poignees');
     const cadre = $('#cadre');
     let drag = null, editeur = null;
-    const POIGNEES = { texte: ['nw', 'ne', 'sw', 'se', 'e', 'w'], bouton: ['nw', 'ne', 'sw', 'se', 'e', 'w'], compteur: ['e', 'w'], champ: ['e', 'w'], image: ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'], video: ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] };
+    const POIGNEES = { texte: ['nw', 'ne', 'sw', 'se', 'e', 'w'], bouton: ['nw', 'ne', 'sw', 'se', 'e', 'w'], compteur: ['e', 'w'], champ: ['e', 'w'], image: ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'], video: ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'], forme: ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] };
     function calqueSel() { return (plan().calques || []).find(x => x.id === E.sel); }
     // ---- Sélection multiple : E.multi contient tous les éléments choisis (E.sel = le dernier cliqué)
     E.multi = new Set();
@@ -1369,6 +1442,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     function calqueA(e) {
       const r = zone.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * 100, y = (e.clientY - r.top) / r.height * 100;
       const cs = (plan().calques || []).filter(c => eng.bbox[c.id] && !c.masque);
+      // comme Photoshop : on attrape d'abord le calque déjà choisi (même s'il est derrière un autre)
+      const sel = cs.find(c => c.id === E.sel); if (sel) { const k = cs.indexOf(sel); cs.splice(k, 1); cs.push(sel); }
       for (let i = cs.length - 1; i >= 0; i--) {
         const b = eng.bbox[cs[i].id], rot = (Number(cs[i].rotation) || 0) * Math.PI / 180;
         let px = x, py = y;
@@ -1728,6 +1803,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       if (e.key === 'Escape' && pinceau) { pinceau = false; zone.classList.remove('pinceau'); rendreBarre(); return; }
       if (mod && e.key.toLowerCase() === 'd' && c) { e.preventDefault(); dupliquerCalque(c); return; }
       if (!mod && !e.altKey && e.key === 'v') { const b = $('#outils [data-outil="select"]'); if (b) b.click(); return; }
+      if (!mod && !e.altKey && (e.key === 'u' || e.key === 'p')) { const b = $('#outils [data-outil="' + (e.key === 'u' ? 'rect' : 'plume') + '"]'); if (b) b.click(); return; }
       if (!mod && !e.altKey && e.key === 'h') { const b = $('#outils [data-outil="main"]'); if (b) b.click(); return; }
       if (!mod && !e.altKey && e.key === 'i' && c) { const b = $('#outils [data-outil="pipette"]'); if (b) b.click(); return; }
       if (mod && (e.code === 'BracketRight' || e.code === 'BracketLeft') && c) { e.preventDefault(); ordreCalque(c, e.code === 'BracketRight' ? (e.shiftKey ? 'avant' : 'avance') : (e.shiftKey ? 'arriere' : 'recule')); return; }
@@ -1984,7 +2060,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       if ($('#p-vitesse', col)) $('#p-vitesse').onchange = e => { E.modif(true); const v = Number(e.target.value) || 1; if (v === 1) delete pl.fond.vitesse; else pl.fond.vitesse = v; const el = eng.medias[pl.fond.media]; if (el && el.tagName === 'VIDEO') el.playbackRate = v; eng._entrerPlan(); afficher(); toast(v === 1 ? 'Vitesse normale' : 'Vitesse ×' + String(v).replace('.', ',') + (v < 1 ? ' (ralenti)' : ' (accéléré)')); };
       surFond('p-ecl', 'oninput', e => { E.modif(); pl.fond.eclaircir = Number(e.target.value); });
       surFond('p-asb', 'oninput', e => { E.modif(); pl.fond.assombrir = Number(e.target.value); });
-      $$('[data-ajout]', col).forEach(b => b.onclick = () => ajouterCalque(b.dataset.ajout));
+      $$('[data-ajout]', col).forEach(b => b.onclick = () => b.dataset.ajout === 'bouton' ? menuBouton(b) : ajouterCalque(b.dataset.ajout));
       $('#imp-calque').onchange = async e => {
         const f = e.target.files[0]; if (!f) return;
         const m = await importerFichier(f, null, p.id); sauverMedias();
@@ -2022,6 +2098,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       let ouvert = Stock.lire(cle, null);
       if (!blocs.some(d => titreBloc(d) === ouvert)) ouvert = titreBloc(blocs.find(d => !/^Fond$|^Durée/.test(titreBloc(d))) || blocs[0]);
       const montrer = t => {
+        if (!blocs.some(d => titreBloc(d) === t)) t = titreBloc(blocs[0]);
         ouvert = t;
         blocs.forEach(d => { const on = titreBloc(d) === t; d.open = true; d.hidden = !on; d.classList.add('ps-panneau'); });
         $$('.ps-liste button', col).forEach(b => b.classList.toggle('on', b.dataset.p === t));
@@ -2132,6 +2209,17 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       $$('[data-nf]', d).forEach(b => b.onclick = () => { fermerPop(); ajouterCalque('forme', b.dataset.nf); });
     }
     E.choisirNouvelleForme = choisirNouvelleForme;
+    // + Bouton : choisir d'abord ce qu'il fait (Je confirme, Maps, Appeler…)
+    function menuBouton(ancre) {
+      const d = pop(ancre, `<b style="display:block;margin:2px 4px 8px">⏺ Quel bouton ?</b><div class="types-bouton" style="min-width:300px">${TYPES_BOUTON.map(t => `<button data-nb="${t.a}" title="${esc(t.aide)}"><span>${t.i}</span>${esc(t.n)}</button>`).join('')}</div>`);
+      $$('[data-nb]', d).forEach(b => b.onclick = () => {
+        fermerPop(); const t = TYPES_BOUTON.find(x => x.a === b.dataset.nb), lang = (p.fiche || {}).langue || 'fr';
+        ajouterCalque('bouton');
+        const c = (plan().calques || []).find(x => x.id === E.sel);
+        if (c) { c.action = t.a; c.texte = t[lang] || t.fr; if (!['suivant', 'precedent', 'passer', 'revoir'].includes(t.a)) c.b_icone = t.i; E.rafraichir(); rendreReglages(); E.ouvrirSection('Bouton'); }
+      });
+    }
+    E.menuBouton = menuBouton;
     E.ajouterCalque = (t, m) => ajouterCalque(t, m);
     function ouvrirFormes(ancre, c) {
       const d = pop(ancre, `<b style="display:block;margin:2px 4px 8px">◇ Forme du cadre</b>${grilleFormes(c, ratioCalque(c))}<button class="btn petit" data-pf-libre style="margin-top:8px;width:100%">✎ Modifier librement la forme (points)</button>`, 'pop-formes');
