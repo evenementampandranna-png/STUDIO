@@ -3783,7 +3783,15 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     }
     $('#app').innerHTML = `<div class="entete"><div><h1>Équipe « ${esc(e.nom)} » <span class="badge ok">admin</span></h1><p>Le travail de chacun, ses invitations et le temps de fabrication des vidéos.</p></div><div class="ligne"><button class="btn" id="eq-maj">Actualiser</button></div></div><div id="eq-vue" class="muet">Chargement…</div>`;
     const rendre = async () => {
-      let d; try { d = await Equipe.rpc('equipe_admin'); } catch (err) { $('#eq-vue').textContent = 'Impossible de lire l\'équipe : ' + err.message; return; }
+      let d; try { d = await Equipe.rpc('equipe_admin'); } catch (err) {
+        // serveur indisponible : les liens restent visibles (ils sont gardés sur cet ordinateur)
+        $('#eq-vue').innerHTML = `<p class="muet">Impossible de lire l'équipe : ${esc(err.message)}</p><div class="ia-grille" style="margin-top:14px"><div class="carte pile"><h3>Lien de l'équipe</h3><p class="muet">Le même lien pour tous les membres.</p>
+          <div class="ligne"><input type="text" readonly value="${esc(lienEquipe(e.cle))}" style="flex:1"><button class="btn petit" id="eq-cp">Copier</button></div></div>
+          <div class="carte pile"><h3>Votre lien admin (privé)</h3><p class="muet">Ne le donnez pas à l'équipe.</p>
+          <div class="ligne"><input type="text" readonly value="${esc(lienEquipe(e.cle_admin))}" style="flex:1"><button class="btn petit" id="eq-cpa">Copier</button></div></div></div>`;
+        $('#eq-cp').onclick = () => copier(lienEquipe(e.cle)); $('#eq-cpa').onclick = () => copier(lienEquipe(e.cle_admin));
+        return;
+      }
       let surVitrine = new Set(); try { const r = await fetch(urlSite() + 'vitrine/index.json?v=' + Date.now(), { cache: 'no-store' }); if (r.ok) surVitrine = new Set((await r.json()).map(x => x.slug)); } catch (e) {}
       const membres = {};
       const ajouter = (n) => (membres[n || '—'] = membres[n || '—'] || { nom: n || '—', evts: 0, publies: 0, videos: 0, secondes: 0, derniere: '' });
