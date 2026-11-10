@@ -1,7 +1,26 @@
 /* Studio d'invitations — application de montage (sans serveur).
  * Données : localStorage (projets, réglages) + IndexedDB (fichiers importés). Publication : GitHub (facultatif). */
-(function () {
+(async function () {
   'use strict';
+  /* Gros contenus (invitations, bibliothèque, listes de l'équipe) : dans IndexedDB (place quasi illimitée),
+     le localStorage du navigateur (5 Mo) ne garde que les petits réglages. Lecture avant le démarrage. */
+  const GRANDS = ['studio.projets', 'studio.medias', 'studio.equipe.biblio', 'studio.equipe.urls', 'studio.travaux'];
+  const GRAND = {};
+  let dbGrand = null;
+  try {
+    dbGrand = await new Promise((ok, ko) => { const r = indexedDB.open('studio', 1); r.onupgradeneeded = () => r.result.createObjectStore('fichiers'); r.onsuccess = () => ok(r.result); r.onerror = () => ko(r.error); });
+    await Promise.all(GRANDS.map(k => new Promise(ok => { const q = dbGrand.transaction('fichiers').objectStore('fichiers').get('ls:' + k); q.onsuccess = () => { if (typeof q.result === 'string') GRAND[k] = q.result; ok(); }; q.onerror = () => ok(); })));
+  } catch (e) { dbGrand = null; }
+  const ecrireGrand = (k, txt) => new Promise(ok => {
+    if (!dbGrand) return ok(false);
+    try { let t; try { t = dbGrand.transaction('fichiers', 'readwrite', { durability: 'strict' }); } catch (e) { t = dbGrand.transaction('fichiers', 'readwrite'); } t.objectStore('fichiers').put(txt, 'ls:' + k); t.oncomplete = () => ok(true); t.onerror = () => ok(false); } catch (e) { ok(false); }
+  });
+  // migration : ce qui était dans le localStorage passe dans IndexedDB, puis libère la place
+  for (const k of GRANDS) {
+    let v = null; try { v = localStorage.getItem(k); } catch (e) {}
+    if (v != null && GRAND[k] == null && dbGrand) { GRAND[k] = v; await ecrireGrand(k, v); }
+    if (GRAND[k] != null && dbGrand) { try { localStorage.removeItem(k); } catch (e) {} }
+  }
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => [...(r || document).querySelectorAll(s)];
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -14,8 +33,22 @@
   // ce que le navigateur avait vraiment au démarrage (pour savoir quoi reprendre de la copie de secours)
   const clesDemarrage = new Set(); try { for (let i = 0; i < localStorage.length; i++) clesDemarrage.add(localStorage.key(i)); } catch (e) {}
   const Stock = {
-    lire(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
-    ecrire(k, v) { let ok = true; try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { ok = false; toast('Mémoire du navigateur pleine : exportez vos projets.'); } if (surEcriture) surEcriture(k); return ok; }
+    lire(k, d) {
+      try { if (GRANDS.includes(k) && GRAND[k] != null) return JSON.parse(GRAND[k]); const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; }
+    },
+    ecrire(k, v) {
+      let ok = true; const txt = JSON.stringify(v);
+      if (GRANDS.includes(k) && dbGrand) { GRAND[k] = txt; ecrireGrand(k, txt); }
+      else {
+        try { localStorage.setItem(k, txt); }
+        catch (e) {
+          // plein : on libère les gros contenus (déjà dans IndexedDB) et on réessaie
+          GRANDS.forEach(g => { if (GRAND[g] != null) { try { localStorage.removeItem(g); } catch (er) {} } });
+          try { localStorage.setItem(k, txt); } catch (e2) { ok = false; toast('Mémoire du navigateur pleine : exportez vos projets.'); }
+        }
+      }
+      if (surEcriture) surEcriture(k); return ok;
+    }
   };
   let projets = Stock.lire('studio.projets', {});
   let medias = Stock.lire('studio.medias', []);
@@ -102,7 +135,7 @@
     tout() { clearTimeout(this._tt); this._tt = setTimeout(() => this.toutMaintenant(), 400); },
     toutMaintenant() {
       clearTimeout(this._tt); if (!this.pret) return Promise.resolve(); const o = {};
-      try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (/^studio\./.test(k) && k !== 'studio.projets' && !/^studio\.sauve\./.test(k)) o[k] = localStorage.getItem(k); } } catch (e) {}
+      try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (/^studio\./.test(k) && !GRANDS.includes(k) && !/^studio\.sauve\./.test(k)) o[k] = localStorage.getItem(k); } } catch (e) {}
       // fusion : une clé effacée par le navigateur ne disparaît pas de la copie de secours
       return IDB.lire('sauve:tout').then(t => { let a = {}; try { a = JSON.parse(t || '{}'); } catch (e) {} return IDB.mettre('sauve:tout', JSON.stringify(Object.assign(a, o))); }).catch(() => {});
     },
@@ -110,7 +143,7 @@
     async reprendreTout() {
       try {
         const t = await IDB.lire('sauve:tout'); if (!t) { this.pret = true; this.toutMaintenant(); return 0; }
-        let n = 0; Object.entries(JSON.parse(t)).forEach(([k, v]) => { if (!clesDemarrage.has(k) && k !== 'studio.nouveautes.vu') { try { localStorage.setItem(k, v); n++; } catch (e) {} } });
+        let n = 0; Object.entries(JSON.parse(t)).forEach(([k, v]) => { if (!clesDemarrage.has(k) && k !== 'studio.nouveautes.vu' && !GRANDS.includes(k)) { try { localStorage.setItem(k, v); n++; } catch (e) {} } });
         this.pret = true; if (!n) this.toutMaintenant();
         return n;
       } catch (e) { this.pret = true; return 0; }
@@ -640,6 +673,10 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-10-8', date: '10 novembre 2026', titre: 'Fini « Mémoire du navigateur pleine »', points: [
+      'Les invitations, la bibliothèque et les listes de l\'équipe sont maintenant gardées dans la grande mémoire du navigateur (IndexedDB, plusieurs Go) au lieu de la petite (5 Mo). Le passage se fait tout seul à l\'ouverture du studio, sans rien perdre.',
+      'Ce message bloquait les enregistrements (ex. suppression d\'un événement qui revenait) : c\'est réglé.'
+    ] },
     { id: '2026-11-10-7', date: '10 novembre 2026', titre: 'Événements : modifier, dupliquer, supprimer · atelier en pleine largeur', points: [
       '<b>Vos événements</b> : chaque carte a ✎ Modifier, ⓘ Infos (titre, date, lieux…), ⧉ Dupliquer et 🗑 Supprimer. Un événement supprimé va dans la <b>🗑 Corbeille</b> (bouton en haut) : « Récupérer » ou « Effacer pour de bon ».',
       '<b>Atelier</b> : prend toute la largeur de l\'écran ; plans et outils collés à gauche, panneaux collés à droite, l\'aperçu au centre est plus grand.',
