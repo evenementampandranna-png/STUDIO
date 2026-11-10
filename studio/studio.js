@@ -69,7 +69,9 @@
       try {
         const t = await IDB.lire('sauve:projets'); if (!t) { this.copieMaintenant(); return 0; }
         const sec = JSON.parse(t);
+        const supprimes = Stock.lire('studio.supprimes', []);
         Object.values(sec).forEach(p => {
+          if (supprimes.includes(p.id)) return;
           const ici = projets[p.id];
           if (!ici || (p.modifie || '') > (ici.modifie || '')) { projets[p.id] = p; n++; }
         });
@@ -638,6 +640,11 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-10-7', date: '10 novembre 2026', titre: 'Événements : modifier, dupliquer, supprimer · atelier en pleine largeur', points: [
+      '<b>Vos événements</b> : chaque carte a ✎ Modifier, ⓘ Infos (titre, date, lieux…), ⧉ Dupliquer et 🗑 Supprimer. Un événement supprimé va dans la <b>🗑 Corbeille</b> (bouton en haut) : « Récupérer » ou « Effacer pour de bon ».',
+      '<b>Atelier</b> : prend toute la largeur de l\'écran ; plans et outils collés à gauche, panneaux collés à droite, l\'aperçu au centre est plus grand.',
+      '<b>Barre d\'options</b> : toujours complète, même sans rien choisir (ajouter texte, forme, photo, bouton, compteur, fond, coller, zoom).'
+    ] },
     { id: '2026-11-10-6', date: '10 novembre 2026', titre: 'Tracer des formes, boutons au choix, aperçu plus grand', points: [
       '<b>Formes</b> : on peut maintenant les déplacer, les agrandir / rétrécir (poignées) et les tourner (⟳). Le calque déjà choisi s\'attrape en premier, même s\'il est derrière un autre.',
       '<b>Tracer</b> : ▭ rectangle, ◯ ellipse, ╱ ligne — faites glisser sur l\'aperçu ; ✒ plume — cliquez des points, double-clic ou Entrée pour fermer ; ✎ crayon — dessinez à main levée.',
@@ -833,6 +840,7 @@
 
   function route() {
     nettoyer();
+    document.body.classList.remove('atelier-plein');
     const h = location.hash.replace(/^#\/?/, '').split('/');
     $$('.barre nav a').forEach(a => a.classList.toggle('actif', a.dataset.nav === (h[0] || 'accueil') || (h[0] === 'p' && a.dataset.nav === 'accueil')));
     window.scrollTo(0, 0);
@@ -855,18 +863,32 @@
     const liste = Object.values(projets).sort((a, b) => (b.modifie || '').localeCompare(a.modifie || ''));
     $('#app').innerHTML = `
       <div class="entete"><div><h1>Vos événements</h1><p>Chaque invitation part d'un texte et de quelques fonds vidéo vierges.</p></div>
-        <div class="ligne">${Equipe.actif() ? '<button class="btn" id="recup-ligne" title="Après une panne ou sur un autre ordinateur">☁ Récupérer depuis la copie en ligne</button>' : ''}<label class="btn">Importer un projet<input type="file" accept=".json" id="imp-projet" hidden></label><a class="btn plein" href="#/nouveau">+ Nouvel événement</a></div></div>
+        <div class="ligne">${Equipe.actif() ? '<button class="btn" id="recup-ligne" title="Après une panne ou sur un autre ordinateur">☁ Récupérer depuis la copie en ligne</button>' : ''}<label class="btn">Importer un projet<input type="file" accept=".json" id="imp-projet" hidden></label><button class="btn" id="corbeille" title="Événements supprimés">🗑 Corbeille</button><a class="btn plein" href="#/nouveau">+ Nouvel événement</a></div></div>
       ${liste.length ? `<div class="grille">${liste.map(p => `
         <div class="carte projet-carte" data-id="${p.id}">
           <img src="${esc(vignettePlan(p.plans.find(x => x.role !== 'ouverture') || p.plans[0] || {}))}" alt="">
           <div><h3>${esc(p.fiche.titre)}</h3>
             <div class="muet">${esc(MoteurInfo.dateLisible(p.fiche.date, p.fiche.langue))}</div>
             <div class="muet">${p.plans.length} plans · ${(p.familles || []).length} familles</div>
-            <div style="margin-top:6px">${p.publie ? '<span class="badge ok">Publié</span>' : '<span class="badge">Brouillon</span>'}</div></div>
+            <div style="margin-top:6px">${p.publie ? '<span class="badge ok">Publié</span>' : '<span class="badge">Brouillon</span>'}</div>
+            <div class="ligne evt-actions"><button class="btn petit" data-evt-ouvrir="${p.id}" title="Ouvrir les plans">✎ Modifier</button><button class="btn petit" data-evt-fiche="${p.id}" title="Titre, date, lieux, contacts">ⓘ Infos</button><button class="btn petit" data-evt-dup="${p.id}" title="Faire une copie">⧉ Dupliquer</button><button class="btn petit danger" data-evt-suppr="${p.id}" title="Supprimer (récupérable dans la corbeille)">🗑</button></div></div>
         </div>`).join('')}</div>` : `
         <div class="carte vide"><h2>Aucun événement pour l'instant</h2><p class="muet">Collez le texte d'une invitation : le studio en tire les informations et propose les plans.</p><a class="btn plein" href="#/nouveau">Créer le premier événement</a>
         <p style="margin-top:14px"><button class="btn" id="demo">Charger l'exemple « Jobily faha-10 taona mariazy — Batemy »</button></p></div>`}`;
-    $$('.projet-carte').forEach(c => c.onclick = () => { location.hash = '#/p/' + c.dataset.id + '/plans'; });
+    $$('.projet-carte').forEach(c => c.onclick = e => { if (e.target.closest('.evt-actions')) return; location.hash = '#/p/' + c.dataset.id + '/plans'; });
+    $$('[data-evt-ouvrir]').forEach(b => b.onclick = () => { location.hash = '#/p/' + b.dataset.evtOuvrir + '/plans'; });
+    $$('[data-evt-fiche]').forEach(b => b.onclick = () => { location.hash = '#/p/' + b.dataset.evtFiche + '/fiche'; });
+    $$('[data-evt-dup]').forEach(b => b.onclick = () => {
+      const src = projets[b.dataset.evtDup]; const c = JSON.parse(JSON.stringify(src)); c.id = uid(); c.slug = (c.slug || 'evenement').replace(/-[a-z0-9]{4}$/, '') + '-' + c.id.slice(0, 4);
+      ['publie', 'cle_hote', 'vitrine', 'vitrine_publiee', 'licence', 'commande'].forEach(k => delete c[k]); c.fiche.titre = (c.fiche.titre || '') + ' (copie)'; c.modifie = new Date().toISOString();
+      projets[c.id] = c; sauverProjets(); toast('Copie créée'); vueAccueil();
+    });
+    $$('[data-evt-suppr]').forEach(b => b.onclick = async () => {
+      const p = projets[b.dataset.evtSuppr];
+      if (!confirm('Supprimer « ' + p.fiche.titre + ' » ?' + (p.publie ? '\n\nL\'invitation déjà publiée reste en ligne pour les invités.' : '') + '\n\nVous pourrez la récupérer dans la Corbeille.')) return;
+      await mettreCorbeille(p); vueAccueil(); toast('« ' + p.fiche.titre + ' » est dans la corbeille');
+    });
+    $('#corbeille').onclick = ouvrirCorbeille;
     const rl = $('#recup-ligne'); if (rl) rl.onclick = recupererEnLigne;
     const imp = $('#imp-projet');
     if (imp) imp.onchange = async () => {
@@ -875,6 +897,30 @@
     };
     const d = $('#demo');
     if (d) d.onclick = () => { const f = Fabrique.analyserTexte(TEXTE_EXEMPLE); const p = Fabrique.nouveauProjet(f, tousFonds()); projets[p.id] = p; sauverProjets(); location.hash = '#/p/' + p.id + '/plans'; };
+  }
+
+  // Corbeille : un événement supprimé reste récupérable (sur cet ordinateur)
+  async function lireCorbeille() { try { return JSON.parse(await IDB.lire('corbeille') || '[]'); } catch (e) { return []; } }
+  async function mettreCorbeille(p) {
+    const l = await lireCorbeille(); l.unshift({ date: new Date().toISOString(), p }); await IDB.mettre('corbeille', JSON.stringify(l.slice(0, 50)));
+    const sup = Stock.lire('studio.supprimes', []); if (!sup.includes(p.id)) sup.push(p.id); Stock.ecrire('studio.supprimes', sup);
+    delete projets[p.id]; sauverProjets(); await Sauve.copieMaintenant();
+  }
+  async function ouvrirCorbeille() {
+    const l = await lireCorbeille();
+    const j = d => new Date(d).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    modale(`<h2>🗑 Corbeille</h2><p class="muet">Les événements supprimés sur cet ordinateur (les 50 derniers).</p>
+      <div class="pile" style="max-height:55vh;overflow:auto;gap:6px">${l.map((x, k) => `<div class="ligne" style="justify-content:space-between;border:1px solid #eadfd3;border-radius:10px;padding:8px 10px"><span><b>${esc(x.p.fiche.titre)}</b> <span class="muet">supprimé le ${esc(j(x.date))}</span></span><span class="ligne"><button class="btn petit plein" data-rest="${k}">Récupérer</button><button class="btn petit danger" data-def="${k}">Effacer pour de bon</button></span></div>`).join('') || '<p class="muet">La corbeille est vide.</p>'}</div>`, (m, fermer) => {
+      $$('[data-rest]', m).forEach(b => b.onclick = async () => {
+        const x = l[Number(b.dataset.rest)]; x.p.modifie = new Date().toISOString(); projets[x.p.id] = x.p;
+        Stock.ecrire('studio.supprimes', Stock.lire('studio.supprimes', []).filter(id => id !== x.p.id));
+        l.splice(Number(b.dataset.rest), 1); await IDB.mettre('corbeille', JSON.stringify(l)); sauverProjets(); fermer(); toast('« ' + x.p.fiche.titre + ' » récupéré'); vueAccueil();
+      });
+      $$('[data-def]', m).forEach(b => b.onclick = async () => {
+        const x = l[Number(b.dataset.def)]; if (!confirm('Effacer définitivement « ' + x.p.fiche.titre + ' » ? Cela ne peut pas être annulé.')) return;
+        l.splice(Number(b.dataset.def), 1); await IDB.mettre('corbeille', JSON.stringify(l)); fermer(); ouvrirCorbeille();
+      });
+    });
   }
 
   const TEXTE_EXEMPLE = `ANDRIATSIDIKANA Dimbinirina Pierre sy RANDRIATSIMITOVIZAKA Njarasoa dia faly manasa anareo hanotrona ny fanamasinana ny jobily faha-folo taonan’ny mariazinay, sy ny Batemin’ny zanakay ANDRIATSIDIKANA Mihaja Kaël.
@@ -1172,6 +1218,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
 
   function ongletPlans(p) {
     const E = { p, i: 0, sel: null, t: 0, vue: 'famille', annuler: [], refaire: [] };
+    document.body.classList.add('atelier-plein');
     Stock.ecrire('studio.bib.evt', p.id);
     $('#onglet').innerHTML = `<div class="editeur ps">
         <div class="barre-sel" id="barre-sel"></div>
@@ -1870,7 +1917,19 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <span class="sep"></span><button class="btn petit icone" data-b="copier" title="Copier (Ctrl+C)">⧉</button><button class="btn petit icone" data-b="dupliquer" title="Dupliquer (Ctrl+D)">⊕</button><button class="btn petit icone" data-b="avant" title="Tout devant (premier plan) — Ctrl+Maj+]">⤒</button><button class="btn petit icone" data-b="avance" title="Avancer d'un cran — Ctrl+]">↑</button><button class="btn petit icone" data-b="recule" title="Reculer d'un cran — Ctrl+[">↓</button><button class="btn petit icone" data-b="arriere" title="Tout derrière (arrière-plan) — Ctrl+Maj+[">⤓</button><button class="btn petit icone danger" data-b="suppr" title="Supprimer (Suppr)">🗑</button>`;
         lierBarre(bar, c); return;
       }
-      if (!c) { bar.innerHTML = pinceau ? `<span class="muet">🖌 Pinceau actif : cliquez les calques à mettre en forme</span><button class="btn petit" data-b="pinceau">Arrêter</button>` : `<span class="muet">Cliquez un élément de l'aperçu pour le modifier</span>${Stock.lire('studio.presse', null) ? '<button class="btn petit" data-b="coller">Coller</button>' : ''}`; lierBarre(bar, c); return; }
+      if (!c && pinceau) { bar.innerHTML = `<span class="muet">🖌 Pinceau actif : cliquez les calques à mettre en forme</span><button class="btn petit" data-b="pinceau">Arrêter</button>`; lierBarre(bar, c); return; }
+      if (!c) {
+        // rien de choisi : la barre reste complète (ajouter, fond, coller…) ; les réglages de calque attendent un calque
+        const off = ' disabled title="Choisissez d\'abord un calque sur l\'aperçu"';
+        bar.innerHTML = `<b class="type-sel">Plan ${E.i + 1}</b>
+          <button class="btn petit" data-ins="texte" title="Ajouter un texte">T Texte</button><button class="btn petit" data-ins="forme" title="Ajouter une forme">★ Forme</button><button class="btn petit" data-ins="photo" title="Ajouter une photo ou une vidéo">🖼 Photo</button><button class="btn petit" data-ins="bouton" title="Ajouter un bouton">⏺ Bouton</button><button class="btn petit" data-ins="compteur" title="Compteur adultes / enfants">± Compteur</button><button class="btn petit" data-ins="illu" title="Illustration">✿</button><button class="btn petit" data-ins="emoji" title="Emoji">😊</button>
+          <span class="sep"></span><button class="btn petit" data-ins="fond" title="Choisir le fond du plan">▦ Fond…</button>
+          <span class="sep"></span><button class="btn petit icone"${off}>A−</button><button class="btn petit icone"${off}>A+</button><button class="btn petit icone"${off}><b>G</b></button><button class="btn petit icone"${off}><i>I</i></button><button class="btn petit icone"${off}>⇔</button><button class="btn petit icone"${off}>⤒</button><button class="btn petit icone"${off}>⤓</button><button class="btn petit icone"${off}>⧉</button>
+          ${Stock.lire('studio.presse', null) ? '<span class="sep"></span><button class="btn petit" data-b="coller">📋 Coller</button>' : ''}
+          <span class="sep"></span><button class="btn petit icone" data-ins="zoom-" title="Zoom arrière">－</button><button class="btn petit icone" data-ins="zoom+" title="Zoom avant">＋</button>`;
+        $$('[data-ins]', bar).forEach(b => b.onclick = () => { const o = b.dataset.ins; if (o === 'bouton') return menuBouton(b); if (o === 'forme') return choisirNouvelleForme(b); const t = $(`#outils [data-outil="${o}"]`); if (t) t.click(); });
+        lierBarre(bar, c); return;
+      }
       const ecr = c.type === 'texte' || c.type === 'bouton' || c.type === 'compteur';
       bar.innerHTML = `<b class="type-sel">${esc(nomType(c))}</b>
         ${ecr ? '<button class="btn petit" data-b="editer" title="Modifier le texte (double-clic)">✎ Écrire</button>' : '<button class="btn petit" data-b="remplacer">Remplacer</button>'}
