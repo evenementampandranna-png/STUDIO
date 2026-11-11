@@ -678,6 +678,11 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-11-1', date: '11 novembre 2026', titre: 'Grille d\'alignement, règles et repères', points: [
+      '<b>▦ Grille</b> (sous l\'aperçu, ou # dans la colonne d\'outils, ou Ctrl+\') : carrés (nombre de cases), colonnes (nombre, gouttière), tiers, quarts ; marge et zone de sécurité ; couleur et opacité.',
+      'Les éléments s\'<b>aimantent</b> sur la grille quand on les déplace (Maj pour déplacer librement).',
+      '<b>Règles et repères</b> dans la même fenêtre : poser un repère à une position précise (%), repères au centre, aux tiers, aux marges, tout effacer. On peut toujours tirer un repère depuis une règle.'
+    ] },
     { id: '2026-11-10-11', date: '10 novembre 2026', titre: 'Publication par les membres, plan de tables, partage partout', points: [
       '<b>Les membres publient</b> : sans GitHub, « 📤 Demander la publication » (Film et publication, ou 🎬 Vidéos pour un film). L\'admin voit les demandes dans <b>Équipe</b> (pastille sur le menu) → « ✓ Valider et publier » ou « Refuser ». Le membre reçoit ensuite ses liens (invités, organisateur) dans son studio. À faire une fois : Réglages → « Mise à jour publication par les membres » → Supabase → Run.',
       '<b>🪑 Plan de tables</b> (onglet Invités) : nombre de tables, personnes par table, places par table, noms des familles à chaque table (+ Ajouter / ✕), « Placer automatiquement », 🖨 Imprimer, feuille « Tables » dans l\'export Excel. Le client a aussi un onglet <b>🪑 Tables</b> dans son espace organisateur.',
@@ -1307,7 +1312,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
             <button data-outil="rogner" title="Rogner la photo ou le fond (C)">⬚</button><button data-outil="pipette" title="Pipette : prendre une couleur à l'écran (I)">💧</button><button data-outil="miroir" title="Miroir horizontal">⇋</button><button data-outil="miroir-v" title="Miroir vertical">⇵</button>
             <button data-outil="verrou" title="Verrouiller / déverrouiller le calque">🔒</button><button data-outil="masquer" title="Masquer / afficher le calque">👁</button><button data-outil="dupliquer" title="Dupliquer (Ctrl+D)">⧉</button><button data-outil="supprimer" title="Supprimer (Suppr)">🗑</button>
             <span class="sep"></span>
-            <button data-outil="fond" title="Fond du plan">▦</button><button data-outil="regles" title="Règles et repères">📏</button><button data-outil="aide" title="Raccourcis clavier">?</button><button data-outil="annuler" title="Annuler (Ctrl+Z)">↶</button><button data-outil="refaire" title="Rétablir (Ctrl+Maj+Z)">↷</button>
+            <button data-outil="fond" title="Fond du plan">▦</button><button data-outil="regles" title="Règles et repères">📏</button><button data-outil="grille" title="Grille d'alignement (Ctrl+') — réglages : clic droit">#</button><button data-outil="aide" title="Raccourcis clavier">?</button><button data-outil="annuler" title="Annuler (Ctrl+Z)">↶</button><button data-outil="refaire" title="Rétablir (Ctrl+Maj+Z)">↷</button>
             <span class="sep"></span>
             <button data-outil="plein" title="Plein écran : aperçu le plus grand possible (F) — Échap pour sortir">⛶</button><button data-outil="ajuster" title="Taille de l'aperçu">↔</button><button data-outil="zoom+" title="Zoom avant (Ctrl +)">＋</button><button data-outil="zoom0" title="Ajuster à l'écran (Ctrl 0)" id="zoom-val">100%</button><button data-outil="zoom-" title="Zoom arrière (Ctrl −)">－</button>
           </div>
@@ -1322,7 +1327,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <div class="temps"><span id="t-aff">0,0 s</span><input type="range" id="t-curseur" min="0" max="6" step="0.05" value="0"><span id="t-dur"></span></div>
           <div class="commandes">
             <button class="btn petit" id="jouer-plan">▶ Plan</button><button class="btn petit" id="jouer-tout">▶ Toute l'invitation</button><button class="btn petit" id="pause" title="Pause / reprendre (barre d'espace)" disabled>⏸ Pause</button><button class="btn petit" id="stop">■</button>
-            <button class="btn petit ${Stock.lire('studio.regles', false) ? 'on' : ''}" id="regles-btn" title="Afficher les règles et les repères">📏 Règles</button>
+            <button class="btn petit ${Stock.lire('studio.regles', false) ? 'on' : ''}" id="regles-btn" title="Afficher les règles et les repères">📏 Règles</button><button class="btn petit" id="grille-btn" title="Grille d'alignement, règles et repères (Ctrl+')">▦ Grille</button>
             <select id="vue" class="btn petit"><option value="famille">Voir : lien personnel</option><option value="general">Voir : lien général</option></select>
             <button class="btn petit icone" id="annuler" title="Annuler">↶</button><button class="btn petit icone" id="refaire" title="Rétablir">↷</button>
           </div>
@@ -1455,6 +1460,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       if (OUTILS_MODE.includes(o)) return choisirOutil(E.outil === o && o !== 'select' ? 'select' : o);
       if (o === 'annuler' || o === 'refaire') { const x = $('#' + o); if (x) x.click(); return; }
       if (o === 'regles') { const x = $('#regles-btn'); if (x) x.click(); return; }
+      if (o === 'grille') return E.reglerGrille(b);
       if (o === 'aide') return modale(`<h2>Raccourcis</h2><div class="pile" style="font-size:14px;line-height:1.7">${($('.astuce') || {}).textContent.split(' · ').map(x => '• ' + esc(x)).join('<br>')}<br>• V : sélection · H ou Espace maintenu : main · I : pipette<br>• Ctrl + / Ctrl − / Ctrl 0 : zoom · Ctrl + molette : zoom<br>• Ctrl+] / Ctrl+[ : avancer / reculer · Ctrl+Maj+] / [ : tout devant / tout derrière</div>`);
       if (o === 'dupliquer') return avecCalque(c => E.dupliquerCalque(c));
       if (o === 'supprimer') return avecCalque(c => E.supprimerCalque(c));
@@ -1619,6 +1625,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     function cibles(exclus) {
       const v = [50], h = [50];
       if (regles) { v.push(...p.guides.v); h.push(...p.guides.h); }
+      if (grille.on && grille.aimant !== false) { const l = lignesGrille(); v.push(...l.v); h.push(...l.h); }
       (plan().calques || []).forEach(c => { if (exclus.has(c.id) || c.masque) return; const b = eng.bbox[c.id]; if (!b) return; v.push(b.x, b.x + b.w / 2, b.x + b.w); h.push(b.y, b.y + b.h / 2, b.y + b.h); });
       return { v, h };
     }
@@ -1777,8 +1784,72 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       const fin = () => { document.removeEventListener('pointermove', bouger); document.removeEventListener('pointerup', fin); const g = p.guides[nouveau][k]; if (g < 0 || g > 100) p.guides[nouveau].splice(k, 1); else toast('Repère posé à ' + String(g).replace('.', ',') + ' % : les éléments s\'y aimantent'); enregistrer(p); zone._html = ''; };
       document.addEventListener('pointermove', bouger); document.addEventListener('pointerup', fin);
     }));
+    // ---- Grille d'alignement (comme Photoshop) : carrés, colonnes, tiers, centre + marges ; aimantation
+    let grille = Object.assign({ on: false, type: 'carres', n: 8, cols: 4, gout: 2, marge: 6, couleur: '#3d7ad6', opacite: 0.35, aimant: true, securite: true }, Stock.lire('studio.grille', {}));
+    function lignesGrille() {
+      const v = [], h = [], bandes = [];
+      const m = Number(grille.marge) || 0;
+      if (grille.type === 'carres') {
+        const n = Math.max(2, Math.min(40, Number(grille.n) || 8)), pas = 100 / n, pasH = pas * 720 / 1280;
+        for (let k = 1; k < n; k++) v.push(Math.round(k * pas * 100) / 100);
+        for (let y = pasH; y < 99.9; y += pasH) h.push(Math.round(y * 100) / 100);
+      } else if (grille.type === 'colonnes') {
+        const n = Math.max(1, Math.min(12, Number(grille.cols) || 4)), g = Math.max(0, Number(grille.gout) || 0), larg = (100 - 2 * m - g * (n - 1)) / n;
+        for (let k = 0; k < n; k++) { const x1 = m + k * (larg + g), x2 = x1 + larg; bandes.push([x1, x2]); v.push(Math.round(x1 * 100) / 100, Math.round(x2 * 100) / 100); }
+        const pasH = (100 - 2 * m * 720 / 1280) / 8; for (let k = 0; k <= 8; k++) h.push(Math.round((m * 720 / 1280 + k * pasH) * 100) / 100);
+      } else if (grille.type === 'tiers') { v.push(33.33, 66.67); h.push(33.33, 66.67); }
+      else { v.push(25, 50, 75); h.push(25, 50, 75); }
+      if (grille.securite && m) { v.push(m, 100 - m); h.push(m * 720 / 1280, 100 - m * 720 / 1280); }
+      return { v, h, bandes };
+    }
+    const svgGrille = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svgGrille.id = 'grille-apercu'; svgGrille.setAttribute('viewBox', '0 0 100 100'); svgGrille.setAttribute('preserveAspectRatio', 'none'); cadre.appendChild(svgGrille);
+    function dessinerGrille() {
+      const b = $('#outils [data-outil="grille"]'); if (b) b.classList.toggle('on', !!grille.on);
+      const gb = $('#grille-btn'); if (gb) gb.classList.toggle('on', !!grille.on);
+      if (!grille.on) { svgGrille.innerHTML = ''; return; }
+      const l = lignesGrille(), c = grille.couleur || '#3d7ad6', o = Number(grille.opacite) || 0.35;
+      const m = Number(grille.marge) || 0, mh = m * 720 / 1280;
+      svgGrille.innerHTML = l.bandes.map(([x1, x2]) => `<rect x="${x1}" y="0" width="${x2 - x1}" height="100" fill="${c}" opacity="${o * 0.18}"/>`).join('')
+        + l.v.map(x => `<line x1="${x}" y1="0" x2="${x}" y2="100" stroke="${c}" stroke-opacity="${o}" stroke-width="1" vector-effect="non-scaling-stroke"/>`).join('')
+        + l.h.map(y => `<line x1="0" y1="${y}" x2="100" y2="${y}" stroke="${c}" stroke-opacity="${o}" stroke-width="1" vector-effect="non-scaling-stroke"/>`).join('')
+        + `<line x1="50" y1="0" x2="50" y2="100" stroke="${c}" stroke-opacity="${Math.min(1, o * 1.8)}" stroke-dasharray="4 3" vector-effect="non-scaling-stroke"/><line x1="0" y1="50" x2="100" y2="50" stroke="${c}" stroke-opacity="${Math.min(1, o * 1.8)}" stroke-dasharray="4 3" vector-effect="non-scaling-stroke"/>`
+        + (grille.securite && m ? `<rect x="${m}" y="${mh}" width="${100 - 2 * m}" height="${100 - 2 * mh}" fill="none" stroke="#c33a4c" stroke-opacity=".7" stroke-dasharray="6 4" vector-effect="non-scaling-stroke"/>` : '');
+    }
+    const sauverGrille = () => { Stock.ecrire('studio.grille', grille); dessinerGrille(); };
+    E.basculerGrille = () => { grille.on = !grille.on; sauverGrille(); toast(grille.on ? 'Grille affichée (Ctrl+\' pour la masquer)' : 'Grille masquée'); };
+    // fenêtre de réglage : grille, règles, repères
+    E.reglerGrille = ancre => {
+      const d = pop(ancre, `<b style="display:block;margin:2px 4px 8px">▦ Grille, règles et repères</b><div class="pile" style="min-width:290px;gap:8px">
+        <label class="cases"><input type="checkbox" id="gr-on" ${grille.on ? 'checked' : ''}> <b>Afficher la grille</b> <span class="muet">(Ctrl+')</span></label>
+        <div class="seg" id="gr-type">${[['carres', '▦ Carrés'], ['colonnes', '▥ Colonnes'], ['tiers', '⊞ Tiers'], ['centre', '✛ Quarts']].map(([k, n]) => `<button data-gt="${k}" class="${grille.type === k ? 'on' : ''}">${n}</button>`).join('')}</div>
+        <div class="deux" id="gr-carres" ${grille.type === 'carres' ? '' : 'hidden'}><label class="champ">Cases sur la largeur<input type="number" id="gr-n" min="2" max="40" value="${grille.n}"></label><span class="muet" style="align-self:end">≈ ${Math.round(720 / (Number(grille.n) || 8))} px par case</span></div>
+        <div class="trois" id="gr-cols" ${grille.type === 'colonnes' ? '' : 'hidden'}><label class="champ">Colonnes<input type="number" id="gr-c" min="1" max="12" value="${grille.cols}"></label><label class="champ">Gouttière (%)<input type="number" id="gr-g" min="0" max="10" step="0.5" value="${grille.gout}"></label><span></span></div>
+        <div class="deux"><label class="champ">Marge (%)<input type="number" id="gr-m" min="0" max="20" step="0.5" value="${grille.marge}"></label><label class="cases" style="align-self:end"><input type="checkbox" id="gr-s" ${grille.securite ? 'checked' : ''}> Zone de sécurité</label></div>
+        <div class="deux"><label class="champ">Couleur<input type="color" id="gr-col" value="${grille.couleur}"></label><label class="champ">Opacité<input type="range" id="gr-o" min="0.1" max="1" step="0.05" value="${grille.opacite}"></label></div>
+        <label class="cases"><input type="checkbox" id="gr-a" ${grille.aimant !== false ? 'checked' : ''}> Aimanter les éléments sur la grille (Maj : sans aimant)</label>
+        <hr style="border:0;border-top:1px solid var(--ligne);margin:2px 0">
+        <label class="cases"><input type="checkbox" id="gr-r" ${regles ? 'checked' : ''}> <b>Règles et repères</b> <span class="muet">(tirer depuis une règle pour poser un repère)</span></label>
+        <div class="ligne" style="gap:6px;flex-wrap:wrap"><label class="champ" style="margin:0;flex:1">Repère à (%)<input type="number" id="gr-rv" min="0" max="100" step="0.5" placeholder="ex. 50"></label><button class="btn petit" id="gr-add-v">+ Vertical</button><button class="btn petit" id="gr-add-h">+ Horizontal</button></div>
+        <div class="ligne" style="gap:6px;flex-wrap:wrap"><button class="btn petit" id="gr-centre">Repères au centre</button><button class="btn petit" id="gr-marges">Repères aux marges</button><button class="btn petit" id="gr-tiers">Repères aux tiers</button><button class="btn petit danger" id="gr-eff">Effacer les repères</button></div>
+      </div>`);
+      const maj = () => { grille.on = $('#gr-on', d).checked; grille.n = Number($('#gr-n', d).value) || 8; grille.cols = Number($('#gr-c', d).value) || 4; grille.gout = Number($('#gr-g', d).value) || 0; grille.marge = Number($('#gr-m', d).value) || 0; grille.securite = $('#gr-s', d).checked; grille.couleur = $('#gr-col', d).value; grille.opacite = Number($('#gr-o', d).value) || 0.35; grille.aimant = $('#gr-a', d).checked; sauverGrille(); };
+      $$('input', d).forEach(i => { if (!/gr-r|gr-rv/.test(i.id)) i.addEventListener('input', maj); });
+      $$('[data-gt]', d).forEach(b => b.onclick = () => { grille.type = b.dataset.gt; grille.on = true; $('#gr-on', d).checked = true; $$('[data-gt]', d).forEach(x => x.classList.toggle('on', x === b)); $('#gr-carres', d).hidden = grille.type !== 'carres'; $('#gr-cols', d).hidden = grille.type !== 'colonnes'; sauverGrille(); });
+      const reglesOn = () => { if (!regles) { basculerRegles(); $('#gr-r', d).checked = true; } };
+      $('#gr-r', d).onchange = () => basculerRegles();
+      const poser = (axe, vals) => { reglesOn(); vals.forEach(v => { if (!p.guides[axe].some(g => Math.abs(g - v) < 0.2)) p.guides[axe].push(Math.round(v * 10) / 10); }); enregistrer(p); zone._html = ''; dessinerRegles(); };
+      $('#gr-add-v', d).onclick = () => { const v = Number($('#gr-rv', d).value); if ($('#gr-rv', d).value === '' || v < 0 || v > 100) return toast('Indiquez une position entre 0 et 100 %'); poser('v', [v]); };
+      $('#gr-add-h', d).onclick = () => { const v = Number($('#gr-rv', d).value); if ($('#gr-rv', d).value === '' || v < 0 || v > 100) return toast('Indiquez une position entre 0 et 100 %'); poser('h', [v]); };
+      $('#gr-centre', d).onclick = () => { poser('v', [50]); poser('h', [50]); };
+      $('#gr-tiers', d).onclick = () => { poser('v', [33.3, 66.7]); poser('h', [33.3, 66.7]); };
+      $('#gr-marges', d).onclick = () => { const m = Number(grille.marge) || 6; poser('v', [m, 100 - m]); poser('h', [m * 720 / 1280, 100 - m * 720 / 1280]); };
+      $('#gr-eff', d).onclick = () => { E.effacerReperes(); toast('Repères effacés'); };
+    };
+    setTimeout(dessinerGrille, 60);
+    ecouter(document, 'keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === "'" && !/^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || '')) { e.preventDefault(); E.basculerGrille(); } });
     const basculerRegles = () => { regles = !regles; Stock.ecrire('studio.regles', regles); $('#regles-btn').classList.toggle('on', regles); zone._html = ''; dessinerRegles(); if (regles) toast('Règles : tirez depuis une règle pour poser un repère'); };
     $('#regles-btn').onclick = basculerRegles;
+    $('#grille-btn').onclick = e => E.reglerGrille(e.currentTarget);
     ecouter(window, 'resize', () => dessinerRegles());
     setTimeout(dessinerRegles, 50);
     E.effacerReperes = () => { p.guides = { v: [], h: [] }; enregistrer(p); zone._html = ''; dessinerRegles(); };
