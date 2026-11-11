@@ -462,10 +462,19 @@
     fermerPop();
     const d = document.createElement('div'); d.className = 'pop ' + (classe || ''); d.innerHTML = html;
     document.body.appendChild(d); popOuvert = d;
-    const r = ancre.getBoundingClientRect(), w = d.offsetWidth, h = d.offsetHeight;
-    let x = Math.min(window.innerWidth - w - 8, Math.max(8, r.left + r.width / 2 - w / 2)), y = r.bottom + 6;
-    if (y + h > window.innerHeight - 8) y = Math.max(8, r.top - h - 6);
-    d.style.left = x + 'px'; d.style.top = y + 'px';
+    // placé juste à côté du bouton : dessous, sinon dessus, sinon sur le côté ; recalé si le contenu grandit
+    const placer = () => {
+      const r = ancre.getBoundingClientRect(), w = d.offsetWidth, h = d.offsetHeight, W = window.innerWidth, H = window.innerHeight;
+      let x = Math.min(W - w - 8, Math.max(8, r.left + r.width / 2 - w / 2)), y = r.bottom + 6;
+      if (ancre.closest && ancre.closest('#outils')) { x = Math.min(W - w - 8, r.right + 8); y = Math.max(8, Math.min(H - h - 8, r.top - 20)); }   // colonne d'outils : à droite du bouton
+      else if (y + h > H - 8) {
+        if (r.top - h - 6 >= 8) y = r.top - h - 6;
+        else { y = Math.max(8, Math.min(H - h - 8, r.top + r.height / 2 - h / 2)); x = r.right + 8 + w <= W - 8 ? r.right + 8 : Math.max(8, r.left - w - 8); }
+      }
+      d.style.left = Math.round(x) + 'px'; d.style.top = Math.round(y) + 'px';
+    };
+    placer(); d.placer = placer;
+    try { const ro = new ResizeObserver(() => { if (!d.isConnected) return ro.disconnect(); placer(); }); ro.observe(d); } catch (e) {}
     setTimeout(() => {
       const dehors = e => { if (!d.isConnected) return document.removeEventListener('pointerdown', dehors, true); if (!d.contains(e.target) && e.target !== ancre) { fermerPop(); document.removeEventListener('pointerdown', dehors, true); } };
       document.addEventListener('pointerdown', dehors, true);
@@ -678,6 +687,9 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-11-2', date: '11 novembre 2026', titre: 'Fenêtres des emojis (et autres) juste à côté du bouton', points: [
+      'La fenêtre des emojis s\'ouvre maintenant collée au bouton touché (colonne d\'outils, barre du haut, Calques, texte) et reste entièrement visible à l\'écran ; même chose pour les polices, formes, boutons et partage.'
+    ] },
     { id: '2026-11-11-1', date: '11 novembre 2026', titre: 'Grille d\'alignement, règles et repères', points: [
       '<b>▦ Grille</b> (sous l\'aperçu, ou # dans la colonne d\'outils, ou Ctrl+\') : carrés (nombre de cases), colonnes (nombre, gouttière), tiers, quarts ; marge et zone de sécurité ; couleur et opacité.',
       'Les éléments s\'<b>aimantent</b> sur la grille quand on les déplace (Maj pour déplacer librement).',
@@ -1481,7 +1493,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       if (o === 'forme') return E.choisirNouvelleForme(b);
       if (o === 'photo') { const i = $('#imp-calque'); if (i) i.click(); return; }
       if (o === 'illu') { const i = $('#ajout-illu'); if (i) i.click(); return; }
-      if (o === 'emoji') { const i = $('#ajout-emoji'); if (i) i.click(); return; }
+      if (o === 'emoji') return E.ajouterEmoji ? E.ajouterEmoji(b) : null;
       if (o === 'fond') { E.sel = null; if (E.multi && E.multi.clear) E.multi.clear(); if (E.rafraichir) E.rafraichir(); E.rendreReglages(); E.ouvrirSection('Fond'); const pf = $('#p-fond-choisir'); if (pf) pf.click(); else E.choisirFond('video'); }
     });
 
@@ -2101,7 +2113,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <span class="sep"></span><button class="btn petit icone"${off}>A−</button><button class="btn petit icone"${off}>A+</button><button class="btn petit icone"${off}><b>G</b></button><button class="btn petit icone"${off}><i>I</i></button><button class="btn petit icone"${off}>⇔</button><button class="btn petit icone"${off}>⤒</button><button class="btn petit icone"${off}>⤓</button><button class="btn petit icone"${off}>⧉</button>
           ${Stock.lire('studio.presse', null) ? '<span class="sep"></span><button class="btn petit" data-b="coller">📋 Coller</button>' : ''}
           <span class="sep"></span><button class="btn petit icone" data-ins="zoom-" title="Zoom arrière">－</button><button class="btn petit icone" data-ins="zoom+" title="Zoom avant">＋</button>`;
-        $$('[data-ins]', bar).forEach(b => b.onclick = () => { const o = b.dataset.ins; if (o === 'bouton') return menuBouton(b); if (o === 'forme') return choisirNouvelleForme(b); const t = $(`#outils [data-outil="${o}"]`); if (t) t.click(); });
+        $$('[data-ins]', bar).forEach(b => b.onclick = () => { const o = b.dataset.ins; if (o === 'bouton') return menuBouton(b); if (o === 'forme') return choisirNouvelleForme(b); if (o === 'emoji' && E.ajouterEmoji) return E.ajouterEmoji(b); const t = $(`#outils [data-outil="${o}"]`); if (t) t.click(); });
         lierBarre(bar, c); return;
       }
       const ecr = c.type === 'texte' || c.type === 'bouton' || c.type === 'compteur';
@@ -2311,7 +2323,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       });
       const ai = $('#ajout-illu', col); if (ai) ai.onclick = () => ouvrirIllustrations();
       const af = $('#ajout-forme', col); if (af) af.onclick = () => choisirNouvelleForme(af);
-      const ae = $('#ajout-emoji', col); if (ae) ae.onclick = () => ouvrirEmojis(ae, em => { E.modif(true); const n = { id: uid(), type: 'texte', texte: em, x: 50, y: 40, largeur: 30, police: 'Cormorant Garamond', taille: 9, align: 'center', couleur: '#000000', debut: 0.4, animation: 'rebond', sortie: 'aucune' }; plan().calques.push(n); fermerPop(); E.choisir(n.id); E.rafraichir(); rendreReglages(); rendrePlans(); toast('Emoji ajouté : agrandissez-le par les coins'); });
+      const ae = $('#ajout-emoji', col); if (ae) ae.onclick = () => E.ajouterEmoji(ae);
+      E.ajouterEmoji = ancre => ouvrirEmojis(ancre, em => { E.modif(true); const n = { id: uid(), type: 'texte', texte: em, x: 50, y: 40, largeur: 30, police: 'Cormorant Garamond', taille: 9, align: 'center', couleur: '#000000', debut: 0.4, animation: 'rebond', sortie: 'aucune' }; plan().calques.push(n); fermerPop(); E.choisir(n.id); E.rafraichir(); rendreReglages(); rendrePlans(); toast('Emoji ajouté : agrandissez-le par les coins'); });
       if (E.multi.size > 1) lierMulti();
       else if (c) lierFormulaire(c);
       accordeon(col, E.multi.size > 1 ? 'multi' : c ? c.type : 'plan');
