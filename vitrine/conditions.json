@@ -1,7 +1,7 @@
 {
  "actif": true,
  "studio": "Studio d'invitations",
- "whatsapp": "",
+ "whatsapp": "033 46 261 16",
  "intro": "Choisissez un modèle, lisez les conditions, puis envoyez-nous toutes les informations : nous adaptons le modèle à votre événement et à vos couleurs.",
  "formules": [
   {
@@ -30,8 +30,38 @@
   "Vous garantissez avoir les droits sur les photos et la musique que vous nous envoyez."
  ],
  "supabase": {
-  "url": "https://cbbnfdzqkpttxtwrucrk.supabase.co",
-  "anon": "sb_publishable_lMpq36SYDbynUZ3d1sJrYg_RPsCe5jX"
+  "url": "https://wckwwupnidcnufnlclbw.supabase.co",
+  "anon": "sb_publishable_VzdoRK9u8WvDk1cZ6sIQZQ_qcxHeCZX"
  },
- "maj": "2026-11-04T11:56:42.818Z"
+ "maj": "2026-11-04T11:56:42.818Z",
+ "email": "oasismdg34@gmail.com",
+ "tarifs": [
+  {
+   "nom": "Invitation sur modèle",
+   "prix": "50 000 Ar",
+   "details": [
+    "Un de nos modèles, adapté à votre événement",
+    "On change la vidéo, les textes et les photos",
+    "Film + page de confirmation",
+    "Un lien personnel par famille"
+   ],
+   "bouton": "Choisir un modèle",
+   "lien": "#modeles"
+  },
+  {
+   "nom": "Invitation personnalisée",
+   "prix": "100 000 Ar",
+   "vedette": true,
+   "details": [
+    "Créée sur mesure pour vous",
+    "Design, couleurs, animations et musique à votre goût",
+    "Film + page de confirmation",
+    "Gestion des invités, plan de tables, export Excel"
+   ],
+   "bouton": "Commander sur mesure",
+   "libre": true
+  }
+ ],
+ "prix_defaut": "50 000 Ar",
+ "prix_modeles": {}
 }

@@ -713,6 +713,10 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-11-12', date: '11 novembre 2026', titre: 'Site moderne, prix par modèle, traduction automatique', points: [
+      'Site : en-tête et pied de page <b>fixes</b>, contact <b>WhatsApp 033 46 261 16</b> et <b>e-mail</b>, prix affiché sur <b>chaque modèle</b>.',
+      'Commandes → Conditions de la vitrine : e-mail, <b>tarifs</b>, <b>prix par défaut</b> et <b>prix de chaque modèle</b> modifiables.',
+      'Plans → 🌐 Traduire : <b>⚡ Traduire automatiquement</b> en un clic vers les langues cochées ; l\'invité change de langue avec le bouton 🌐.'] },
     { id: '2026-11-11-11', date: '11 novembre 2026', titre: 'Site : menu, tarifs, WhatsApp', points: [
       'Site : <b>menu</b> en haut (☰ sur téléphone), section <b>Tarifs</b> : 50 000 Ar sur modèle (vidéo, textes, photos changés), 100 000 Ar personnalisée.',
       'Boutons <b>WhatsApp</b> partout (menu, tarifs, contact, bouton flottant) dès que le numéro est mis dans Commandes → Conditions de la vitrine.',
@@ -3046,6 +3050,20 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     });
   }
 
+  /* ---------- Traduction automatique d'un texte (Google Traduction, sans clé ; variables {…} gardées) ---------- */
+  async function traduireTexte(texte, de, vers) {
+    const vars = []; const prot = texte.replace(/\{[^{}]+\}/g, m => { vars.push(m); return '__' + (vars.length - 1) + '__'; });
+    const remettre = t => t.replace(/_{2}\s*(\d+)\s*_{2}/g, (m, i) => vars[Number(i)] || m);
+    try {
+      const r = await fetch('https://translate.googleapis.com/translate_a/single?client=gtx&dt=t&sl=' + encodeURIComponent(de) + '&tl=' + encodeURIComponent(vers) + '&q=' + encodeURIComponent(prot));
+      if (!r.ok) throw new Error('Google ' + r.status);
+      const j = await r.json(); return remettre((j[0] || []).map(x => x[0]).join(''));
+    } catch (e) {
+      const r = await fetch('https://api.mymemory.translated.net/get?langpair=' + encodeURIComponent(de + '|' + vers) + '&q=' + encodeURIComponent(prot.slice(0, 480)));
+      const j = await r.json(); if (!j || !j.responseData || !j.responseData.translatedText) throw e;
+      return remettre(j.responseData.translatedText);
+    }
+  }
   /* ---------- Traduction de toute l'invitation ---------- */
   function modaleTraduction(p, apres) {
     const N = MoteurInfo.LANGUES;
@@ -3054,6 +3072,10 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     modale(`<h2>🌐 Langues de l'invitation</h2>
       <p class="muet">Langue principale : <b>${esc(N[p.fiche.langue] || p.fiche.langue)}</b>. Cochez les langues à proposer aux invités : dans l'invitation, un bouton 🌐 leur permet de changer de langue d'un clic.</p>
       <div class="cases" style="flex-wrap:wrap" id="tr-langues">${Object.entries(N).filter(([k]) => k !== p.fiche.langue).map(([k, n]) => `<label><input type="checkbox" value="${k}" ${(p.langues || []).includes(k) ? 'checked' : ''}> ${n}${(p.langues || []).includes(k) ? ` <span class="muet">(${manque(k) ? manque(k) + ' texte(s) à traduire' : '✓ traduite'})</span>` : ''}</label>`).join('')}</div>
+      <div class="carte pile" style="margin-top:12px;background:#f3f8f2"><b>⚡ Traduction automatique (en un clic)</b>
+        <p class="muet" style="margin:0">Traduit tous les textes vers les langues cochées (Google Traduction). Les variables {famille}, {date}… sont gardées. Relisez ensuite : chaque traduction reste modifiable (Plans → texte → Traductions).</p>
+        <div class="ligne"><button class="btn plein" id="tr-auto">⚡ Traduire automatiquement</button><span class="muet" id="tr-auto-etat"></span></div></div>
+      <details style="margin-top:8px"><summary class="muet" style="cursor:pointer">Ou avec Claude / ChatGPT (traduction plus soignée)</summary>
       <div class="ia-grille" style="margin-top:12px">
         <div class="pile"><p class="ia-etape">1. Copier le prompt</p>
           <p class="muet" style="margin:0">Il contient tous les textes de l'invitation (${calques().length}) et les règles (ton de faire-part, variables {famille}, {date}… gardées).</p>
@@ -3062,7 +3084,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <div class="pile"><p class="ia-etape">2. Coller la réponse</p>
           <textarea id="tr-rep" rows="8" placeholder='{ "fr": { "…": "…" }, "en": { … } }' style="width:100%;font:12.5px ui-monospace,monospace"></textarea>
           <div class="ligne"><button class="btn plein" id="tr-ok">Appliquer les traductions</button><span class="muet" id="tr-etat"></span></div></div>
-      </div>`, (box, fermer) => {
+      </div></details>`, (box, fermer) => {
       const choisies = () => $$('#tr-langues input:checked', box).map(i => i.value);
       $$('#tr-langues input', box).forEach(i => i.onchange = () => { p.langues = choisies(); enregistrer(p); });
       $('#tr-copier', box).onclick = () => {
@@ -3070,6 +3092,22 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         let proj = p;
         if (!$('#tr-tout', box).checked) { proj = JSON.parse(JSON.stringify(p)); proj.plans.forEach(x => x.calques = (x.calques || []).filter(c => ls.some(l => !(c.trad && c.trad[l])))); }
         copier(Fabrique.promptTraduction(proj, ls, N));
+      };
+      $('#tr-auto', box).onclick = async () => {
+        const ls = choisies(); if (!ls.length) return toast('Cochez d\'abord au moins une langue');
+        const b = $('#tr-auto', box), etat = $('#tr-auto-etat', box), tout = $('#tr-tout', box).checked;
+        const cs = calques(); let n = 0, err = 0, k = 0;
+        const total = ls.reduce((s, l) => s + cs.filter(c => tout || !(c.trad && c.trad[l])).length, 0);
+        if (!total) { etat.textContent = 'Tout est déjà traduit (cochez « Retraduire » pour recommencer).'; return; }
+        b.disabled = true;
+        for (const l of ls) for (const c of cs) {
+          if (!tout && c.trad && c.trad[l]) continue;
+          etat.textContent = `${N[l] || l} : ${++k} / ${total}…`;
+          try { const t = await traduireTexte(String(c.texte), p.fiche.langue || 'fr', l); if (t && t.trim()) { c.trad = c.trad || {}; c.trad[l] = t; n++; } } catch (e) { err++; console.warn('traduction', e.message); if (err > 5) break; }
+        }
+        enregistrer(p); b.disabled = false;
+        etat.textContent = n + ' texte(s) traduit(s)' + (err ? ' · ' + err + ' échec(s) : réessayez ou utilisez Claude' : '');
+        if (n) { toast(n + ' traductions faites : relisez-les dans l\'aperçu (bouton 🌐)'); if (apres) apres(); }
       };
       $('#tr-ok', box).onclick = () => {
         let j; try { j = Fabrique.lireJSON($('#tr-rep', box).value); } catch (e) { $('#tr-etat', box).textContent = 'Réponse illisible : collez tout le bloc de code JSON.'; return; }
@@ -4344,11 +4382,23 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
 
   // Conditions et formules affichées sur la vitrine (fichier vitrine/conditions.json du site)
   async function vueConditionsVitrine(tete) {
-    if (!conditionsVitrine) { try { const r = await fetch(urlSite() + 'vitrine/conditions.json?v=' + Date.now(), { cache: 'no-store' }); if (r.ok) conditionsVitrine = await r.json(); } catch (e) {} }
+    // la version du site d'abord (un autre ordinateur a pu la modifier)
+    try { const r = await fetch(urlSite() + 'vitrine/conditions.json?v=' + Date.now(), { cache: 'no-store' }); if (r.ok) conditionsVitrine = await r.json(); } catch (e) {}
     const c = Object.assign({}, CONDITIONS_DEFAUT, conditionsVitrine || {});
+    const TARIFS_DEF = [
+      { nom: 'Invitation sur modèle', prix: '50 000 Ar', details: ['Un de nos modèles, adapté à votre événement', 'On change la vidéo, les textes et les photos', 'Film + page de confirmation', 'Un lien personnel par famille'], bouton: 'Choisir un modèle', lien: '#modeles' },
+      { nom: 'Invitation personnalisée', prix: '100 000 Ar', vedette: true, details: ['Créée sur mesure pour vous', 'Design, couleurs, animations et musique à votre goût', 'Film + page de confirmation', 'Gestion des invités, plan de tables, export Excel'], bouton: 'Commander sur mesure', libre: true }];
+    const tarifs = (c.tarifs && c.tarifs.length ? c.tarifs : TARIFS_DEF).map(t => Object.assign({}, t));
+    let modelesVitrine = []; try { modelesVitrine = (await (await fetch(urlSite() + 'vitrine/index.json?v=' + Date.now(), { cache: 'no-store' })).json()).filter(m => !m.film); } catch (e) {}
+    const prixM = Object.assign({}, c.prix_modeles || {});
     $('#app').innerHTML = tete + `<div class="ia-grille"><div class="carte pile">
       <label class="cases"><input type="checkbox" id="cv-actif" ${c.actif !== false ? 'checked' : ''}> Commandes ouvertes sur la vitrine (bouton « Commander ce modèle »)</label>
       <div class="deux"><label class="champ">Nom du studio<input type="text" id="cv-studio" value="${esc(c.studio || '')}"></label><label class="champ">WhatsApp du studio<input type="text" id="cv-wa" value="${esc(c.whatsapp || '')}" placeholder="034 00 000 00"></label></div>
+      <label class="champ">E-mail du studio<input type="email" id="cv-mail" value="${esc(c.email || '')}" placeholder="contact@…"></label>
+      <b>Tarifs affichés sur le site</b>${tarifs.map((t, i) => `<div class="cv-formule"><div class="deux"><label class="champ">Offre<input type="text" data-tn="${i}" value="${esc(t.nom)}"></label><label class="champ">Prix par invitation<input type="text" data-tp="${i}" value="${esc(t.prix || '')}" placeholder="ex. 50 000 Ar"></label></div><label class="champ">Ce qui est compris (une ligne par point)<textarea data-td="${i}" rows="3">${esc((t.details || []).join('\n'))}</textarea></label></div>`).join('')}
+      <b>Prix affiché sur chaque modèle</b>
+      <label class="champ">Prix par défaut (si rien n'est mis pour un modèle)<input type="text" id="cv-prix-def" value="${esc(c.prix_defaut || tarifs[0].prix || '')}" placeholder="50 000 Ar"></label>
+      ${modelesVitrine.length ? `<div class="pile" style="gap:6px">${modelesVitrine.map(m => `<div class="ligne" style="gap:8px"><span style="flex:1">${esc(m.titre || m.slug)}</span><input type="text" data-pm="${esc(m.slug)}" value="${esc(prixM[m.slug] || '')}" placeholder="${esc(c.prix_defaut || tarifs[0].prix || '')}" style="width:140px"></div>`).join('')}</div>` : '<span class="muet">Aucun modèle sur la vitrine pour l\'instant.</span>'}
       <label class="champ">Présentation<textarea id="cv-intro" rows="2">${esc(c.intro || '')}</textarea></label>
       <b>Formules et prix</b>${(c.formules || []).map((f, i) => `<div class="cv-formule"><div class="deux"><label class="champ">Nom<input type="text" data-fn="${i}" value="${esc(f.nom)}"></label><label class="champ">Prix (vide = sur devis)<input type="text" data-fp="${i}" value="${esc(f.prix || '')}" placeholder="ex. 150 000 Ar"></label></div><label class="champ">Contenu (une ligne par point)<textarea data-fc="${i}" rows="3">${esc(f.contenu || '')}</textarea></label></div>`).join('')}
       <label class="champ">Délai de réalisation<input type="text" id="cv-delai" value="${esc(c.delai || '')}"></label>
@@ -4364,7 +4414,10 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     $('#cv-sql').onclick = async () => { copier(await (await fetch('../outils/commandes.sql?v=' + Date.now())).text()); toast('Script copié : Supabase → SQL Editor → coller → Run'); };
     $('#cv-pub').onclick = async () => {
       const n = {
-        actif: $('#cv-actif').checked, studio: $('#cv-studio').value.trim(), whatsapp: $('#cv-wa').value.trim(), intro: $('#cv-intro').value.trim(),
+        actif: $('#cv-actif').checked, studio: $('#cv-studio').value.trim(), whatsapp: $('#cv-wa').value.trim(), email: $('#cv-mail').value.trim(), intro: $('#cv-intro').value.trim(),
+        tarifs: tarifs.map((t, i) => Object.assign({}, t, { nom: $(`[data-tn="${i}"]`).value.trim(), prix: $(`[data-tp="${i}"]`).value.trim(), details: $(`[data-td="${i}"]`).value.split('\n').map(x => x.trim()).filter(Boolean) })).filter(t => t.nom),
+        prix_defaut: $('#cv-prix-def').value.trim(),
+        prix_modeles: Object.fromEntries($$('[data-pm]').map(i => [i.dataset.pm, i.value.trim()]).filter(([, v]) => v)),
         formules: (c.formules || []).map((f, i) => ({ nom: $(`[data-fn="${i}"]`).value.trim(), prix: $(`[data-fp="${i}"]`).value.trim(), contenu: $(`[data-fc="${i}"]`).value.trim() })).filter(f => f.nom),
         delai: $('#cv-delai').value.trim(), paiement: $('#cv-paiement').value.trim(), conditions: $('#cv-cond').value.split('\n').map(x => x.trim()).filter(Boolean),
         supabase: reglages.supabase ? { url: reglages.supabase.url, anon: reglages.supabase.anon } : null, maj: new Date().toISOString()

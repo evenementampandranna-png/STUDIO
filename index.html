@@ -42,6 +42,26 @@
   .tarif .actions .cta { margin: 0; }
   .cta.wa { background: #1f9d55; }
   .contact-boutons .cta { margin-right: 8px; }
+  footer#pied { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: rgba(43, 34, 34, .96); backdrop-filter: blur(8px); color: #f3e9dc; padding: 10px max(16px, calc((100% - 1110px) / 2)) calc(10px + env(safe-area-inset-bottom)); text-align: left; font-size: 14px; }
+  .pied-in { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+  .pied-nom { font: 700 18px "Cormorant Garamond", serif; margin-right: auto; } .pied-nom em { color: #e7b7a0; }
+  footer#pied a { color: #fff; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+  .pied-wa { background: #1f9d55; padding: 8px 16px; border-radius: 999px; font-weight: 600; }
+  body { padding-bottom: 70px; }
+  @media (max-width: 600px) { .pied-nom, .pied-mail span, .pied-wa span { display: none; } .pied-in { justify-content: center; } .pied-wa { flex: 1; justify-content: center; } }
+  .contact-cartes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 10px; }
+  .contact-carte { display: flex; flex-direction: column; gap: 4px; padding: 20px 22px; border-radius: 20px; background: #fff; border: 1px solid var(--ligne); text-decoration: none; color: var(--encre); box-shadow: 0 10px 30px rgba(60,20,20,.06); transition: transform .2s; }
+  .contact-carte:hover { transform: translateY(-3px); }
+  .contact-carte b { font-size: 18px; } .contact-carte span { font: 700 22px "Cormorant Garamond", serif; color: var(--vin); } .contact-carte small { color: var(--gris); }
+  .contact-carte.wa { background: #1f9d55; color: #fff; border-color: #1f9d55; } .contact-carte.wa span, .contact-carte.wa small { color: #fff; }
+  .prix-modele { position: absolute; top: 12px; left: 12px; z-index: 2; background: rgba(255,255,255,.94); color: var(--vin); font: 700 14px Inter, sans-serif; padding: 6px 12px; border-radius: 999px; box-shadow: 0 6px 16px rgba(0,0,0,.15); }
+  /* interface moderne */
+  body { background: radial-gradient(1200px 600px at 85% -10%, #f3e1d3 0%, transparent 60%), radial-gradient(900px 500px at -10% 20%, #efe4f0 0%, transparent 55%), var(--creme); background-attachment: fixed; }
+  section h2 { font: 700 clamp(30px, 4vw, 42px) "Cormorant Garamond", serif; letter-spacing: -.01em; }
+  .modele { border-radius: 22px !important; box-shadow: 0 12px 34px rgba(60,20,20,.08); transition: transform .25s, box-shadow .25s; }
+  .modele:hover { transform: translateY(-4px); box-shadow: 0 20px 44px rgba(60,20,20,.14); }
+  .etape, .formule { border-radius: 20px !important; box-shadow: 0 8px 26px rgba(60,20,20,.05); }
+  .cta { transition: transform .15s, box-shadow .15s; } .cta:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(122,31,43,.25); }
   .wa-flottant { position: fixed; right: 18px; bottom: 18px; z-index: 40; width: 58px; height: 58px; border-radius: 50%; background: #1f9d55; color: #fff; font-size: 28px; display: flex; align-items: center; justify-content: center; text-decoration: none; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
   .wa-flottant[hidden], [data-wa][hidden] { display: none !important; }
   .hero { max-width: 1150px; margin: 0 auto; padding: 30px 20px 50px; display: grid; grid-template-columns: 1.1fr .9fr; gap: 40px; align-items: center; }
@@ -161,14 +181,18 @@
   </div>
 </section>
 <section id="contact"><h2>Contact</h2><p id="contact-texte" style="color:var(--gris)">Écrivez-nous : nous répondons vite, avec un devis et des idées pour votre invitation.</p>
-  <p class="contact-boutons"><a class="cta wa" data-wa hidden target="_blank">💬 Nous écrire sur WhatsApp</a><a class="cta contour" href="#modeles">Choisir un modèle</a></p></section>
-<a class="wa-flottant" data-wa hidden target="_blank" aria-label="WhatsApp">💬</a>
-<footer>Invitations vidéo interactives</footer>
+  <div class="contact-cartes"><a class="contact-carte wa" data-wa hidden target="_blank"><b>💬 WhatsApp</b><span id="contact-tel"></span><small>Réponse rapide · devis gratuit</small></a><a class="contact-carte" id="contact-mail" hidden><b>✉ E-mail</b><span id="contact-mail-t"></span><small>Pour vos photos et documents</small></a></div></section>
+
+<footer id="pied"><div class="pied-in">
+  <span class="pied-nom">Invitations <em>vidéo</em></span>
+  <a class="pied-wa" data-wa target="_blank" hidden>💬 <span>WhatsApp</span> <b id="pied-tel"></b></a>
+  <a class="pied-mail" id="pied-mail" hidden>✉ <span id="pied-mail-t"></span></a>
+</div></footer>
 <div id="boite"><button id="fermer" aria-label="Fermer">×</button><div class="lecteur" id="lecteur"><div class="fin-film" id="fin"><button id="revoir">↺ Revoir le film</button><a id="essayer" target="_blank">Essayer l'invitation interactive</a></div></div><div class="barre-lecture"><div id="progression"></div></div></div>
-<script src="config.js?v=202611111644"></script>
-<script src="moteur/moteur.js?v=202611111644"></script>
-<script src="moteur/fabrique.js?v=202611111644"></script>
-<script src="vitrine/index.js?v=202611111644"></script>
+<script src="config.js?v=202611111654"></script>
+<script src="moteur/moteur.js?v=202611111654"></script>
+<script src="moteur/fabrique.js?v=202611111654"></script>
+<script src="vitrine/index.js?v=202611111654"></script>
 <script>
 (async function () {
   const $ = s => document.querySelector(s);
@@ -188,8 +212,10 @@
       <div class="actions">${t.libre ? `<button class="cta" data-libre>${esc(t.bouton || 'Commander')}</button>` : `<a class="cta" href="${esc(t.lien || '#modeles')}">${esc(t.bouton || 'Choisir un modèle')}</a>`}${wa ? `<a class="cta wa" target="_blank" href="https://wa.me/${wa}?text=${encodeURIComponent('Bonjour, je souhaite une « ' + t.nom + ' » (' + t.prix + ').')}">WhatsApp</a>` : ''}</div></div>`).join('');
     document.querySelectorAll('[data-libre]').forEach(b => b.onclick = () => { const x = document.getElementById('cmd-libre'); if (x) x.click(); else if (wa) window.open('https://wa.me/' + wa + '?text=' + encodeURIComponent('Bonjour, je souhaite une invitation personnalisée.'), '_blank'); else location.hash = '#contact'; });
   };
-  window.brancherWhatsApp = n => {
+  window.brancherEmail = m => { if (!m) return; [['#pied-mail', '#pied-mail-t'], ['#contact-mail', '#contact-mail-t']].forEach(([a, t]) => { const e = $(a); if (e) { e.href = 'mailto:' + m + '?subject=' + encodeURIComponent('Invitation vidéo'); e.hidden = false; $(t).textContent = m; } }); };
+  window.brancherWhatsApp = (n, affiche) => {
     if (!n) return;
+    if (affiche) { const t = $('#pied-tel'), c = $('#contact-tel'); if (t) t.textContent = affiche; if (c) c.textContent = affiche; }
     const lien = 'https://wa.me/' + n + '?text=' + encodeURIComponent('Bonjour, je souhaite une invitation vidéo.');
     document.querySelectorAll('[data-wa]').forEach(a => { a.href = lien; a.hidden = false; });
     const d = $('#devis'); if (d) { d.href = lien; d.target = '_blank'; }
@@ -299,7 +325,12 @@
   try { const r = await fetch('vitrine/conditions.json?v=' + Date.now(), { cache: 'no-store' }); if (r.ok) cond = await r.json(); } catch (e) {}
   window.CONDITIONS_VITRINE = cond;
   const waTout = String((cond && cond.whatsapp) || (window.STUDIO_CONFIG && window.STUDIO_CONFIG.contact && window.STUDIO_CONFIG.contact.whatsapp) || '').replace(/\D/g, '').replace(/^0/, '261');
-  if (window.brancherWhatsApp) brancherWhatsApp(waTout);
+  if (window.brancherWhatsApp) brancherWhatsApp(waTout, (cond && cond.whatsapp) || '');
+  if (window.brancherEmail) brancherEmail(cond && cond.email);
+  // Prix affiché sur chaque modèle (modifiable par l'admin : Studio → Commandes → Conditions de la vitrine)
+  const prixDe = slug => { const p = (cond && cond.prix_modeles) || {}; return p[slug] || (cond && cond.prix_defaut) || ((cond && cond.tarifs && cond.tarifs[0] && cond.tarifs[0].prix) || '50 000 Ar'); };
+  const poserPrix = () => document.querySelectorAll('#liste .modele').forEach(el => { if (el.querySelector('.prix-modele')) return; const m = (window.LISTE_VITRINE || [])[Number(el.dataset.i)]; if (!m || m.film) return; const p = prixDe(m.slug); if (!p) return; const b = document.createElement('span'); b.className = 'prix-modele'; b.textContent = p; (el.querySelector('.vignette') || el).appendChild(b); });
+  poserPrix(); setTimeout(poserPrix, 1500); setTimeout(poserPrix, 4000);
   if (window.afficherTarifs) afficherTarifs(cond && cond.tarifs, waTout);
   if (!cond || cond.actif === false) return;
   const wa = String(cond.whatsapp || (window.STUDIO_CONFIG && window.STUDIO_CONFIG.contact && window.STUDIO_CONFIG.contact.whatsapp) || '').replace(/\D/g, '').replace(/^0/, '261');
