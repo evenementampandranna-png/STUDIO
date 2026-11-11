@@ -51,10 +51,10 @@
 <button id="son" aria-label="Son">♪</button><button id="pause" aria-label="Pause">❚❚</button>
 <div id="bandeau" role="dialog"></div>
 <div id="erreur"></div>
-<script src="../config.js?v=202611111501"></script>
-<script src="../moteur/moteur.js?v=202611111501"></script>
-<script src="../moteur/fabrique.js?v=202611111501"></script>
-<script src="../moteur/base.js?v=202611111501"></script>
+<script src="../config.js?v=202611111554"></script>
+<script src="../moteur/moteur.js?v=202611111554"></script>
+<script src="../moteur/fabrique.js?v=202611111554"></script>
+<script src="../moteur/base.js?v=202611111554"></script>
 <script>
 (async function () {
   const q = new URLSearchParams(location.search);
@@ -259,7 +259,7 @@
   async function onAction(action, c, form) {
     const lieux = fiche.lieux || [], contacts = fiche.contacts || [];
     const cible = Number(c.cible) || 0;
-    if (action === 'map') { noter('map'); if (c.lien) { window.open(/^https?:/.test(c.lien) ? c.lien : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(c.lien), '_blank'); return; } const l = lieux[cible] || lieux[0]; if (l) window.open(l.maps || ('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(l.nom)), '_blank'); return; }
+    if (action === 'map') { noter('map'); if (c.lien) { window.open(/^https?:/.test(c.lien) ? c.lien : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(c.lien), '_blank'); return; } const l = lieux[cible] || lieux[0]; const q = l ? ((l.nom || '') + ' ' + (l.adresse || '')).trim() : ''; window.open(l && l.maps && !/\/maps\/search\/\?api=1/.test(l.maps) ? l.maps : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q || fiche.titre || ''), '_blank'); return; }
     if (action === 'appeler') { noter('appel'); const n = c.tel || ((contacts[cible] || contacts[0]) || {}).telephone; if (n) location.href = 'tel:' + String(n).replace(/\s/g, ''); return; }
     if (action === 'messenger') { if (c.lien) window.open(c.lien, '_blank'); return; }
     if (action === 'lien') { if (c.lien) window.open(c.lien, '_blank'); return; }

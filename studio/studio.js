@@ -713,6 +713,10 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-11-8', date: '11 novembre 2026', titre: 'Bouton Maps direct et équipe synchronisée', points: [
+      'Bouton <b>Maps</b> : plus besoin de lien. L\'invité touche le bouton → Google Maps s\'ouvre directement sur le lieu de la Fiche (ou sur le nom écrit dans le bouton).',
+      'Si le nom d\'un lieu change dans la Fiche, Maps suit le nouveau nom.',
+      'Équipe : à chaque ouverture du studio et de la page Équipe, vos modèles, fonds et vidéos sont envoyés dans la base, pour que tous les membres voient tout.'] },
     { id: '2026-11-11-7', date: '11 novembre 2026', titre: 'Changer de base de données (gratuit)', points: [
       'Réglages → <b>🔁 Changer de base de données</b> : nouvelle base Supabase gratuite en 4 étapes, avec <b>un seul script</b> à coller.',
       'Invitations déjà publiées, lien organisateur, vitrine et membres de l\'équipe suivent <b>automatiquement</b> la nouvelle base (mêmes liens).',
@@ -1126,7 +1130,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     }
     if (e === 2) {
       const f = brouillon.fiche;
-      const ligneLieu = (l, i) => `<div class="trois" data-lieu="${i}"><input type="text" data-k="nom" value="${esc(l.nom)}" placeholder="Nom du lieu"><select data-k="role"><option value="ceremonie" ${l.role === 'ceremonie' ? 'selected' : ''}>Cérémonie</option><option value="reception" ${l.role === 'reception' ? 'selected' : ''}>Réception</option></select><input type="url" data-k="maps" value="${esc(l.maps)}" placeholder="Lien Google Maps"></div>`;
+      const ligneLieu = (l, i) => `<div class="trois" data-lieu="${i}"><input type="text" data-k="nom" value="${esc(l.nom)}" placeholder="Nom du lieu"><select data-k="role"><option value="ceremonie" ${l.role === 'ceremonie' ? 'selected' : ''}>Cérémonie</option><option value="reception" ${l.role === 'reception' ? 'selected' : ''}>Réception</option></select><input type="url" data-k="maps" value="${esc(l.maps && !/\/maps\/search\/\?api=1/.test(l.maps) ? l.maps : '')}" placeholder="Lien Google Maps (facultatif : le nom suffit)"></div>`;
       const ligneContact = (c, i) => `<div class="deux" data-contact="${i}"><input type="text" data-k="nom" value="${esc(c.nom)}" placeholder="Nom"><input type="text" data-k="telephone" value="${esc(c.telephone)}" placeholder="034 00 000 00"></div>`;
       const ligneHote = (h, i) => `<div class="deux" data-hote="${i}"><input type="text" data-k="nom_complet" value="${esc(h.nom_complet)}" placeholder="Nom complet"><input type="text" data-k="surnom" value="${esc(h.surnom)}" placeholder="Prénom usuel"></div>`;
       const ligneCel = (h, i) => `<div class="deux" data-cel="${i}"><input type="text" data-k="nom_complet" value="${esc(h.nom_complet)}" placeholder="Nom complet"><input type="text" data-k="occasion" value="${esc(h.occasion)}" placeholder="Occasion (Batemy…)"></div>`;
@@ -1326,8 +1330,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <div class="cases" style="flex-wrap:wrap">${Object.entries(MoteurInfo.LANGUES).filter(([k]) => k !== f.langue).map(([k, n]) => `<label><input type="checkbox" data-langue="${k}" ${(p.langues || []).includes(k) ? 'checked' : ''}> ${n}</label>`).join('')}</div>
         <div class="muet">Ensuite : onglet Plans → <b>🌐 Traduire</b> pour traduire tous les textes d'un coup.</div>
       </div>
-      <div class="section-titre">Lieux (n° pour les boutons Map : 0, 1…)</div>
-      ${f.lieux.map((l, i) => `<div class="deux"><input type="text" data-l="${i}" data-k="nom" value="${esc(l.nom)}"><input type="url" data-l="${i}" data-k="maps" value="${esc(l.maps)}"></div>`).join('')}
+      <div class="section-titre">Lieux (le bouton Maps ouvre Google Maps sur ce nom ; le lien est facultatif)</div>
+      ${f.lieux.map((l, i) => `<div class="deux"><input type="text" data-l="${i}" data-k="nom" value="${esc(l.nom)}"><input type="url" data-l="${i}" data-k="maps" value="${esc(l.maps && !/\/maps\/search\/\?api=1/.test(l.maps) ? l.maps : '')}" placeholder="Lien Google Maps (facultatif : le nom suffit)"></div>`).join('')}
       <div class="section-titre">Contacts (n° pour les boutons Appeler : 0, 1…)</div>
       ${f.contacts.map((c, i) => `<div class="deux"><input type="text" data-c="${i}" data-k="nom" value="${esc(c.nom)}"><input type="text" data-c="${i}" data-k="telephone" value="${esc(c.telephone)}"></div>`).join('')}
       <label class="champ">Texte source<textarea rows="8" readonly>${esc(f.texte_source || '')}</textarea></label>
@@ -1617,7 +1621,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       if (a === 'confirmer' || a === 'refuser') { toast(a === 'confirmer' ? 'Réponse « vient » (simulée) : suite du film' : 'Réponse « ne vient pas » (simulée) : suite du film'); return eng.allerRemerciement(); }
       const c = cB || {}, f = p.fiche || {}, k = Number(c.cible) || 0;
       const tel = String(c.tel || ((f.contacts || [])[k] || {}).telephone || '').replace(/[^\d+]/g, '');
-      if (a === 'map') { const l = (f.lieux || [])[k] || (f.lieux || [])[0] || {}; return window.open(c.lien ? (/^https?:/.test(c.lien) ? c.lien : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(c.lien)) : (l.maps || 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(l.nom || '')), '_blank'); }
+      if (a === 'map') { const l = (f.lieux || [])[k] || (f.lieux || [])[0] || {}; return window.open(c.lien ? (/^https?:/.test(c.lien) ? c.lien : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(c.lien)) : (l.maps && !/\/maps\/search\/\?api=1/.test(l.maps) ? l.maps : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(((l.nom || '') + ' ' + (l.adresse || '')).trim() || f.titre || '')), '_blank'); }
       if (a === 'whatsapp') return tel ? window.open('https://wa.me/' + tel.replace(/^\+/, '').replace(/^0/, '261'), '_blank') : toast('Aucun numéro pour ce bouton');
       if (a === 'appeler') return toast(tel ? '📞 Sur le téléphone de l\'invité, ce bouton appelle ' + tel : 'Aucun numéro pour ce bouton');
       if (a === 'lien' || a === 'messenger') return c.lien ? window.open(c.lien, '_blank') : toast('Ce bouton n\'a pas encore de lien');
@@ -2666,8 +2670,9 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       const a = c.action || 'suivant', f = p.fiche || {}, lieux = f.lieux || [], contacts = f.contacts || [];
       const t = TYPES_BOUTON.find(x => x.a === a) || TYPES_BOUTON[0];
       let h = `<div class="aide-bouton">${t.i} ${esc(t.aide)}</div>`;
-      if (a === 'map') h += `<label class="champ">Lieu<select data-k="cible">${lieux.map((l, i) => `<option value="${i}" ${Number(c.cible || 0) === i ? 'selected' : ''}>${esc(l.nom || 'Lieu ' + (i + 1))}</option>`).join('') || '<option value="0">— aucun lieu dans la Fiche —</option>'}</select></label>
-        <label class="champ">Ou une autre adresse / un lien Google Maps<input type="text" data-k="lien" placeholder="ex. Hôtel Colbert Antananarivo, ou https://maps.app.goo.gl/…" value="${esc(c.lien || '')}"></label>
+      if (a === 'map') h += `${lieux.length ? `<label class="champ">Lieu (de la Fiche)<select data-k="cible">${lieux.map((l, i) => `<option value="${i}" ${Number(c.cible || 0) === i ? 'selected' : ''}>${esc(l.nom || 'Lieu ' + (i + 1))}</option>`).join('')}</select></label>
+        <div class="muet" style="font-size:12px">✓ Rien d'autre à faire : l'invité touche le bouton → <b>Google Maps s'ouvre directement sur ce lieu</b>.</div>` : ''}
+        <label class="champ">${lieux.length ? 'Autre lieu (facultatif) : écrivez simplement son nom' : 'Nom du lieu (Google Maps le trouve tout seul, pas besoin de lien)'}<input type="text" data-k="lien" placeholder="ex. Hôtel Colbert Antananarivo" value="${esc(c.lien || '')}"></label>
         <button class="btn petit" data-tester-bouton>Ouvrir pour tester ↗</button>`;
       if (a === 'appeler' || a === 'whatsapp') h += `<label class="champ">Contact<select data-k="cible">${contacts.map((k, i) => `<option value="${i}" ${Number(c.cible || 0) === i ? 'selected' : ''}>${esc((k.nom || 'Contact ' + (i + 1)) + ' — ' + (k.telephone || ''))}</option>`).join('') || '<option value="0">— aucun contact dans la Fiche —</option>'}</select></label>
         <label class="champ">Ou un autre numéro<input type="tel" data-k="tel" placeholder="ex. 034 12 345 67" value="${esc(c.tel || '')}"></label>
@@ -2802,7 +2807,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       const tb = $('#props [data-tester-bouton]'); if (tb) tb.onclick = () => {
         const f = p.fiche || {}, a = c.action, k = Number(c.cible) || 0;
         const tel = String(c.tel || ((f.contacts || [])[k] || {}).telephone || '').replace(/[^\d+]/g, '');
-        if (a === 'map') { const l = (f.lieux || [])[k] || {}; const u = c.lien ? (/^https?:/.test(c.lien) ? c.lien : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(c.lien)) : (l.maps || 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(l.nom || '')); window.open(u, '_blank'); }
+        if (a === 'map') { const l = (f.lieux || [])[k] || (f.lieux || [])[0] || {}; const u = c.lien ? (/^https?:/.test(c.lien) ? c.lien : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(c.lien)) : (l.maps && !/\/maps\/search\/\?api=1/.test(l.maps) ? l.maps : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(((l.nom || '') + ' ' + (l.adresse || '')).trim() || f.titre || '')); window.open(u, '_blank'); }
         else if (a === 'whatsapp') { if (!tel) return toast('Aucun numéro'); window.open('https://wa.me/' + tel.replace(/^0/, '261').replace(/^\+/, ''), '_blank'); }
         else if (a === 'appeler') { if (!tel) return toast('Aucun numéro'); toast('Le bouton appellera : ' + tel); }
         else if (c.lien) window.open(c.lien, '_blank'); else toast('Mettez d\'abord l\'adresse du lien');
@@ -4953,6 +4958,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     rendre();
   }
   async function vueEquipe() {
+    syncEquipe();
     if (!Equipe.actif()) { $('#app').innerHTML = `<div class="entete"><div><h1>Équipe</h1><p>Travaillez à plusieurs : bibliothèque de fonds commune, et l'admin voit le travail de chacun.</p></div></div><div class="carte pile" style="max-width:640px"><p>Vous n'êtes dans aucune équipe. Ouvrez le lien d'équipe reçu, ou créez l'équipe dans <a href="#/reglages">Réglages</a> (vous en serez l'admin).</p></div>`; return; }
     const e = reglages.equipe;
     if (!Equipe.admin()) {
@@ -5528,6 +5534,14 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     Object.values(projets).forEach((p, k) => Equipe.travail(p, 3000 + k * 4000));
     Stock.ecrire('studio.base.renvoyer', 0);
   }, 20000);
+  // Tout ce que cet ordinateur a fait (modèles, fonds, vidéos) est visible par toute l'équipe dans la base actuelle
+  function syncEquipe() {
+    if (!Equipe.actif() || !navigator.onLine) return;
+    Equipe.rattraper().catch(() => {}); Equipe.restaurer().catch(() => {});
+    const cle = 'studio.base.travaux.' + normU(reglages.supabase.url);
+    if (!Stock.lire(cle, 0)) { Object.values(projets).forEach((p, k) => Equipe.travail(p, 2000 + k * 3000)); Stock.ecrire(cle, 1); }
+  }
+  setTimeout(syncEquipe, 35000);
   if (Equipe.actif() && Stock.lire('studio.equipe.arestaurer', []).length) setTimeout(() => Equipe.restaurer().catch(e => console.warn('restaurer', e.message)), 30000);
   if (reglages.supabase) { setTimeout(relierBases, 15000); setInterval(relierBases, 10 * 60e3); window.addEventListener('online', () => setTimeout(relierBases, 5000)); }
   window.addEventListener('online', () => setTimeout(() => Equipe.rattraper(), 8000));
