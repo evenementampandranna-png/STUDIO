@@ -86,6 +86,8 @@
   .salle-table.plein .rond { border-color: var(--vert); } .salle-table.trop .rond { border-color: var(--rouge); }
   .salle-table .noms { font-size: 12px; color: var(--gris); line-height: 1.35; }
   @media print { header .outils, .onglets, .outils, .cartes-inv, .cats-grille, .stats, #toast { display: none !important; } }
+  .lien-fam { background: #f6efe6; border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--gris); }
+  .lien-fam small { font-weight: 400; }
 </style>
 </head>
 <body>
@@ -95,8 +97,8 @@
 <div id="erreur" hidden></div>
 <dialog id="dlg"><form method="dialog" id="dlg-form"></form></dialog>
 <div id="toast"></div>
-<script src="../config.js?v=202611111627"></script>
-<script src="../moteur/base.js?v=202611111627"></script>
+<script src="../config.js?v=202611111644"></script>
+<script src="../moteur/base.js?v=202611111644"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
 <script>
 (async function () {
@@ -322,6 +324,7 @@
     const d = $('#dlg'), fo = $('#dlg-form');
     fo.innerHTML = `<h3>${n ? 'Ajouter une famille' : 'Modifier'}</h3>
       <label>Nom de la famille<input name="nom" required value="${esc(f.nom)}" placeholder="Ex. Fianakaviana Rakoto"></label>
+      <div class="lien-fam"><span>🔗 Lien personnel de cette famille${n ? ' <small>(actif dès que vous enregistrez)</small>' : ''}</span><div class="outils" style="margin:0"><input type="text" readonly value="${esc(lienFamille(f))}" onclick="this.select()" style="flex:1"><button type="button" class="btn petit" id="f-cp-lien">Copier</button></div></div>
       <label>Catégorie<select name="categorie" id="f-cat"><option value="">— Sans catégorie —</option>${categories().map(c => `<option ${(f.categorie || (n && filtreCat !== '∅' ? filtreCat : '')) === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}<option value="__nouvelle">＋ Nouvelle catégorie…</option></select></label>
       <label id="f-cat-nouv" hidden>Nom de la nouvelle catégorie<input name="nouvelle_cat" placeholder="${mg ? 'Ohatra : Mpianatra niara-nianatra' : 'Ex. : Anciens camarades de classe'}"></label>
       <div class="deux"><label>Adultes invités<input name="prevus_adultes" type="number" min="0" value="${invA(f)}"></label><label>Enfants invités<input name="prevus_enfants" type="number" min="0" value="${invE(f)}"></label></div>
@@ -330,6 +333,7 @@
       <label>Réponse<select name="statut">${Object.entries(STAT).map(([k, t]) => `<option value="${k}" ${(f.statut || 'attente') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
       <div class="deux"><label>Adultes qui viennent<input name="adultes" type="number" min="0" value="${f.adultes || 0}"></label><label>Enfants qui viennent<input name="enfants" type="number" min="0" value="${f.enfants || 0}"></label></div>
       <div class="outils" style="margin:6px 0 0;justify-content:flex-end"><button class="btn" value="annuler" formnovalidate>Annuler</button><button class="btn plein" value="ok">Enregistrer</button></div>`;
+    $('#f-cp-lien').onclick = () => { copier(lienFamille(f)); if (!n) marquerEnvoye(f); };
     $('#f-cat').onchange = e => { const nv = e.target.value === '__nouvelle'; $('#f-cat-nouv').hidden = !nv; if (nv) $('#f-cat-nouv input').focus(); };
     d.showModal();
     d.onclose = async () => {

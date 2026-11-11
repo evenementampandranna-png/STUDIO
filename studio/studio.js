@@ -713,6 +713,10 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-11-11', date: '11 novembre 2026', titre: 'Site : menu, tarifs, WhatsApp', points: [
+      'Site : <b>menu</b> en haut (☰ sur téléphone), section <b>Tarifs</b> : 50 000 Ar sur modèle (vidéo, textes, photos changés), 100 000 Ar personnalisée.',
+      'Boutons <b>WhatsApp</b> partout (menu, tarifs, contact, bouton flottant) dès que le numéro est mis dans Commandes → Conditions de la vitrine.',
+      'Espace organisateur : le <b>lien personnel</b> de la famille est visible dans la fenêtre « Ajouter / Modifier ».'] },
     { id: '2026-11-11-10', date: '11 novembre 2026', titre: 'Lien de chaque famille', points: [
       'Espace organisateur : après « Ajouter une famille », son <b>lien personnel</b> s\'affiche tout de suite (WhatsApp, Copier, Partager, Voir). Quand elle confirme, on voit combien d\'adultes et d\'enfants viennent.',
       'Compte à rebours : le jour J, il affiche « C\'est le grand jour ! » au lieu de disparaître.'] },
