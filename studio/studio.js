@@ -222,7 +222,7 @@
       const cle = 'cache:' + src.split('/object/public/')[1];
       try {
         let b = await IDB.lire(cle);
-        if (!b) { const r = await fetch(src); if (!r.ok) return src; b = await r.blob(); if (b.size < 80e6) IDB.mettre(cle, b).catch(() => {}); }
+        if (!b) { const r = await fetch(Equipe.actuelle(src)); if (!r.ok) return src; b = await r.blob(); if (b.size < 80e6) IDB.mettre(cle, b).catch(() => {}); }
         return (urlsIdb[src] = URL.createObjectURL(b));
       } catch (e) { return src; }
     }
@@ -240,12 +240,38 @@
     cleAcces() { return reglages.equipe.cle_admin || reglages.equipe.cle; },
     rpc(fn, args) { return Base.rpc(reglages.supabase, fn, Object.assign({ p_cle: this.cleAcces() }, args || {})); },
     url(chemin) { return reglages.supabase.url.replace(/\/+$/, '') + '/storage/v1/object/public/equipe/' + chemin; },
-    estUrl(src) { return !!(reglages.supabase && typeof src === 'string' && src.startsWith(reglages.supabase.url.replace(/\/+$/, '') + '/storage/v1/object/public/equipe/')); },
-    async envoyerFichier(chemin, blob) {
+    // adresses de la base actuelle et des anciennes (après un changement de base, les fichiers gardent le même chemin)
+    prefixes() { return reglages.supabase ? [reglages.supabase.url].concat(reglages.supabase_anciens || []).map(u => u.replace(/\/+$/, '') + '/storage/v1/object/public/equipe/') : []; },
+    estUrl(src) { return typeof src === 'string' && this.prefixes().some(x => src.startsWith(x)); },
+    actuelle(src) { if (!this.estUrl(src)) return src; return this.url(src.split('/storage/v1/object/public/equipe/')[1]); },
+    async envoyerFichier(chemin, blob, dejaOk) {
       const a = reglages.supabase.anon;
+      // cache long : chaque fichier ne change jamais (nom unique) → le navigateur ne le retélécharge pas
       const r = await fetch(reglages.supabase.url.replace(/\/+$/, '') + '/storage/v1/object/equipe/' + chemin, { method: 'POST', body: blob,
-        headers: Object.assign({ apikey: a, 'Content-Type': blob.type || 'video/mp4', 'x-upsert': 'false' }, /^eyJ/.test(a) ? { Authorization: 'Bearer ' + a } : {}) });
-      if (!r.ok) throw new Error('Envoi du fichier impossible (' + r.status + ') ' + (await r.text()).slice(0, 120));
+        headers: Object.assign({ apikey: a, 'Content-Type': blob.type || 'video/mp4', 'x-upsert': 'false', 'cache-control': 'max-age=31536000' }, /^eyJ/.test(a) ? { Authorization: 'Bearer ' + a } : {}) });
+      if (!r.ok) { const t = await r.text(); if (dejaOk && /duplicate|already exists|409/i.test(t + r.status)) return; throw new Error('Envoi du fichier impossible (' + r.status + ') ' + t.slice(0, 120)); }
+    },
+    // après un changement de base : chaque membre renvoie les fichiers d'équipe qu'il a sur son ordinateur (même chemin, même fiche)
+    async restaurer() {
+      const l = Stock.lire('studio.equipe.arestaurer', []);
+      if (!l.length || !this.actif() || this._rest || !navigator.onLine) return;
+      this._rest = true; let n = 0;
+      try {
+        try { await this.charger(); } catch (e) { return; }
+        const deja = new Set((this.items || []).map(x => x.id)), reste = [];
+        for (const it of l) {
+          if (deja.has(it.id)) continue;
+          let blob = null;
+          try { blob = await IDB.lire('cache:equipe/' + it.chemin); } catch (e) {}
+          if (!blob) { const m = medias.find(x => x.equipe_id === it.id && /^idb:/.test(x.src || '')); if (m) try { blob = await IDB.lire(m.src); } catch (e) {} }
+          if (!blob) { const f = Films.liste().find(x => x.equipe_id === it.id); if (f) try { blob = await Films.blob(f); } catch (e) {} }
+          if (!blob) { reste.push(it); continue; }   // un autre membre l'a peut-être sur son ordinateur
+          try { await this.envoyerFichier(it.chemin, blob, true); await this.rpc('equipe_biblio_ajouter', { p_item: it }); n++; }
+          catch (e) { reste.push(it); if (/402|quota|restrict|fetch/i.test(e.message)) { reste.push(...l.slice(l.indexOf(it) + 1)); break; } }
+        }
+        Stock.ecrire('studio.equipe.arestaurer', reste);
+        if (n) { toast(n + ' fichier(s) de l\'équipe recopié(s) dans la nouvelle base'); await this.charger().catch(() => {}); }
+      } finally { this._rest = false; }
     },
     async charger() { if (!this.actif()) return; this.items = await this.rpc('equipe_biblio_lire') || []; Stock.ecrire('studio.equipe.biblio', this.items); },
     // éléments de l'équipe présentés comme des fichiers de la bibliothèque (sauf ceux qui sont déjà les miens en local)
@@ -687,6 +713,11 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-11-7', date: '11 novembre 2026', titre: 'Changer de base de données (gratuit)', points: [
+      'Réglages → <b>🔁 Changer de base de données</b> : nouvelle base Supabase gratuite en 4 étapes, avec <b>un seul script</b> à coller.',
+      'Invitations déjà publiées, lien organisateur, vitrine et membres de l\'équipe suivent <b>automatiquement</b> la nouvelle base (mêmes liens).',
+      'Chaque ordinateur y recopie tout seul ses invitations, ses invités, ses travaux et les fichiers d\'équipe qu\'il possède.',
+      'Les fichiers d\'équipe sont maintenant gardés en cache longtemps pour ne plus saturer la base.'] },
     { id: '2026-11-11-6', date: '11 novembre 2026', titre: 'Retirer une publication', points: [
       'Événement → <b>Liens du client</b> : nouveau bouton <b>🚫 Retirer la publication</b>. L\'invitation disparaît du site (avec sa démo et sa place sur la vitrine) ; les invités voient « Invitation introuvable ».',
       'Le projet, les invités et les réponses restent dans le studio : <b>Remettre en ligne</b> la republie avec le même lien.',
@@ -3686,7 +3717,11 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       suivi && suivi('Copie du fichier d\'équipe ' + src.split('/').pop() + '…');
       const nom = 'medias/eq-' + src.split('/').pop();
       let existe = false; try { existe = !!(await GitHub.sha(nom)); } catch (e) {}
-      if (!existe) { const r = await fetch(src); if (!r.ok) throw new Error('Fichier d\'équipe introuvable (' + r.status + ')'); await GitHub.envoyer(nom, await r.blob(), 'Fichier d\'équipe ' + src.split('/').pop()); }
+      if (!existe) {
+        let b = null; try { b = await IDB.lire('cache:' + src.split('/object/public/')[1]); } catch (e) {}
+        if (!b || !b.size) { const r = await fetch(Equipe.actuelle(src)); if (!r.ok) throw new Error('Fichier d\'équipe introuvable (' + r.status + ')'); b = await r.blob(); }
+        await GitHub.envoyer(nom, b, 'Fichier d\'équipe ' + src.split('/').pop());
+      }
     }
   }
   // Ne renvoie une liste vide que si le fichier n'existe pas encore (sinon on effacerait la vitrine)
@@ -5107,6 +5142,18 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
             <button class="btn petit" id="sb-sql">Copier le script SQL</button> <button class="btn petit" id="sb-sql2" title="Adultes et enfants invités séparément, par famille">Mise à jour adultes / enfants</button> <button class="btn petit" id="sb-sql3" title="Chaque membre peut récupérer ses invitations depuis la copie en ligne">Mise à jour sauvegarde en ligne</button> <button class="btn petit" id="sb-sql4" title="Les membres demandent la publication, l'admin valide">Mise à jour publication par les membres</button>
             <p class="muet">La formule gratuite se met en pause après 7 jours sans aucune visite ; une invitation en cours reçoit des visites, sinon réactivez-la d'un clic dans Supabase.</p></details>
         </div>
+        ${reglages.supabase && (!Equipe.actif() || Equipe.admin()) ? `<div class="carte pile" id="nb-carte"><h3>🔁 Changer de base de données (base saturée ou bloquée)</h3>
+          <p class="muet">Passe tout le studio sur une <b>nouvelle base Supabase gratuite</b> : réponses des invités, espace organisateur, commandes, équipe. Les invitations déjà publiées, la vitrine et les membres de l'équipe suivent <b>automatiquement</b> (mêmes liens). Chaque ordinateur y recopie ensuite ses invitations, ses invités et ses fichiers.</p>
+          <ol class="muet" style="margin:0 0 6px;padding-left:20px;line-height:1.6">
+            <li>Sur <a href="https://supabase.com/dashboard/new" target="_blank" rel="noopener">supabase.com ↗</a> : en haut à gauche, <b>New organization</b> (plan <b>Free</b>). <b>Important : une nouvelle organisation</b>, sinon le quota reste partagé avec l'ancienne base bloquée.</li>
+            <li>Dans cette organisation : <b>New project</b> (région Europe), attendez qu'il soit prêt.</li>
+            <li><b>SQL Editor</b> → <b>New query</b> → collez le script complet <button class="btn petit" id="nb-sql">📋 Copier le script complet</button> → <b>Run</b> (« Success »).</li>
+            <li><b>Connect</b> (ou Project Settings → API Keys) : copiez la <b>Project URL</b> et la clé <b>publishable</b> ci-dessous, puis <b>Basculer</b>.</li></ol>
+          <label class="champ">Nouvelle adresse (Project URL)<input type="url" id="nb-url" placeholder="https://xxxxxxxx.supabase.co"></label>
+          <label class="champ">Nouvelle clé publique (publishable / anon)<input type="text" id="nb-anon" placeholder="sb_publishable_… ou eyJhbGciOi…"></label>
+          <div class="ligne"><button class="btn plein" id="nb-go">🔁 Basculer vers la nouvelle base</button><span class="muet" id="nb-etat"></span></div>
+          ${(reglages.supabase_anciens || []).length ? `<p class="muet">Anciennes bases suivies : ${reglages.supabase_anciens.map(esc).join(', ')}</p>` : ''}
+        </div>` : ''}
         <div class="carte pile"><h3>Réponses des invités (Firebase, facultatif)</h3>
           <p class="muet">Sans Firebase, les invités envoient leur réponse par WhatsApp (message prérempli). Avec Firebase, les réponses arrivent directement dans l'onglet Invités.</p>
           <label class="champ">Configuration web Firebase (JSON)<textarea id="fb" rows="7" placeholder='{"apiKey":"...","authDomain":"...","projectId":"..."}'>${reglages.firebase ? esc(JSON.stringify(reglages.firebase, null, 1)) : ''}</textarea></label>
@@ -5184,6 +5231,16 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       eqt.disabled = false; eqt.textContent = 'Partager tous mes fonds existants'; toast(n + ' fichier(s) partagé(s) avec l\'équipe');
     };
     const eqq = $('#eq-quitter'); if (eqq) eqq.onclick = () => { if (!confirm('Quitter l\'équipe sur cet ordinateur ? (Vos fichiers restent ici ; vous pourrez revenir avec le lien.)')) return; reglages.equipe = null; sauverReglages(); vueReglages(); };
+    const nbs = $('#nb-sql'); if (nbs) nbs.onclick = async () => { try { copier(await (await fetch('../outils/tout.sql?v=' + Date.now())).text()); toast('Script complet copié : Supabase → SQL Editor → New query → coller → Run', 5000); } catch (e) { toast('Script introuvable'); } };
+    const nbg = $('#nb-go'); if (nbg) nbg.onclick = async () => {
+      const url = $('#nb-url').value.trim(), anon = $('#nb-anon').value.trim(), etat = $('#nb-etat');
+      if (!/^https:\/\/[\w-]+\.supabase\.co\/?$/.test(url)) return toast('Adresse attendue : https://xxxxxxxx.supabase.co');
+      if (!/^(sb_publishable_|eyJ)/.test(anon)) return toast('Collez la clé « publishable » (sb_publishable_…) ou « anon » (eyJ…) — jamais la clé secrète');
+      if (!confirm('Basculer tout le studio vers ' + url + ' ?\n\nLes invitations publiées, la vitrine et l\'équipe suivront automatiquement.')) return;
+      nbg.disabled = true;
+      try { const r = await basculerBase({ url, anon }, t => { etat.textContent = t; }); etat.textContent = ''; alert('✅ Nouvelle base en service.\n\n' + r.join('\n') + '\n\nLe studio va se recharger, puis y recopier vos invitations, vos invités et vos fichiers (quelques minutes, en arrière-plan).'); location.reload(); }
+      catch (e) { console.error(e); etat.textContent = ''; toast('Échec : ' + e.message, 8000); nbg.disabled = false; }
+    };
     $('#sb-ok').onclick = () => { lireSb(); toast(reglages.supabase ? 'Base des invités enregistrée' : 'Base des invités désactivée'); };
     $('#sb-test').onclick = async () => {
       lireSb(); const e = $('#sb-etat');
@@ -5423,6 +5480,55 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       try { await Base.rpc(reglages.supabase, 'inv_studio_publier', { p_evt: p.id, p_cle: p.cle_hote, p_titre: p.fiche.titre || '', p_slug: p.slug, p_langue: p.fiche.langue || 'fr' }); await syncInvites(p); delete p.base_a_faire; enregistrer(p); toast('« ' + p.fiche.titre + ' » : base des invités reliée ✓'); } catch (e) { break; }
     }
   };
+  // Changement de base de données (base saturée) : tout le studio passe sur la nouvelle base
+  const normU = u => String(u || '').replace(/\/+$/, '').toLowerCase();
+  async function basculerBase(nouv, etat) {
+    const anc = reglages.supabase, res = [];
+    nouv = { url: nouv.url.replace(/\/+$/, ''), anon: nouv.anon };
+    if (anc && normU(anc.url) === normU(nouv.url)) throw new Error('c\'est déjà la base actuelle');
+    etat('Vérification de la nouvelle base…');
+    try { await Base.rpc(nouv, 'equipe_info', { p_cle: 'essai' }); } catch (e) { if (!/invalide/i.test(e.message)) throw new Error('la nouvelle base ne répond pas comme prévu (' + e.message + '). Le script complet a-t-il été lancé (Run → Success) ?'); }
+    if (Equipe.actif()) {
+      if (!Equipe.admin()) throw new Error('seul l\'admin de l\'équipe peut changer de base');
+      etat('Équipe…');
+      await Base.rpc(nouv, 'equipe_importer', { p_id: reglages.equipe.id || '', p_nom: reglages.equipe.nom || '', p_cle: reglages.equipe.cle, p_cle_admin: reglages.equipe.cle_admin });
+      res.push('• Équipe reprise avec les mêmes liens');
+    }
+    if (reglages.github && reglages.github.owner && reglages.github.repo && reglages.github.token) {
+      etat('Annonce de la nouvelle base sur le site…');
+      let b = null; try { b = await (await fetch('../base.json?t=' + Date.now(), { cache: 'no-store' })).json(); } catch (e) {}
+      const anciens = [...new Set([].concat((b && b.anciens) || [], b && b.url ? [b.url] : [], anc ? [anc.url] : [], reglages.supabase_anciens || []).map(u => u.replace(/\/+$/, '')))].filter(u => normU(u) !== normU(nouv.url));
+      await GitHub.envoyer('base.json', new Blob([JSON.stringify({ url: nouv.url, anon: nouv.anon, anciens, date: new Date().toISOString() }, null, 1)], { type: 'application/json' }), 'Nouvelle base de données');
+      res.push('• Invitations déjà publiées, espace organisateur et vitrine : suivent la nouvelle base (dans 1 à 10 minutes)');
+      res.push('• Membres de l\'équipe : passent tout seuls sur la nouvelle base à la prochaine ouverture du studio');
+    } else res.push('• Sans jeton GitHub, les invitations déjà publiées doivent être republiées');
+    appliquerBase(nouv);
+    return res;
+  }
+  function appliquerBase(nouv) {
+    const anc = reglages.supabase;
+    reglages.supabase_anciens = [...new Set([].concat(reglages.supabase_anciens || [], anc ? [anc.url.replace(/\/+$/, '')] : []))].filter(u => normU(u) !== normU(nouv.url));
+    // fichiers de l'équipe connus ici : à recopier dans la nouvelle base (même chemin → les invitations et projets restent valables)
+    const avant = Stock.lire('studio.equipe.arestaurer', []), ids = new Set(avant.map(x => x.id));
+    Stock.ecrire('studio.equipe.arestaurer', avant.concat((Equipe.items || []).filter(x => x && x.id && x.chemin && !ids.has(x.id))));
+    reglages.supabase = nouv; sauverReglages();
+    Equipe.urls = Object.fromEntries(Object.entries(Equipe.urls || {}).map(([k, v]) => [k, Equipe.actuelle(v)])); Stock.ecrire('studio.equipe.urls', Equipe.urls);
+    // invitations publiées depuis cet ordinateur : invités et lien organisateur recréés dans la nouvelle base
+    Object.values(projets).forEach(p => { if (p.publie && p.cle_hote) { p.base_a_faire = true; enregistrer(p); } });
+    // travail de chacun et accessoires : renvoyés
+    Stock.ecrire('studio.sauve.acc.date', 0); Stock.ecrire('studio.base.renvoyer', 1);
+  }
+  // Un autre ordinateur (l'admin) a changé de base : on suit automatiquement
+  if (reglages.supabase) Base.confActuelle(reglages.supabase).then(n => {
+    if (!n || normU(n.url) === normU(reglages.supabase.url)) return;
+    appliquerBase(n); toast('Nouvelle base de données : vos invitations et vos fichiers y sont recopiés automatiquement', 6000);
+    setTimeout(() => location.reload(), 2500);
+  }).catch(() => {});
+  if (Stock.lire('studio.base.renvoyer', 0) && Equipe.actif()) setTimeout(() => {
+    Object.values(projets).forEach((p, k) => Equipe.travail(p, 3000 + k * 4000));
+    Stock.ecrire('studio.base.renvoyer', 0);
+  }, 20000);
+  if (Equipe.actif() && Stock.lire('studio.equipe.arestaurer', []).length) setTimeout(() => Equipe.restaurer().catch(e => console.warn('restaurer', e.message)), 30000);
   if (reglages.supabase) { setTimeout(relierBases, 15000); setInterval(relierBases, 10 * 60e3); window.addEventListener('online', () => setTimeout(relierBases, 5000)); }
   window.addEventListener('online', () => setTimeout(() => Equipe.rattraper(), 8000));
   Sauve.reprendre().then(n => { if (n) { toast(n + ' invitation(s) reprise(s) depuis la sauvegarde automatique'); route(); } });

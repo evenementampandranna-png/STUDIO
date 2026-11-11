@@ -81,8 +81,8 @@
 <div id="erreur" hidden></div>
 <dialog id="dlg"><form method="dialog" id="dlg-form"></form></dialog>
 <div id="toast"></div>
-<script src="../config.js?v=202611111254"></script>
-<script src="../moteur/base.js?v=202611111254"></script>
+<script src="../config.js?v=202611111501"></script>
+<script src="../moteur/base.js?v=202611111501"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
 <script>
 (async function () {
@@ -128,7 +128,10 @@
   document.addEventListener('visibilitychange', () => { if (!document.hidden) document.title = document.title.replace(/^\(\d+\) /, ''); });
   const lire = async (silencieux) => {
     try { D = await Base.rpc(conf, 'inv_hote_lire', { p_evt: projet.id, p_cle: cle }); try { localStorage.setItem('hote.donnees.' + slug, JSON.stringify(D)); } catch (er) {} $('#indispo').hidden = true; annoncer(); rendre(); $('.etat-sync') && ($('.etat-sync').textContent = 'À jour · ' + new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })); }
-    catch (e) { if (/invalide/.test(e.message)) return erreur('<h2>Lien organisateur invalide</h2><p class="muet">Demandez au studio le lien organisateur à jour.</p>'); if (!D.familles.length) { try { const c = JSON.parse(localStorage.getItem('hote.donnees.' + slug)); if (c) { D = c; rendre(); toast('Hors connexion : dernière liste enregistrée sur cet appareil', 4000); return; } } catch (er) {} } const bloq = /restricted|quota|exceed|402|503|Failed to fetch|NetworkError|Load failed/i.test(e.message || '');
+    catch (e) {
+      // base de données changée : tant que le studio n'a pas recopié cet événement, on patiente au lieu de dire « invalide »
+      if (/invalide|inconnu/i.test(e.message) && !D.familles.length) { try { const n = await Base.confActuelle(conf); if (n && n.url !== conf.url) { const z = $('#indispo'); z.hidden = false; z.innerHTML = `<h2>⏳ Transfert en cours</h2><p>Le studio installe une nouvelle base de données. Votre liste d'invités y est recopiée dès que le studio qui a publié l'invitation est ouvert.</p><p class="muet">Cette page réessaie toute seule régulièrement. Vous pouvez la laisser ouverte.</p>`; return; } } catch (er) {} }
+      if (/invalide/.test(e.message)) return erreur('<h2>Lien organisateur invalide</h2><p class="muet">Demandez au studio le lien organisateur à jour.</p>'); if (!D.familles.length) { try { const c = JSON.parse(localStorage.getItem('hote.donnees.' + slug)); if (c) { D = c; rendre(); toast('Hors connexion : dernière liste enregistrée sur cet appareil', 4000); return; } } catch (er) {} } const bloq = /restricted|quota|exceed|402|503|Failed to fetch|NetworkError|Load failed/i.test(e.message || '');
       if (bloq && !D.familles.length) { const z = $('#indispo'); z.hidden = false; z.innerHTML = `<h2>⏳ Liste des invités momentanément indisponible</h2><p>Le service qui garde les réponses des invités est saturé pour le moment. <b>Rien n'est perdu</b> : vos invités, leurs réponses et cette page reviendront dès qu'il sera rétabli.</p><p class="muet">Cette page réessaie toute seule régulièrement. Vous pouvez la laisser ouverte.</p>`; return; }
       if (!silencieux) toast(bloq ? 'Service des réponses momentanément indisponible : nouvel essai dans un instant' : 'Connexion impossible : ' + e.message); }
   };

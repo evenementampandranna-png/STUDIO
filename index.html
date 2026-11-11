@@ -130,10 +130,10 @@
 <section id="contact"><h2>Contact</h2><p id="contact-texte" style="color:var(--gris)">Écrivez-nous pour un devis.</p></section>
 <footer>Invitations vidéo interactives</footer>
 <div id="boite"><button id="fermer" aria-label="Fermer">×</button><div class="lecteur" id="lecteur"><div class="fin-film" id="fin"><button id="revoir">↺ Revoir le film</button><a id="essayer" target="_blank">Essayer l'invitation interactive</a></div></div><div class="barre-lecture"><div id="progression"></div></div></div>
-<script src="config.js?v=202611111254"></script>
-<script src="moteur/moteur.js?v=202611111254"></script>
-<script src="moteur/fabrique.js?v=202611111254"></script>
-<script src="vitrine/index.js?v=202611111254"></script>
+<script src="config.js?v=202611111501"></script>
+<script src="moteur/moteur.js?v=202611111501"></script>
+<script src="moteur/fabrique.js?v=202611111501"></script>
+<script src="vitrine/index.js?v=202611111501"></script>
 <script>
 (async function () {
   const $ = s => document.querySelector(s);
@@ -249,8 +249,11 @@
     if (fz) fz.innerHTML = cond.formules.map(f => `<div class="formule"><h3>${esc(f.nom)}</h3><div class="prix">${esc(f.prix || 'Prix sur devis')}</div><ul>${String(f.contenu || '').split('\n').filter(Boolean).map(l => `<li>${esc(l)}</li>`).join('')}</ul></div>`).join('');
   }
   if (wa) { const d = $('#devis'); if (d) d.href = 'https://wa.me/' + wa + '?text=' + encodeURIComponent('Bonjour, je souhaite une invitation vidéo.'); }
-  const sb = cond.supabase;
+  let sb = cond.supabase;
+  // nouvelle base de données (base.json publié par le studio) : on suit automatiquement
+  const sbPret = (async () => { try { const b = await fetch('base.json?t=' + Math.floor(Date.now() / 60000), { cache: 'no-store' }).then(r => r.ok ? r.json() : null); const n = u => String(u || '').replace(/\/+$/, '').toLowerCase(); if (sb && b && b.url && b.anon && n(b.url) !== n(sb.url) && (b.anciens || []).map(n).includes(n(sb.url))) sb = { url: b.url, anon: b.anon }; } catch (e) {} })();
   const rpc = async (fn, args) => {
+    await sbPret;
     const h = { apikey: sb.anon, 'Content-Type': 'application/json' }; if (/^eyJ/.test(sb.anon)) h.Authorization = 'Bearer ' + sb.anon;
     const r = await fetch(sb.url.replace(/\/+$/, '') + '/rest/v1/rpc/' + fn, { method: 'POST', headers: h, body: JSON.stringify(args) });
     const t = await r.text(); let j = null; try { j = t ? JSON.parse(t) : null; } catch (e) {}
@@ -258,6 +261,7 @@
     return j;
   };
   const envoyerFichier = async (chemin, f) => {
+    await sbPret;
     const h = { apikey: sb.anon, 'Content-Type': f.type || 'application/octet-stream', 'x-upsert': 'false' }; if (/^eyJ/.test(sb.anon)) h.Authorization = 'Bearer ' + sb.anon;
     const r = await fetch(sb.url.replace(/\/+$/, '') + '/storage/v1/object/commandes/' + chemin, { method: 'POST', headers: h, body: f });
     if (!r.ok) throw new Error('fichier refusé (' + r.status + ')');

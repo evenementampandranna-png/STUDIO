@@ -51,10 +51,10 @@
 <button id="son" aria-label="Son">♪</button><button id="pause" aria-label="Pause">❚❚</button>
 <div id="bandeau" role="dialog"></div>
 <div id="erreur"></div>
-<script src="../config.js?v=202611111254"></script>
-<script src="../moteur/moteur.js?v=202611111254"></script>
-<script src="../moteur/fabrique.js?v=202611111254"></script>
-<script src="../moteur/base.js?v=202611111254"></script>
+<script src="../config.js?v=202611111501"></script>
+<script src="../moteur/moteur.js?v=202611111501"></script>
+<script src="../moteur/fabrique.js?v=202611111501"></script>
+<script src="../moteur/base.js?v=202611111501"></script>
 <script>
 (async function () {
   const q = new URLSearchParams(location.search);
@@ -232,7 +232,7 @@
   // réponse restée sur le téléphone (connexion coupée, serveur indisponible) : renvoyée toute seule
   const renvoyerReponse = async () => {
     if (!sbConf || demo) return; let a; try { a = JSON.parse(localStorage.getItem('inv.attente.' + projet.id)); } catch (e) {} if (!a) return;
-    try { await Base.rpc(sbConf, 'inv_repondre', a); localStorage.removeItem('inv.attente.' + projet.id); } catch (e) { if (/places|Plus d|inconnu/i.test(e.message || '')) { try { localStorage.removeItem('inv.attente.' + projet.id); } catch (er) {} } }
+    try { await Base.rpc(sbConf, 'inv_repondre', a); localStorage.removeItem('inv.attente.' + projet.id); } catch (e) { if (/places|Plus d/i.test(e.message || '')) { try { localStorage.removeItem('inv.attente.' + projet.id); } catch (er) {} } }
   };
   window.addEventListener('online', renvoyerReponse); setTimeout(renvoyerReponse, 4000); setInterval(renvoyerReponse, 30000);
   async function enregistrer(presence, form) {
@@ -242,7 +242,7 @@
         try { await Base.rpc(sbConf, 'inv_repondre', argsRep); }
         catch (e) {
           // pas de connexion / serveur indisponible : la réponse reste sur le téléphone et part dès que possible
-          if (/places|Plus d|inconnu/i.test(e.message || '')) throw e;
+          if (/places|Plus d/i.test(e.message || '')) throw e;   // « inconnu » : base en cours de transfert → on garde
           try { localStorage.setItem('inv.attente.' + projet.id, JSON.stringify(argsRep)); } catch (er) {}
           console.warn('réponse gardée pour plus tard', e.message); return 'attente';
         }

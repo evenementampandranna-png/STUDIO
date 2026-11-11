@@ -1,7 +1,23 @@
 /* Base partagée (Supabase) : invités, réponses, espace organisateur.
    Appels directs aux fonctions SQL (RPC) avec la clé publique « anon » : aucune donnée n'est lisible sans passer par elles. */
 (function (global) {
+  // Changement de base : le site publie base.json { url, anon, anciens: [...] } ; toute page qui utilise encore
+  // une ancienne adresse (invitations déjà publiées, vitrine, studio) passe automatiquement à la nouvelle.
+  const racine = (() => { try { return new URL('../', document.currentScript.src).href; } catch (e) { return null; } })();
+  let redir = null;
+  const norm = u => String(u || '').replace(/\/+$/, '').toLowerCase();
+  function nouvelleBase() {
+    if (!redir) redir = racine ? fetch(racine + 'base.json?t=' + Math.floor(Date.now() / 60000), { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null) : Promise.resolve(null);
+    return redir;
+  }
+  async function confActuelle(conf) {
+    if (!conf || !conf.url) return conf;
+    const b = await nouvelleBase();
+    if (b && b.url && b.anon && norm(conf.url) !== norm(b.url) && (b.anciens || []).map(norm).includes(norm(conf.url))) return { url: b.url, anon: b.anon };
+    return conf;
+  }
   async function rpc(conf, fn, args) {
+    conf = await confActuelle(conf);
     if (!conf || !conf.url || !conf.anon) throw new Error('Base non configurée');
     const r = await fetch(conf.url.replace(/\/+$/, '') + '/rest/v1/rpc/' + fn, {
       method: 'POST',
@@ -45,5 +61,5 @@
     d.querySelectorAll('[data-i]').forEach(b => b.onclick = ev => { ev.stopPropagation(); choix[Number(b.dataset.i)][2](); if (!/Copier|Instagram|TikTok|Messenger/.test(choix[Number(b.dataset.i)][1])) d.remove(); });
     setTimeout(() => document.addEventListener('click', function f(ev) { if (!d.contains(ev.target)) { d.remove(); document.removeEventListener('click', f); } }), 0);
   }
-  global.Base = { rpc, code, cle, partager };
+  global.Base = { rpc, code, cle, partager, confActuelle, nouvelleBase };
 })(window);
