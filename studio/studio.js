@@ -3763,12 +3763,22 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
   }
   // Supabase (base + espace d'équipe) bloqué par le quota, ou injoignable
   function baseBloquee(e) { return /restricted|exceed_\w*quota|\b402\b|spend cap|Failed to fetch|NetworkError/i.test((e && e.message) || String(e || '')); }
+  // le fichier d'un film de l'équipe : copie déjà gardée sur cet ordinateur, sinon le cache du navigateur, sinon Supabase
+  async function blobFilmEquipe(f) {
+    const url = Equipe.url(f.chemin);
+    try { const b = await IDB.lire('cache:' + Equipe.url(f.chemin).split('/object/public/')[1]); if (b && b.size) return b; } catch (e) {}
+    const local = Films.liste().find(x => x.equipe_id === f.id); if (local) { try { return await Films.blob(local); } catch (e) {} }
+    for (const mode of ['force-cache', 'default']) {
+      const r = await fetch(url, { cache: mode }).catch(() => null);
+      if (r && r.ok) { const b = await r.blob(); IDB.mettre('cache:' + Equipe.url(f.chemin).split('/object/public/')[1], b).catch(() => {}); return b; }
+      if (r && r.status !== 402 && r.status !== 0) throw new Error('film introuvable (' + r.status + ')');
+    }
+    const e = new Error('bloqué'); e.bloque = true; throw e;
+  }
   async function publierFilmVitrine(f) {
-    const r = await fetch(Equipe.url(f.chemin)).catch(() => null);
-    if (!r || r.status === 402) throw new Error('le film est dans l\'espace d\'équipe (Supabase), bloqué par le quota : publiez-le depuis 💻 Mes films sur l\'ordinateur de ' + (f.auteur || 'son auteur') + ', ou après le déblocage');
-    if (!r.ok) throw new Error('film introuvable (' + r.status + ')');
+    const blob = await blobFilmEquipe(f);
     const ext = (f.chemin.split('.').pop() || 'mp4').toLowerCase(), chemin = 'medias/films/' + f.id + '.' + ext;
-    await GitHub.envoyer(chemin, await r.blob(), 'Film ' + f.nom);
+    await GitHub.envoyer(chemin, blob, 'Film ' + f.nom);
     let vignette = 'fonds/fond_2.jpg';
     if (/^data:/.test(f.vignette || '')) { vignette = 'medias/films/' + f.id + '.jpg'; await GitHub.envoyer(vignette, dataURLversBlob(f.vignette), 'Vignette ' + f.nom); }
     const index = (await lireVitrine()).filter(x => x.slug !== 'film-' + f.id);
@@ -4737,7 +4747,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     zone.innerHTML = `<div class="seg" style="margin-bottom:12px">${[['film', '🎬 Films terminés', films.length], ['fond', '🎞 Fonds vidéo de l\'équipe', fondsEq.length], ['tout', 'Tout', tout.length]].map(([k, n, c]) => `<button data-vpt="${k}" class="${vpFiltre.type === k ? 'on' : ''}">${n} (${c})</button>`).join('')}</div>
       ${aPartager ? `<div class="carte ligne" style="padding:10px 12px;margin-bottom:10px;background:#fbf4ec;justify-content:space-between"><span><b>${aPartager}</b> de vos vidéos / fonds ne sont pas encore visibles par l'équipe.</span><button class="btn petit plein" id="vp-rattraper">Les partager maintenant</button></div>` : ''}
       <div class="stats"><div class="stat"><b>${films.length}</b><span>films terminés</span></div><div class="stat"><b>${fondsEq.length}</b><span>fonds vidéo partagés</span></div><div class="stat"><b>${nPub}</b><span>sur le site</span></div><div class="stat"><b>${films.length - nPub}</b><span>pas encore publiés</span></div><div class="stat"><b>${membres.length}</b><span>membres</span></div></div>
-      ${horsLigne ? `<div class="carte" style="padding:10px 12px;margin-top:10px;background:#fdecec">Serveur de l'équipe injoignable (${esc(horsLigne)}) : dernière liste connue. Les vidéos se liront et se publieront de nouveau quand il répondra.</div>` : ''}
+      ${horsLigne ? `<div class="carte" style="padding:10px 12px;margin-top:10px;background:#fdecec">${baseBloquee({ message: horsLigne }) ? '<b>Espace d\'équipe bloqué</b> : le forfait gratuit de Supabase est dépassé (Supabase → « Resolve billing issues » pour débloquer).' : 'Serveur de l\'équipe injoignable.'} Liste affichée : la dernière connue. Les films déjà ouverts sur cet ordinateur se lisent et se publient quand même ; les autres : leur auteur les ajoute avec « + Ajouter un film terminé ».</div>` : ''}
       ${peutPublier ? '' : '<div class="carte" style="padding:10px 12px;margin-top:10px;background:#fbf4ec">Pour mettre un film sur le site : « Demander la publication » — l\'admin valide et il est publié. Vous pouvez regarder et télécharger toutes les vidéos de l\'équipe.</div>'}
       <div class="ligne" style="margin:14px 0 10px;gap:6px;flex-wrap:wrap">
         ${[['tout', 'Toutes', films.length], ['non', 'Pas encore sur le site', films.length - nPub], ['oui', 'Sur le site', nPub]].map(([k, n, c]) => `<button class="btn petit ${vpFiltre.etat === k ? 'plein' : ''}" data-vpf="${k}">${n} (${c})</button>`).join('')}
@@ -4745,11 +4755,12 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         ${peutPublier ? `<span style="margin-left:auto" class="ligne"><label class="cases" style="margin:0"><input type="checkbox" id="vp-tous"> Tout cocher</label><button class="btn petit plein" id="vp-pub-sel" disabled>Publier la sélection</button><button class="btn petit" id="vp-pub-tout">Publier tout ce qui manque (${films.length - nPub})</button></span>` : ''}</div>
       <div class="muet" id="vp-etat" style="margin:0 0 8px"></div>
       <div class="grille" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr))">${visibles.map(f => { const u = Equipe.url(f.chemin), sv = pub(f), estFilm = f.type === 'film'; return `<div class="carte pile" style="padding:10px">
-        <video src="${esc(u)}" poster="${esc(f.vignette || '')}" controls preload="none" playsinline style="width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:8px;background:#000"></video>
+        <video src="${esc(u)}" data-chemin="${esc(f.chemin)}" poster="${esc(f.vignette || '')}" controls preload="none" playsinline style="width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:8px;background:#000"></video>
         <div class="ligne" style="justify-content:space-between">${!estFilm ? '<span class="badge">🎞 fond vidéo</span>' : sv ? '<span class="badge ok">✓ sur le site</span>' : '<span class="badge">pas encore publié</span>'}${peutPublier && estFilm && !sv ? `<input type="checkbox" data-vp-sel="${esc(f.id)}" title="Sélectionner">` : ''}</div>
         <b style="font-size:13px">${esc((f.evenement || f.nom || '').replace(/^Film — /, ''))}</b><div class="muet" style="font-size:12px">par <b>${esc(f.auteur || '—')}</b> · ${date(f.cree)}${f.duree ? ' · ' + Math.round(f.duree) + ' s' : ''}</div>
         <div class="ligne"><a class="btn petit" href="${esc(u)}" download target="_blank">Télécharger</a>${!estFilm ? '<a class="btn petit" href="#/bibliotheque">Dans la bibliothèque</a>' : !peutPublier ? (sv ? '' : demandesFilms[f.id] ? `<span class="badge">${demandesFilms[f.id] === 'attente' ? '⏳ demandé' : demandesFilms[f.id] === 'refusee' ? 'refusé' : ''}</span>` : `<button class="btn petit plein" data-vp-demander="${esc(f.id)}">Demander la publication</button>`) : peutPublier ? (sv ? `<button class="btn petit danger" data-vp-retirer="${esc(f.id)}">Retirer du site</button>` : `<button class="btn petit plein" data-vp-pub="${esc(f.id)}">Publier sur le site</button>`) : ''}</div></div>`; }).join('') || '<p class="muet">Aucune vidéo ici. Les films fabriqués par l\'équipe arrivent tout seuls ; on peut aussi en ajouter avec « + Ajouter un film terminé ».</p>'}</div>`;
     $$('[data-vpf]', zone).forEach(b => b.onclick = () => { vpFiltre.etat = b.dataset.vpf; Stock.ecrire('studio.vp.filtre', vpFiltre); vueVideos(); });
+    $$('video[data-chemin]', zone).forEach(v => { IDB.lire('cache:' + Equipe.url(v.dataset.chemin).split('/object/public/')[1]).then(b => { if (b && b.size) v.src = URL.createObjectURL(b); }).catch(() => {}); });
     $$('[data-vpt]', zone).forEach(b => b.onclick = () => { vpFiltre.type = b.dataset.vpt; Stock.ecrire('studio.vp.filtre', vpFiltre); vueVideos(); });
     const vr = $('#vp-rattraper', zone); if (vr) vr.onclick = async () => { vr.disabled = true; vr.textContent = 'Partage en cours…'; await Equipe.rattraper(); vueVideos(); };
     $('#vp-membre', zone).onchange = e => { vpFiltre.membre = e.target.value; Stock.ecrire('studio.vp.filtre', vpFiltre); vueVideos(); };
@@ -4762,10 +4773,12 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     const publierListe = async liste => {
       if (!liste.length) return toast('Rien à publier');
       $$('button', zone).forEach(b => b.disabled = true); let ok = 0; const rates = [];
-      for (const [k, f] of liste.entries()) { etat.textContent = `Publication ${k + 1}/${liste.length} : ${f.evenement || f.nom}…`; try { await publierFilmVitrine(f); ok++; } catch (err) { rates.push((f.evenement || f.nom) + ' (' + err.message + ')'); } }
-      toast(ok + ' vidéo(s) publiée(s) sur le site (visibles dans quelques minutes)');
-      etat.innerHTML = `${ok} publiée(s).${rates.length ? ' Non publiées : ' + esc(rates.join(' · ')) : ''}`;
-      setTimeout(vueVideos, rates.length ? 4000 : 1200);
+      const bloques = [];
+      for (const [k, f] of liste.entries()) { etat.textContent = `Publication ${k + 1}/${liste.length} : ${f.evenement || f.nom}…`; try { await publierFilmVitrine(f); ok++; } catch (err) { if (err.bloque) bloques.push(f); else rates.push((f.evenement || f.nom) + ' (' + err.message + ')'); } }
+      toast(ok ? ok + ' vidéo(s) publiée(s) sur le site (visibles dans quelques minutes)' : 'Aucune vidéo publiée', 5000);
+      const auteurs = [...new Set(bloques.map(f => f.auteur || '?'))];
+      etat.innerHTML = (ok ? `✓ ${ok} publiée(s). ` : '') + (bloques.length ? `<div class="alerte-boite" style="margin-top:6px">⚠ <b>${bloques.length} film(s) non publiés</b> : ils sont rangés dans l'espace d'équipe (Supabase), qui est bloqué par le quota, et ils ne sont pas encore sur cet ordinateur.<br>Solution tout de suite : ${esc(auteurs.join(', '))} ouvre 🎬 Vidéos → <b>« + Ajouter un film terminé »</b> (le fichier MP4 téléchargé) puis <b>Publier sur le site</b>. Sinon ils se publieront dès que Supabase sera débloqué.</div>` : '') + (rates.length ? ' Non publiées : ' + esc(rates.join(' · ')) : '');
+      if (!bloques.length) setTimeout(vueVideos, rates.length ? 4000 : 1200); else $$('button', zone).forEach(b => b.disabled = false);
     };
     const sel = () => $$('[data-vp-sel]', zone).filter(c => c.checked).map(c => films.find(f => f.id === c.dataset.vpSel));
     const majSel = () => { const n = sel().length, b = $('#vp-pub-sel', zone); b.disabled = !n; b.textContent = n ? `Publier la sélection (${n})` : 'Publier la sélection'; };
