@@ -713,6 +713,9 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-11-10', date: '11 novembre 2026', titre: 'Lien de chaque famille', points: [
+      'Espace organisateur : après « Ajouter une famille », son <b>lien personnel</b> s\'affiche tout de suite (WhatsApp, Copier, Partager, Voir). Quand elle confirme, on voit combien d\'adultes et d\'enfants viennent.',
+      'Compte à rebours : le jour J, il affiche « C\'est le grand jour ! » au lieu de disparaître.'] },
     { id: '2026-11-11-9', date: '11 novembre 2026', titre: 'Espace organisateur plus complet', points: [
       'Cartes <b>Invitation générale</b> (voir, copier, partager) et <b>Invitation personnelle</b> (voir un exemple) en haut de la page du client.',
       'Une carte par <b>catégorie</b> : familles, places, confirmés, sans réponse (toucher = filtrer).',

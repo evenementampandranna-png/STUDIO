@@ -75,7 +75,7 @@
     const f = (projet && projet.fiche) || {};
     const ms = joursAvant(c.compte_date || f.date, c.compte_date ? (c.compte_heure || '00:00') : (c.compte_heure || f.heure));
     if (ms == null) return '';
-    if (ms <= 0 && c.compte_fini) return c.compte_fini;
+    if (ms <= 0) return c.compte_fini || (langue === 'mg' ? 'Androany ny fety !' : langue === 'en' ? 'It\'s the big day!' : 'C\'est le grand jour !');
     const fmt = c.compte_format || 'complet';
     if (fmt === 'complet' && !c.compte_j && !c.compte_h && !c.compte_m && !c.compte_s) return texteCompte(ms, langue);
     const s = Math.floor(ms / 1000), j = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60;
