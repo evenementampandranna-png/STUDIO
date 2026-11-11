@@ -147,6 +147,50 @@
   @media (max-width: 600px) { .cmd-form fieldset { grid-template-columns: 1fr; } .cmd-boite { padding: 20px 14px; } }
   @media (max-width: 800px) { .hero { grid-template-columns: 1fr; } .etapes, .formules { grid-template-columns: 1fr 1fr; } }
   @media (max-width: 520px) { .etapes, .formules { grid-template-columns: 1fr; } .cta.contour { margin: 10px 0 0; } }
+
+  /* ===== Boutons stylés ===== */
+  :root { --vin2: #a3394a; --or: #c9a46a; --vert-wa: #1f9d55; --vert-wa2: #25d366; }
+  .cta, button.cta, .modele .liens button, .modele .commander, .fin-film a, .fin-film button, .voir, #menu a.nav-wa, .pied-wa, .tarif .actions .cta {
+    vertical-align: middle; overflow: hidden; isolation: isolate; letter-spacing: .01em;
+    transition: transform .18s ease, box-shadow .25s ease, background-position .4s ease, filter .2s;
+  }
+  .cta, button.cta, .modele .liens button, .modele .commander, .fin-film a, .fin-film button, #menu a.nav-wa, .pied-wa { position: relative; }
+  .voir { position: absolute; }
+  /* reflet qui passe au survol */
+  .cta::after, .modele .liens button::after, .modele .commander::after, .voir::after, .pied-wa::after, #menu a.nav-wa::after {
+    content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,.35) 50%, transparent 70%); background-size: 250% 100%; background-position: 150% 0; transition: background-position .6s ease;
+  }
+  .cta:hover::after, .modele .liens button:hover::after, .modele .commander:hover::after, .voir:hover::after, .pied-wa:hover::after, #menu a.nav-wa:hover::after { background-position: -50% 0; }
+  /* bouton principal : dégradé bordeaux */
+  .cta, button.cta, .modele .liens button, .fin-film a { background: linear-gradient(135deg, var(--vin2), var(--vin) 55%, #5e1520) !important; color: #fff !important; border: 0 !important; box-shadow: 0 8px 22px rgba(122,31,43,.28), inset 0 1px 0 rgba(255,255,255,.25); }
+  .cta:hover, button.cta:hover, .modele .liens button:hover, .fin-film a:hover { transform: translateY(-2px); box-shadow: 0 14px 30px rgba(122,31,43,.38), inset 0 1px 0 rgba(255,255,255,.3); }
+  .cta:active, .modele .liens button:active, .modele .commander:active { transform: translateY(0) scale(.98); }
+  /* bouton secondaire : contour or/bordeaux en verre */
+  .cta.contour { background: rgba(255,255,255,.55) !important; color: var(--vin) !important; border: 1.5px solid rgba(122,31,43,.55) !important; box-shadow: 0 4px 14px rgba(60,20,20,.06); backdrop-filter: blur(6px); }
+  .cta.contour:hover { background: #fff !important; border-color: var(--vin) !important; box-shadow: 0 10px 24px rgba(60,20,20,.12); }
+  /* WhatsApp : vert vif */
+  .cta.wa, #menu a.nav-wa, .pied-wa, .contact-carte.wa { background: linear-gradient(135deg, var(--vert-wa2), var(--vert-wa)) !important; color: #fff !important; box-shadow: 0 8px 22px rgba(31,157,85,.32), inset 0 1px 0 rgba(255,255,255,.3); }
+  .cta.wa:hover, #menu a.nav-wa:hover, .pied-wa:hover { transform: translateY(-2px); box-shadow: 0 14px 30px rgba(31,157,85,.42); }
+  /* Commander ce modèle : noir élégant avec liseré or */
+  .modele .commander { background: linear-gradient(135deg, #3a2c2c, #1f1717) !important; color: #fff; border: 1px solid rgba(201,164,106,.55) !important; box-shadow: 0 8px 20px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.12); padding: 12px !important; font-weight: 700 !important; }
+  .modele .commander::before { content: '✦ '; color: var(--or); }
+  .modele .commander:hover { transform: translateY(-2px); background: linear-gradient(135deg, var(--vin2), var(--vin)) !important; box-shadow: 0 14px 28px rgba(122,31,43,.35); }
+  /* prix : pastille dorée */
+  .modele .liens .prix-lien { background: linear-gradient(135deg, #fbf3e6, #f1dfc4) !important; color: #6b3a14 !important; border: 1px solid rgba(201,164,106,.6); box-shadow: inset 0 1px 0 #fff, 0 4px 12px rgba(201,164,106,.25); font-weight: 800 !important; }
+  /* boutons ronds (lecture, regarder) */
+  .modele .lire { background: linear-gradient(135deg, var(--vin2), var(--vin)) !important; box-shadow: 0 8px 20px rgba(122,31,43,.4), 0 0 0 4px rgba(255,255,255,.55); transition: transform .2s; }
+  .modele:hover .lire { transform: scale(1.08); }
+  .voir { background: linear-gradient(135deg, rgba(163,57,74,.95), rgba(94,21,32,.95)) !important; box-shadow: 0 10px 26px rgba(0,0,0,.35), 0 0 0 3px rgba(255,255,255,.35); }
+  .voir:hover { transform: translateX(-50%) translateY(-2px); }
+  .fin-film button { background: rgba(255,255,255,.92) !important; box-shadow: 0 10px 26px rgba(0,0,0,.25); }
+  .burger { width: 44px; height: 44px; border-radius: 12px; background: rgba(255,255,255,.7) !important; box-shadow: 0 4px 12px rgba(60,20,20,.1); font-size: 22px !important; }
+  #menu a:not(.nav-wa):not(.studio) { position: relative; }
+  #menu a:not(.nav-wa):not(.studio)::after { content: ''; position: absolute; left: 0; right: 0; bottom: -4px; height: 2px; background: var(--vin); transform: scaleX(0); transition: transform .25s; transform-origin: left; }
+  #menu a:not(.nav-wa):not(.studio):hover::after { transform: scaleX(1); }
+  @media (max-width: 860px) { #menu a:not(.nav-wa):not(.studio)::after { display: none; } }
+  .pied-mail { padding: 8px 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,.25); transition: background .2s; } .pied-mail:hover { background: rgba(255,255,255,.1); }
+  .cta:focus-visible, .modele .commander:focus-visible, .modele .liens button:focus-visible { outline: 3px solid rgba(201,164,106,.8); outline-offset: 2px; }
 </style>
 </head>
 <body>
@@ -191,10 +235,10 @@
   <a class="pied-mail" id="pied-mail" hidden>✉ <span id="pied-mail-t"></span></a>
 </div></footer>
 <div id="boite"><button id="fermer" aria-label="Fermer">×</button><div class="lecteur" id="lecteur"><div class="fin-film" id="fin"><button id="revoir">↺ Revoir le film</button><a id="essayer" target="_blank">Essayer l'invitation interactive</a></div></div><div class="barre-lecture"><div id="progression"></div></div></div>
-<script src="config.js?v=202611111658"></script>
-<script src="moteur/moteur.js?v=202611111658"></script>
-<script src="moteur/fabrique.js?v=202611111658"></script>
-<script src="vitrine/index.js?v=202611111658"></script>
+<script src="config.js?v=202611111701"></script>
+<script src="moteur/moteur.js?v=202611111701"></script>
+<script src="moteur/fabrique.js?v=202611111701"></script>
+<script src="vitrine/index.js?v=202611111701"></script>
 <script>
 (async function () {
   const $ = s => document.querySelector(s);
@@ -339,7 +383,7 @@
   // Formules et prix
   if (cond.formules && cond.formules.length) {
     const fz = document.querySelector('.formules');
-    if (fz) fz.innerHTML = cond.formules.map(f => `<div class="formule"><h3>${esc(f.nom)}</h3><div class="prix">${esc(f.prix || 'Prix sur devis')}</div><ul>${String(f.contenu || '').split('\n').filter(Boolean).map(l => `<li>${esc(l)}</li>`).join('')}</ul></div>`).join('');
+    if (fz) fz.innerHTML = cond.formules.map(f => `<div class="formule"><h3>${esc(f.nom)}</h3>${f.prix ? `<div class="prix">${esc(f.prix)}</div>` : ''}<ul>${String(f.contenu || '').split('\n').filter(Boolean).map(l => `<li>${esc(l)}</li>`).join('')}</ul></div>`).join('');
   }
   if (wa) { const d = $('#devis'); if (d) d.href = 'https://wa.me/' + wa + '?text=' + encodeURIComponent('Bonjour, je souhaite une invitation vidéo.'); }
   let sb = cond.supabase;
