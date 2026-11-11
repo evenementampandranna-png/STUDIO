@@ -687,6 +687,10 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-11-5', date: '11 novembre 2026', titre: 'Studio plus léger : allègement automatique et nettoyage', points: [
+      '<b>Allègement automatique à l\'import</b> : photos réduites à 1440 px (souvent 3 à 10 fois plus légères), fonds vidéo de plus de 8 Mo ré-encodés en 720 × 1280. À l\'écran du téléphone, la différence ne se voit pas.',
+      '<b>Réglages → 💾 Espace et légèreté</b> : place utilisée dans ce navigateur et taille du site, les 12 fichiers les plus lourds (« Alléger » pour les vidéos), suppression des fichiers que plus rien n\'utilise, et demande au navigateur de ne jamais effacer vos fichiers.'
+    ] },
     { id: '2026-11-11-4', date: '11 novembre 2026', titre: 'Brouillon ou validé ; publier même quand la base est bloquée', points: [
       '<b>Invitations</b> : en haut de chaque événement, <b>📁 Brouillon / ✅ Validé</b> (aussi sur les cartes de « Vos événements »). Publier une invitation en brouillon demande de la valider.',
       '<b>Films</b> : après « Enregistrer le film », <b>📁 En brouillon</b> ou <b>✅ Validé</b> (rangé dans 🎬 Vidéos). Un film validé peut être publié sur le site.',
@@ -4508,7 +4512,63 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     return new Promise(ok => { const im = new Image(); im.onload = () => { const c = document.createElement('canvas'); const r = 240 / im.width; c.width = 240; c.height = Math.round(im.height * r); c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); let v = ''; try { v = c.toDataURL('image/jpeg', 0.75); } catch (e) {} ok({ vignette: v, l: im.width, h: im.height }); }; im.onerror = () => ok({ vignette: '' }); im.src = url; });
   }
   function nomMedia(src) { const m = medias.find(x => x.src === src) || Equipe.medias().find(x => x.src === src); return m ? m.nom : ''; }
+  /* ---------- Alléger : photos réduites à 1440 px, fonds vidéo ré-encodés en 720 × 1280 ---------- */
+  async function allegerImage(f) {
+    if (!/^image\/(jpeg|png|webp|heic|heif)$/i.test(f.type) || f.size < 450e3) return f;
+    try {
+      const bmp = await createImageBitmap(f); const max = 1440, k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+      const w = Math.round(bmp.width * k), h = Math.round(bmp.height * k);
+      const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const x = cv.getContext('2d'); x.drawImage(bmp, 0, 0, w, h);
+      // transparence (PNG) : WebP ; sinon JPEG
+      let alpha = false; if (/png|webp/i.test(f.type)) { const d = x.getImageData(0, 0, Math.min(w, 64), Math.min(h, 64)).data; for (let i = 3; i < d.length; i += 4) if (d[i] < 250) { alpha = true; break; } }
+      const b = await new Promise(ok => cv.toBlob(ok, alpha ? 'image/webp' : 'image/jpeg', alpha ? 0.9 : 0.86));
+      if (!b || b.size >= f.size * 0.9) return f;
+      return new File([b], f.name.replace(/\.\w+$/, alpha ? '.webp' : '.jpg'), { type: b.type });
+    } catch (e) { return f; }
+  }
+  async function allegerVideo(f, suivi) {
+    if (!window.VideoEncoder || !window.VideoFrame) return f;
+    const url = URL.createObjectURL(f);
+    try {
+      const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.src = url; v.preload = 'auto';
+      await new Promise((ok, ko) => { v.onloadedmetadata = ok; v.onerror = () => ko(new Error('vidéo illisible')); });
+      const vw = v.videoWidth, vh = v.videoHeight, duree = v.duration || 0;
+      if (!vw || !vh || !duree) return f;
+      const k = Math.min(1, 1280 / Math.max(vw, vh)), W = Math.round(vw * k / 2) * 2, H = Math.round(vh * k / 2) * 2;
+      const debit = 2.2e6;
+      if (f.size < 8e6 && k === 1) return f;   // déjà léger
+      if (f.size * 8 / duree < debit * 1.25 && k === 1) return f;
+      if (!window.Mp4Muxer) await new Promise((ok, ko) => { const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.1/build/mp4-muxer.min.js'; sc.onload = ok; sc.onerror = () => ko(new Error('mp4-muxer')); document.head.appendChild(sc); });
+      let codec = null; for (const c of ['avc1.640028', 'avc1.4d0028', 'avc1.42E028']) { try { if ((await VideoEncoder.isConfigSupported({ codec: c, width: W, height: H, bitrate: debit, framerate: 30 })).supported) { codec = c; break; } } catch (e) {} }
+      if (!codec) return f;
+      const muxer = new Mp4Muxer.Muxer({ target: new Mp4Muxer.ArrayBufferTarget(), fastStart: 'in-memory', firstTimestampBehavior: 'offset', video: { codec: 'avc', width: W, height: H } });
+      let erreur = null; const enc = new VideoEncoder({ output: (ch, meta) => muxer.addVideoChunk(ch, meta), error: e => { erreur = e; } });
+      enc.configure({ codec, width: W, height: H, bitrate: debit, framerate: 30, latencyMode: 'quality' });
+      const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const x = cv.getContext('2d');
+      let n = 0, dernier = -1;
+      await new Promise((ok, ko) => {
+        const image = (now, meta) => {
+          if (erreur) return ko(erreur);
+          const t = meta ? meta.mediaTime : v.currentTime;
+          if (t > dernier + 0.01) { dernier = t; x.drawImage(v, 0, 0, W, H); const fr = new VideoFrame(cv, { timestamp: Math.round(t * 1e6) }); enc.encode(fr, { keyFrame: n % 60 === 0 }); fr.close(); n++; if (suivi) suivi(Math.min(1, t / duree)); }
+          if (!v.ended) v.requestVideoFrameCallback(image);
+        };
+        v.onended = () => ok(); v.requestVideoFrameCallback(image); v.play().catch(ko);
+      });
+      await enc.flush(); muxer.finalize();
+      const b = new Blob([muxer.target.buffer], { type: 'video/mp4' });
+      if (erreur || n < 5 || b.size >= f.size * 0.85) return f;
+      return new File([b], f.name.replace(/\.\w+$/, '.mp4'), { type: 'video/mp4' });
+    } catch (e) { console.warn('allègement vidéo', e); return f; } finally { URL.revokeObjectURL(url); }
+  }
   async function importerFichier(f, type, evt) {
+    // allègement automatique (photos toujours ; fonds vidéo lourds), sauf si désactivé dans Réglages
+    if (reglages.alleger !== false) {
+      const avant = f.size;
+      if (/^image/.test(f.type)) f = await allegerImage(f);
+      else if (/^video/.test(f.type) && (type === 'fond' || type === 'video') && f.size > 8e6) { toast('Allègement de « ' + f.name + ' »… (aussi long que la vidéo)', 60000); f = await allegerVideo(f, v => { const t = $('#toast'); if (t) t.textContent = 'Allègement de la vidéo : ' + Math.round(v * 100) + ' %'; }); }
+      if (f.size < avant * 0.95) toast(`Allégé : ${(avant / 1e6).toFixed(1)} Mo → ${(f.size / 1e6).toFixed(1)} Mo`, 4000);
+    }
     const video = /^video/.test(f.type);
     const ext = (f.name.split('.').pop() || (video ? 'mp4' : 'jpg')).toLowerCase();
     const id = 'm' + uid();
@@ -4906,7 +4966,46 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     $('#eq-maj').onclick = rendre; rendre();
   }
 
+  // Espace : ce navigateur (IndexedDB), le site (GitHub) ; alléger, nettoyer
+  async function carteEspace() {
+    const z = $('#espace'); if (!z) return;
+    const mo = n => (n / 1e6).toFixed(n > 1e8 ? 0 : 1) + ' Mo';
+    let est = {}; try { est = await navigator.storage.estimate(); } catch (e) {}
+    let persiste = false; try { persiste = await navigator.storage.persisted(); } catch (e) {}
+    const cles = await IDB.cles('idb:');
+    const utilise = new Set();
+    Object.values(projets).forEach(p => { (p.plans || []).forEach(pl => { if (pl.fond && pl.fond.media) utilise.add(pl.fond.media); (pl.calques || []).forEach(c => c.media && utilise.add(c.media)); }); if (p.musique) utilise.add(p.musique.src); (p.polices_perso || []).forEach(x => utilise.add(x.src)); });
+    medias.forEach(m => utilise.add(m.src)); Films.liste().forEach(f => utilise.add(f.src)); Stock.lire('studio.polices.perso', []).forEach(x => utilise.add(x.src));
+    const tailles = []; let total = 0;
+    for (const k of cles) { const b = await IDB.lire(k).catch(() => null); const t = b && b.size || 0; total += t; tailles.push({ k, t, orphelin: !utilise.has(k) }); }
+    tailles.sort((a, b) => b.t - a.t);
+    const orph = tailles.filter(x => x.orphelin), tOrph = orph.reduce((s, x) => s + x.t, 0);
+    let site = null; const g = reglages.github || {};
+    if (g.owner && g.repo && g.token) { try { const r = await fetch(`https://api.github.com/repos/${g.owner}/${g.repo}`, { headers: { Authorization: 'Bearer ' + g.token } }); if (r.ok) site = (await r.json()).size * 1024; } catch (e) {} }
+    const nom = k => { const m = medias.find(x => x.src === k); if (m) return m.nom; const f = Films.liste().find(x => x.src === k); if (f) return '🎞 ' + f.titre; return k.slice(4); };
+    z.innerHTML = `<h3>💾 Espace et légèreté</h3>
+      <div class="stats"><div class="stat"><b>${mo(total)}</b><span>fichiers dans ce navigateur (${cles.length})</span></div><div class="stat"><b>${est.quota ? mo(est.quota) : '?'}</b><span>place disponible pour le studio</span></div><div class="stat"><b>${site != null ? mo(site) : '—'}</b><span>taille du site (GitHub, conseillé : moins de 1 Go)</span></div></div>
+      <label class="cases"><input type="checkbox" id="esp-all" ${reglages.alleger !== false ? 'checked' : ''}> <b>Alléger automatiquement à l'import</b> : photos réduites à 1440 px (souvent 10 fois plus légères), fonds vidéo de plus de 8 Mo ré-encodés en 720 × 1280 — qualité identique à l'écran du téléphone.</label>
+      ${persiste ? '<span class="muet">✓ Le navigateur garde ces fichiers (pas d\'effacement automatique).</span>' : '<button class="btn petit" id="esp-persist">Demander au navigateur de ne jamais effacer ces fichiers</button>'}
+      <details><summary>Les 12 fichiers les plus lourds</summary><div class="pile" style="gap:4px;margin-top:6px">${tailles.slice(0, 12).map(x => `<div class="ligne" style="justify-content:space-between;font-size:13px"><span>${esc(nom(x.k))}${x.orphelin ? ' <span class="badge">inutilisé</span>' : ''}</span><span class="ligne" style="gap:6px"><b>${mo(x.t)}</b>${/\.(mp4|mov|webm)$/i.test(x.k) && x.t > 8e6 && !/^idb:film-/.test(x.k) ? `<button class="btn petit" data-esp-all="${esc(x.k)}">Alléger</button>` : ''}</span></div>`).join('') || '<span class="muet">Aucun fichier.</span>'}</div></details>
+      ${orph.length ? `<div class="ligne" style="justify-content:space-between;flex-wrap:wrap"><span class="muet">${orph.length} fichier(s) que plus rien n'utilise : ${mo(tOrph)}</span><button class="btn petit danger" id="esp-nettoyer">Supprimer ces fichiers inutilisés</button></div>` : '<span class="muet">✓ Aucun fichier inutilisé.</span>'}`;
+    $('#esp-all', z).onchange = e => { reglages.alleger = e.target.checked; sauverReglages(); };
+    const pe = $('#esp-persist', z); if (pe) pe.onclick = async () => { try { const ok = await navigator.storage.persist(); toast(ok ? 'C\'est fait : le navigateur gardera vos fichiers' : 'Le navigateur a refusé (ajoutez le studio aux favoris puis réessayez)'); carteEspace(); } catch (e) { toast(e.message); } };
+    const nt = $('#esp-nettoyer', z); if (nt) nt.onclick = async () => {
+      if (!confirm(`Supprimer définitivement ${orph.length} fichier(s) inutilisé(s) (${mo(tOrph)}) de ce navigateur ?\nAucun événement, fond de la bibliothèque, film ni police ne les utilise.`)) return;
+      for (const x of orph) { try { await IDB.suppr(x.k); } catch (e) {} }
+      toast(mo(tOrph) + ' libérés'); carteEspace();
+    };
+    $$('[data-esp-all]', z).forEach(b => b.onclick = async () => {
+      const k = b.dataset.espAll; b.disabled = true;
+      const blob = await IDB.lire(k); const f = new File([blob], k.slice(4), { type: blob.type || 'video/mp4' });
+      const nf = await allegerVideo(f, v => { b.textContent = Math.round(v * 100) + ' %'; });
+      if (nf === f) { toast('Déjà léger (ou navigateur sans encodeur vidéo)'); b.textContent = 'Alléger'; return; }
+      await IDB.mettre(k, nf); toast(`Allégé : ${mo(blob.size)} → ${mo(nf.size)}`); carteEspace();
+    });
+  }
   function vueReglages() {
+    setTimeout(carteEspace, 100);
     const g = reglages.github || {};
     $('#app').innerHTML = `<div class="entete"><div><h1>Réglages</h1><p>À faire une seule fois.</p></div></div>
       <div class="ia-grille">
@@ -4975,6 +5074,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
             <li>Cliquez <b>Tester</b> : le studio affiche la carte graphique du pod si tout va bien.</li>
             <li>Arrêtez le pod quand vous ne vous en servez pas : RunPod facture le temps où il tourne.</li></ol></details>
         </div>
+        <div class="carte pile" id="espace"><h3>💾 Espace et légèreté</h3><p class="muet">Calcul en cours…</p></div>
         <div class="carte pile"><h3>Sauvegarde</h3>
           <p class="muet">Vos projets sont gardés dans ce navigateur. Exportez-les régulièrement, ou pour passer sur un autre appareil.</p>
           <div class="ligne"><button class="btn" id="exp-tout">Exporter tous les projets</button><label class="btn">Importer une sauvegarde<input type="file" id="imp-tout" accept=".json" hidden></label></div>
