@@ -91,6 +91,9 @@
   .cmd-apercus { display: flex; gap: 6px; flex-wrap: wrap; } .cmd-apercus img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; }
   .cmd-bas { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
   #cmd-etat { color: var(--gris); font-size: 14px; }
+  .cmd-repli { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+  .cmd-bandeau { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 80; background: #1f5a33; color: #fff; padding: 12px 44px 12px 16px; border-radius: 12px; max-width: min(92vw, 640px); box-shadow: 0 8px 30px rgba(0,0,0,.35); font-size: 15px; }
+  .cmd-bandeau button { position: absolute; right: 8px; top: 6px; background: none; border: 0; color: #fff; font-size: 22px; cursor: pointer; }
   .cmd-num { font-size: 22px; color: var(--vin); letter-spacing: .04em; }
   @media (max-width: 600px) { .cmd-form fieldset { grid-template-columns: 1fr; } .cmd-boite { padding: 20px 14px; } }
   @media (max-width: 800px) { .hero { grid-template-columns: 1fr; } .etapes, .formules { grid-template-columns: 1fr 1fr; } }
@@ -127,10 +130,10 @@
 <section id="contact"><h2>Contact</h2><p id="contact-texte" style="color:var(--gris)">Écrivez-nous pour un devis.</p></section>
 <footer>Invitations vidéo interactives</footer>
 <div id="boite"><button id="fermer" aria-label="Fermer">×</button><div class="lecteur" id="lecteur"><div class="fin-film" id="fin"><button id="revoir">↺ Revoir le film</button><a id="essayer" target="_blank">Essayer l'invitation interactive</a></div></div><div class="barre-lecture"><div id="progression"></div></div></div>
-<script src="config.js?v=202611111059"></script>
-<script src="moteur/moteur.js?v=202611111059"></script>
-<script src="moteur/fabrique.js?v=202611111059"></script>
-<script src="vitrine/index.js?v=202611111059"></script>
+<script src="config.js?v=202611111143"></script>
+<script src="moteur/moteur.js?v=202611111143"></script>
+<script src="moteur/fabrique.js?v=202611111143"></script>
+<script src="vitrine/index.js?v=202611111143"></script>
 <script>
 (async function () {
   const $ = s => document.querySelector(s);
@@ -359,28 +362,94 @@
       const btn = form.querySelector('[type=submit]'); btn.disabled = true; boite.dataset.envoi = '1';
       const etat = t => { $('#cmd-etat').textContent = t; };
       const details = { formule: d.formule || '', type: d.type, titre: d.titre, celebres: d.celebres, hotes: d.hotes, date: d.date, heure: d.heure, lieux: d.lieux, date_limite: d.date_limite, invites: d.invites, contacts: d.contacts, langues: d.langues, livraison: d.livraison, texte: d.texte, couleurs: [d.couleur1, d.couleur2], ambiance: d.ambiance, musique: d.musique, message: d.message, conditions_acceptees: accepte };
+      const cmd = { modele: m ? m.slug : '', modele_titre: m ? (m.titre || m.slug) : 'Sur mesure', client: { nom: d.nom, telephone: d.telephone, email: d.email }, details };
       try {
         if (!sb) throw new Error('commandes en ligne indisponibles');
         etat('Envoi de la commande…');
-        const r = await rpc('commande_creer', { p_commande: { modele: m ? m.slug : '', modele_titre: m ? (m.titre || m.slug) : 'Sur mesure', client: { nom: d.nom, telephone: d.telephone, email: d.email }, details } });
-        const photos = [];
-        for (const [k, f] of fs.entries()) {
-          etat(`Envoi des fichiers ${k + 1}/${fs.length}…`);
-          const nom = (k + 1) + '-' + f.name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w.\-]+/g, '-').slice(-60);
-          try { await envoyerFichier(r.jeton + '/' + nom, f); photos.push({ chemin: r.jeton + '/' + nom, nom: f.name, type: f.type, taille: f.size }); } catch (err) { console.warn(err); }
-        }
-        if (photos.length) await rpc('commande_photos', { p_numero: r.numero, p_jeton: r.jeton, p_photos: photos });
+        const { r, photos } = await envoyerCommande(cmd, fs, etat);
         try { localStorage.removeItem('cmd.brouillon'); } catch (e) {} brouillon = {}; delete boite.dataset.envoi;
         merci(r.numero, d, photos.length, fs.length);
       } catch (err) {
         console.warn(err); delete boite.dataset.envoi; btn.disabled = false;
-        // repli : tout part par WhatsApp
-        const texte = `Commande d'invitation — modèle « ${m ? (m.titre || m.slug) : 'sur mesure'} »\nNom : ${d.nom}\nTéléphone : ${d.telephone}\nFormule : ${d.formule || ''}\nType : ${d.type}\nTitre : ${d.titre}\nCélébrés : ${d.celebres}\nHôtes : ${d.hotes}\nDate : ${d.date} ${d.heure}\nLieux : ${d.lieux}\nRéponse avant : ${d.date_limite}\nInvités : ${d.invites}\nContacts : ${d.contacts}\nLangues : ${d.langues}\nCouleurs : ${d.couleur1} / ${d.couleur2}\nAmbiance : ${d.ambiance}\nMusique : ${d.musique}\nTexte :\n${d.texte}\n\nMessage : ${d.message}\n(J'accepte les conditions.)`;
-        etat('La commande en ligne n\'a pas pu partir (' + err.message + ').');
-        if (wa) { const a = document.createElement('a'); a.className = 'cta'; a.target = '_blank'; a.href = 'https://wa.me/' + wa + '?text=' + encodeURIComponent(texte); a.textContent = 'Envoyer plutôt par WhatsApp'; $('#cmd-etat').appendChild(document.createElement('br')); $('#cmd-etat').appendChild(a); }
+        const texte = texteCommande(m, d);
+        const indispo = !sb || serviceBloque(err);
+        let garde = false;
+        if (sb) { try { await Attente.ajouter({ cmd, fichiers: fs.map(f => ({ nom: f.name, type: f.type, blob: f })), date: new Date().toISOString() }); garde = true; } catch (e2) { console.warn(e2); } }
+        if (garde) {
+          try { localStorage.removeItem('cmd.brouillon'); } catch (e) {} brouillon = {};
+          enAttente(d, texte);
+        } else {
+          etat(indispo ? 'Le service de commande en ligne est momentanément indisponible.' : 'La commande n\'a pas pu partir : vérifiez votre connexion et réessayez.');
+          $('#cmd-etat').appendChild(boutonsRepli(texte));
+        }
       }
     };
   }
+  // Texte complet de la commande (pour WhatsApp ou à copier)
+  function texteCommande(m, d) {
+    return `Commande d'invitation — modèle « ${m ? (m.titre || m.slug) : 'sur mesure'} »\nNom : ${d.nom}\nTéléphone : ${d.telephone}\nE-mail : ${d.email || ''}\nFormule : ${d.formule || ''}\nType : ${d.type}\nTitre : ${d.titre}\nCélébrés : ${d.celebres}\nHôtes : ${d.hotes}\nDate : ${d.date} ${d.heure}\nLieux : ${d.lieux}\nRéponse avant : ${d.date_limite}\nInvités : ${d.invites}\nContacts : ${d.contacts}\nLangues : ${d.langues}\nLivraison avant : ${d.livraison}\nCouleurs : ${d.couleur1} / ${d.couleur2}\nAmbiance : ${d.ambiance}\nMusique : ${d.musique}\nTexte :\n${d.texte}\n\nMessage : ${d.message}\n(J'accepte les conditions.)`;
+  }
+  const serviceBloque = err => /restricted|quota|exceed|402|503|Failed to fetch|NetworkError|Load failed/i.test(String(err && err.message || err));
+  function boutonsRepli(texte) {
+    const z = document.createElement('div'); z.className = 'cmd-repli';
+    if (wa) { const a = document.createElement('a'); a.className = 'cta'; a.target = '_blank'; a.href = 'https://wa.me/' + wa + '?text=' + encodeURIComponent(texte); a.textContent = '💬 Envoyer par WhatsApp'; z.appendChild(a); }
+    const c = document.createElement('button'); c.type = 'button'; c.className = 'cta contour'; c.style.cursor = 'pointer'; c.textContent = '📋 Copier ma commande';
+    c.onclick = async () => { try { await navigator.clipboard.writeText(texte); c.textContent = '✓ Copiée — collez-la dans un message'; } catch (e) { prompt('Copiez votre commande :', texte); } };
+    z.appendChild(c);
+    return z;
+  }
+  // Envoi d'une commande et de ses fichiers
+  async function envoyerCommande(cmd, fs, etat) {
+    const r = await rpc('commande_creer', { p_commande: cmd });
+    const photos = [];
+    for (const [k, f] of fs.entries()) {
+      etat(`Envoi des fichiers ${k + 1}/${fs.length}…`);
+      const nomF = f.name || f.nom || ('fichier-' + (k + 1));
+      const nom = (k + 1) + '-' + nomF.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w.\-]+/g, '-').slice(-60);
+      try { await envoyerFichier(r.jeton + '/' + nom, f.blob || f); photos.push({ chemin: r.jeton + '/' + nom, nom: nomF, type: f.type, taille: (f.blob || f).size }); } catch (err) { console.warn(err); }
+    }
+    if (photos.length) await rpc('commande_photos', { p_numero: r.numero, p_jeton: r.jeton, p_photos: photos });
+    return { r, photos };
+  }
+  // Commandes gardées sur l'appareil quand le service est indisponible (avec les photos), renvoyées automatiquement
+  const Attente = {
+    ouvrir: () => new Promise((ok, ko) => { const q = indexedDB.open('commandes-attente', 1); q.onupgradeneeded = () => q.result.createObjectStore('c', { keyPath: 'id', autoIncrement: true }); q.onsuccess = () => ok(q.result); q.onerror = () => ko(q.error); }),
+    tx: async (mode, f) => { const db = await Attente.ouvrir(); return new Promise((ok, ko) => { const t = db.transaction('c', mode); const r = f(t.objectStore('c')); t.oncomplete = () => { ok(r && r.result); db.close(); }; t.onerror = () => { ko(t.error); db.close(); }; }); },
+    ajouter: c => Attente.tx('readwrite', s => s.add(c)),
+    liste: () => Attente.tx('readonly', s => s.getAll()),
+    retirer: id => Attente.tx('readwrite', s => s.delete(id))
+  };
+  let renvoiEnCours = false;
+  async function renvoyerAttente() {
+    if (!sb || renvoiEnCours) return; renvoiEnCours = true;
+    try {
+      const l = await Attente.liste() || [];
+      for (const c of l) {
+        try {
+          const { r, photos } = await envoyerCommande(c.cmd, c.fichiers || [], () => {});
+          await Attente.retirer(c.id);
+          bandeau(`✅ Votre commande « ${c.cmd.modele_titre} » est bien arrivée chez nous. Numéro : ${r.numero}` + (photos.length < (c.fichiers || []).length ? ' (certaines photos sont à renvoyer sur WhatsApp)' : ''));
+        } catch (err) { console.warn('commande en attente', err); break; }
+      }
+    } catch (e) { console.warn(e); }
+    renvoiEnCours = false;
+  }
+  function bandeau(t) {
+    const b = document.createElement('div'); b.className = 'cmd-bandeau'; b.innerHTML = esc(t) + ' <button aria-label="Fermer">×</button>';
+    b.querySelector('button').onclick = () => b.remove(); document.body.appendChild(b);
+  }
+  function enAttente(d, texte) {
+    zone.innerHTML = `<h2>Merci ${esc(d.nom)} !</h2>
+      <div class="cmd-etapes"><span>1. Conditions ✓</span><span>2. Vos informations ✓</span><span class="on">3. En attente d'envoi</span></div>
+      <p style="font-size:18px">Notre service de commande en ligne est <b>momentanément indisponible</b>.</p>
+      <p>Votre commande et vos photos sont <b>gardées sur cet appareil</b> : elles partiront <b>toutes seules</b> dès que le service revient, à votre prochaine visite sur ce site (ou dans quelques minutes si vous laissez la page ouverte).</p>
+      <p>Pour aller plus vite, vous pouvez aussi nous l'envoyer maintenant :</p>
+      <div id="cmd-repli-z"></div>
+      <p><button class="cta contour" id="cmd-fin" style="cursor:pointer">Fermer</button></p>`;
+    $('#cmd-repli-z').appendChild(boutonsRepli(texte));
+    $('#cmd-fin').onclick = fermer;
+  }
+  if (sb) { setTimeout(renvoyerAttente, 3000); setInterval(renvoyerAttente, 3 * 60 * 1000); window.addEventListener('online', renvoyerAttente); }
   function merci(numero, d, n, total) {
     zone.innerHTML = `<h2>Merci ${esc(d.nom)} !</h2>
       <div class="cmd-etapes"><span>1. Conditions ✓</span><span>2. Vos informations ✓</span><span class="on">3. Envoyée</span></div>
