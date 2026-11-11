@@ -4,7 +4,7 @@
   'use strict';
   /* Gros contenus (invitations, bibliothèque, listes de l'équipe) : dans IndexedDB (place quasi illimitée),
      le localStorage du navigateur (5 Mo) ne garde que les petits réglages. Lecture avant le démarrage. */
-  const GRANDS = ['studio.projets', 'studio.medias', 'studio.equipe.biblio', 'studio.equipe.urls', 'studio.travaux'];
+  const GRANDS = ['studio.projets', 'studio.medias', 'studio.equipe.biblio', 'studio.equipe.urls', 'studio.travaux', 'studio.films'];
   const GRAND = {};
   let dbGrand = null;
   try {
@@ -316,7 +316,7 @@
       }
       if (dernier) throw dernier;
       await this.rpc('equipe_biblio_ajouter', { p_item: { id, auteur: this.membre(), type: 'film', nom: 'Film — ' + (o.titre || 'Sans titre'), chemin, vignette: vignette.length < 150000 ? vignette : '', duree, secondes_creation: o.secondes || null, evenement: o.titre || '' } });
-      await this.charger();
+      await this.charger(); this._dernierFilm = id; return { id };
     },
     // fichiers d'une invitation envoyés dans l'espace d'équipe (une seule fois chacun), pour que l'admin ait tout
     urls: Stock.lire('studio.equipe.urls', {}),
@@ -687,6 +687,11 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-11-3', date: '11 novembre 2026', titre: 'Ranger ses films (Vidéos ou brouillon) et les publier soi-même', points: [
+      'Chaque film enregistré (Film et publication → « Enregistrer le film ») est <b>gardé sur l\'ordinateur</b>, dans le <b>brouillon de l\'événement</b> ; on choisit ensuite « 🎬 Dans Vidéos » ou « 📁 Dans le brouillon ». Liste « 🎞 Films de cet événement » : regarder, télécharger, ranger, publier, supprimer.',
+      '<b>🎬 Vidéos → 💻 Mes films</b> : tous vos films rangés dans Vidéos (et les brouillons si on coche), même sans équipe ni connexion à la base.',
+      '<b>Publier sur le site</b> : chaque membre relié à GitHub publie lui-même (l\'admin l\'ajoute comme collaborateur du dépôt, le membre colle son jeton dans Réglages). Sinon : « Envoyer à l\'admin » pour validation.'
+    ] },
     { id: '2026-11-11-2', date: '11 novembre 2026', titre: 'Fenêtres des emojis (et autres) juste à côté du bouton', points: [
       'La fenêtre des emojis s\'ouvre maintenant collée au bouton touché (colonne d\'outils, barre du haut, Calques, texte) et reste entièrement visible à l\'écran ; même chose pour les polices, formes, boutons et partage.'
     ] },
@@ -3669,6 +3674,83 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
   }
   // Ne renvoie une liste vide que si le fichier n'existe pas encore (sinon on effacerait la vitrine)
   // Met un film de l'équipe sur la vitrine du site
+  /* ---------- Mes films : chaque film fabriqué est gardé sur cet ordinateur, rangé dans « Vidéos » ou dans le brouillon de l'événement ---------- */
+  const Films = {
+    liste() { return Stock.lire('studio.films', []); },
+    ecrire(l) { Stock.ecrire('studio.films', l); },
+    async garder(blob, p, o) {
+      const ext = /webm/.test(blob.type) ? 'webm' : /quicktime/.test(blob.type) ? 'mov' : 'mp4';
+      const id = 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), src = 'idb:film-' + id + '.' + ext;
+      await IDB.mettre(src, blob);
+      let vignette = '';
+      try { const u = URL.createObjectURL(blob); const info = await Promise.race([vignetteVideo(u), new Promise(ok => setTimeout(() => ok({}), 12000))]); URL.revokeObjectURL(u); vignette = info.vignette || ''; } catch (e) {}
+      const f = { id, src, projet: p ? p.id : '', titre: (p && p.fiche.titre) || o.titre || 'Film', date: new Date().toISOString(), taille: blob.size, duree: Math.round(o.duree || 0), dossier: o.dossier || 'brouillon', auteur: (reglages.equipe && reglages.equipe.membre) || '', vignette: vignette.length < 150000 ? vignette : '' };
+      this.ecrire([f].concat(this.liste())); return f;
+    },
+    maj(id, champs) { const l = this.liste(), f = l.find(x => x.id === id); if (f) Object.assign(f, champs); this.ecrire(l); return f; },
+    async supprimer(id) { const l = this.liste(), f = l.find(x => x.id === id); if (f) { try { await IDB.suppr(f.src); } catch (e) {} } this.ecrire(l.filter(x => x.id !== id)); },
+    async blob(f) { const b = await IDB.lire(f.src); if (!b) throw new Error('fichier du film introuvable sur cet ordinateur'); return b; }
+  };
+  // publier un film gardé sur cet ordinateur dans la rubrique « Nos vidéos réalisées » du site
+  async function publierFilmLocal(f) {
+    if (!peutPublierGitHub()) throw new Error('publication non reliée');
+    const blob = await Films.blob(f), ext = (f.src.split('.').pop() || 'mp4').toLowerCase(), chemin = 'medias/films/' + f.id + '.' + ext;
+    if (blob.size > 95e6) throw new Error('film trop lourd pour le site (plus de 95 Mo)');
+    await GitHub.envoyer(chemin, blob, 'Film ' + f.titre);
+    let vignette = 'fonds/fond_2.jpg';
+    if (/^data:/.test(f.vignette || '')) { vignette = 'medias/films/' + f.id + '.jpg'; await GitHub.envoyer(vignette, dataURLversBlob(f.vignette), 'Vignette ' + f.titre); }
+    const index = (await lireVitrine()).filter(x => x.slug !== 'film-' + f.id);
+    index.unshift({ slug: 'film-' + f.id, film: true, video: chemin, titre: f.titre, type: 'Film vidéo', vignette, auteur: f.auteur || '', date: new Date().toISOString().slice(0, 10) });
+    await ecrireVitrine(index, 'Vitrine : film ' + f.titre);
+    Films.maj(f.id, { site: new Date().toISOString() });
+  }
+  function peutPublierGitHub() { const g = reglages.github || {}; return !!(g.owner && g.repo && g.token); }
+  // pas de GitHub sur ce studio : les deux façons de publier
+  function aidePublier(f, apres) {
+    modale(`<h2>Publier sur le site</h2><div class="pile">
+      <p>Pour publier directement, ce studio doit être relié au dépôt du site. Deux façons :</p>
+      <div class="carte pile" style="margin:0"><b>1. Publier soi-même (chaque membre)</b><span class="muet">L'admin ajoute le membre comme <b>collaborateur</b> du dépôt <b>${esc((reglages.github || {}).repo || 'STUDIO')}</b> sur GitHub (Settings → Collaborators). Le membre crée son propre jeton (Contents : Read and write) et le colle dans Réglages → GitHub. Ensuite il publie lui-même, sans attendre.</span><a class="btn petit plein" href="#/reglages" id="ap-reg">Relier mon GitHub (Réglages)</a></div>
+      ${Equipe.actif() ? `<div class="carte pile" style="margin:0"><b>2. Demander à l'admin</b><span class="muet">Le film part vers l'équipe, l'admin le valide et il est publié.</span><button class="btn petit" id="ap-dem">Envoyer à l'admin</button></div>` : ''}
+    </div>`, (m, fermer) => {
+      $('#ap-reg', m).onclick = () => fermer();
+      const d = $('#ap-dem', m); if (d) d.onclick = async () => {
+        d.disabled = true; d.textContent = 'Envoi…';
+        try { const it = f.equipe_id ? { id: f.equipe_id } : await Equipe.ajouterFilm(await Films.blob(f), { titre: f.titre, vignette: f.vignette }); if (it && it.id) Films.maj(f.id, { equipe_id: it.id, dossier: 'videos' }); await demanderPublication('film', (it && it.id) || f.id, f.titre); toast('Demande envoyée à l\'admin'); fermer(); if (apres) apres(); }
+        catch (e) { d.disabled = false; d.textContent = 'Réessayer'; toast(e.message); }
+      };
+    });
+  }
+  // carte d'un film de cet ordinateur (Vidéos et Film et publication)
+  function carteFilmLocal(f) {
+    const pr = projets[f.projet];
+    return `<div class="carte pile film-local" data-fl="${esc(f.id)}" style="padding:10px">
+      <div class="fl-video" style="position:relative;aspect-ratio:9/16;background:#000 center/cover no-repeat url('${esc(f.vignette || '')}');border-radius:8px;cursor:pointer" title="Regarder"><span style="position:absolute;inset:auto 0 0 0;padding:6px;color:#fff;font-size:22px;text-align:center;background:linear-gradient(transparent,rgba(0,0,0,.5))">▶</span></div>
+      <div class="ligne" style="justify-content:space-between;gap:4px;flex-wrap:wrap">${f.dossier === 'videos' ? '<span class="badge">🎬 Vidéos</span>' : '<span class="badge">📁 Brouillon</span>'}${f.site ? '<span class="badge ok">✓ sur le site</span>' : ''}${f.equipe_id ? '<span class="badge">équipe ✓</span>' : ''}</div>
+      <b style="font-size:13px">${esc(f.titre)}</b><div class="muet" style="font-size:12px">${pr ? '' : 'événement supprimé · '}${new Date(f.date).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}${f.duree ? ' · ' + f.duree + ' s' : ''} · ${(f.taille / 1e6).toFixed(1)} Mo</div>
+      <div class="ligne" style="gap:4px;flex-wrap:wrap">
+        <button class="btn petit plein" data-fl-pub>${f.site ? 'Republier' : 'Publier sur le site'}</button>
+        ${f.dossier === 'videos' ? '<button class="btn petit" data-fl-dos="brouillon">→ Brouillon</button>' : '<button class="btn petit" data-fl-dos="videos">→ Vidéos</button>'}
+        <button class="btn petit" data-fl-dl>Télécharger</button><button class="btn petit danger" data-fl-suppr title="Supprimer de cet ordinateur">🗑</button></div></div>`;
+  }
+  function lierFilmsLocaux(zone, relancer) {
+    $$('.film-local', zone).forEach(el => {
+      const id = el.dataset.fl, f = () => Films.liste().find(x => x.id === id);
+      $('.fl-video', el).onclick = async () => { try { const u = URL.createObjectURL(await Films.blob(f())); modale(`<video src="${u}" controls autoplay playsinline style="max-height:78vh;max-width:100%;display:block;margin:auto;border-radius:10px"></video>`); } catch (e) { toast(e.message); } };
+      $('[data-fl-dl]', el).onclick = async () => { try { telecharger((f().titre || 'film').replace(/[^\wÀ-ÿ -]+/g, '') + '.' + f().src.split('.').pop(), await Films.blob(f())); } catch (e) { toast(e.message); } };
+      $('[data-fl-suppr]', el).onclick = async () => { if (!confirm('Supprimer ce film de cet ordinateur ?')) return; await Films.supprimer(id); relancer(); };
+      $$('[data-fl-dos]', el).forEach(b => b.onclick = async () => {
+        const dos = b.dataset.flDos; Films.maj(id, { dossier: dos });
+        if (dos === 'videos' && Equipe.actif() && !f().equipe_id) { toast('Rangé dans Vidéos · envoi à l\'équipe…'); try { const it = await Equipe.ajouterFilm(await Films.blob(f()), { titre: f().titre, vignette: f().vignette }); if (it && it.id) Films.maj(id, { equipe_id: it.id }); toast('Visible par toute l\'équipe ✓'); } catch (e) { toast('Rangé dans Vidéos (sur cet ordinateur) ; équipe : ' + e.message); } }
+        else toast(dos === 'videos' ? 'Rangé dans 🎬 Vidéos' : 'Rangé dans le brouillon de l\'événement');
+        relancer();
+      });
+      $('[data-fl-pub]', el).onclick = async e => {
+        if (!peutPublierGitHub()) return aidePublier(f(), relancer);
+        const b = e.currentTarget; b.disabled = true; b.textContent = 'Publication…';
+        try { await publierFilmLocal(f()); toast('Film publié sur le site ✓ (visible dans quelques minutes)'); relancer(); } catch (er) { toast('Échec : ' + er.message); b.disabled = false; b.textContent = 'Publier sur le site'; }
+      };
+    });
+  }
   async function publierFilmVitrine(f) {
     const r = await fetch(Equipe.url(f.chemin)); if (!r.ok) throw new Error('film introuvable (' + r.status + ')');
     const ext = (f.chemin.split('.').pop() || 'mp4').toLowerCase(), chemin = 'medias/films/' + f.id + '.' + ext;
@@ -3710,7 +3792,14 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     await ecrireVitrine(index, 'Vitrine : retrait ' + (titre || slug));
   }
 
+  let rendreFilmsEvt = () => {};
   function ongletPublier(p) {
+    rendreFilmsEvt = () => {
+      const z = $('#films-evt'); if (!z) return;
+      const l = Films.liste().filter(f => f.projet === p.id);
+      z.innerHTML = `<h3>🎞 Films de cet événement <span class="muet" style="font-size:13px">(${l.length}, gardés sur cet ordinateur)</span></h3>${l.length ? `<div class="grille" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px">${l.map(carteFilmLocal).join('')}</div>` : '<p class="muet" style="margin:0">Chaque film enregistré ici (« Enregistrer le film ») est gardé dans le brouillon de l\'événement ; vous choisissez ensuite de le ranger dans 🎬 Vidéos et de le publier sur le site.</p>'}`;
+      lierFilmsLocaux(z, rendreFilmsEvt);
+    };
     const g = reglages.github || {};
     const pret = g.owner && g.repo && g.token;
     const fichiersIdb = [];
@@ -3734,9 +3823,11 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <label class="champ">Film pour<select id="film-pour"><option value="">Tout le monde (comme le lien général)</option>${(p.familles || []).filter(f => f.nom).map(f => `<option value="${esc(f.code)}">${esc(f.nom)} (film personnalisé)</option>`).join('')}</select></label>
           ${p.plans.some(pl => (pl.calques || []).some(c => c.condition === 'famille' && c.type === 'texte' && !c.masque)) ? `<div class="pile" id="film-tous" style="gap:6px"><span class="muet">Textes du lien personnel (« Pour {famille} », « {places} personnes »…) : dans le film pour tout le monde, ils s'affichent avec :</span>
             <div class="deux"><label class="champ">{famille} devient<input type="text" id="film-nom" value="${esc((p.film || {}).nom != null ? p.film.nom : nomFilmDefaut(p))}"></label><label class="champ">{places} devient<input type="text" id="film-places" placeholder="vide = phrase sans nombre" value="${esc((p.film || {}).places || '')}"></label></div></div>` : ''}
+          <div id="film-rangement"></div>
           <div class="ligne"><button class="btn plein" id="film">Enregistrer le film</button><button class="btn" id="film-transparent" title="Vidéo WebM avec transparence : les plans « Sans fond » restent transparents, pour la poser sur une autre vidéo">▦ Vidéo sans fond (WebM)</button><span class="muet" id="film-etat"></span></div></div>
       </div>
       <div class="pile">
+        <div class="carte pile" id="films-evt"></div>
         ${p.commande || p.client || Equipe.admin() ? carteLivraison(p) : ''}
         <div class="carte pile carte-client"><h3>🔗 Les 2 liens à donner au client</h3>
           <ol class="etat-liste">
@@ -3779,6 +3870,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         </div>
       </div></div>`;
     carteDemande(p, $('#carte-demande'));
+    rendreFilmsEvt();
     $$('[data-partage]').forEach(b => b.onclick = () => b.dataset.partage === 'gen' ? Base.partager(b, lienGeneral(p), p.fiche.titre || '') : Base.partager(b, lienHote(p), p.fiche.langue === 'mg' ? 'Ity ny rohy hitantananao ny vahiny (aza zaraina):' : 'Votre lien pour gérer vos invités (à garder pour vous) :'));
     $('#ap-gen').onclick = () => { Stock.ecrire('studio.apercu', publication(p, true)); window.open('../i/?apercu=1', '_blank'); };
     $('#ap-fam').onclick = () => { Stock.ecrire('studio.apercu', publication(p, true)); window.open('../i/?apercu=1&test=1', '_blank'); };
@@ -3827,6 +3919,13 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         const r = await eng.exporterFilm({ musique: mus, debut: p.musique ? Number(p.musique.debut) || 0 : 0, volume: p.musique ? p.musique.volume : 0.8, etape: t => { $('#film-etat').textContent = t; }, progres: v => { $('#barre').style.width = Math.round(v * 100) + '%'; $('#film-etat').textContent = 'Fabrication du film… ' + Math.round(v * 100) + ' %'; } });
         telecharger(`${p.slug}-film.${r.extension}`, r.blob);
         const sec = (Date.now() - t0) / 1000;
+        // gardé sur cet ordinateur : on demande où le ranger
+        Films.garder(r.blob, p, { duree: r.duree, dossier: 'brouillon' }).then(fl => {
+          const z = $('#film-rangement'); if (!z) return;
+          z.innerHTML = `<div class="carte ligne" style="padding:10px 12px;margin-top:8px;gap:8px;flex-wrap:wrap;background:#fbf7f1"><b>Où ranger ce film ?</b><button class="btn petit plein" data-ranger="videos">🎬 Dans Vidéos${Equipe.actif() ? ' (visible par l\'équipe)' : ''}</button><button class="btn petit" data-ranger="brouillon">📁 Dans le brouillon de l'événement</button><span class="muet">(il est déjà gardé dans le brouillon)</span></div>`;
+          $$('[data-ranger]', z).forEach(b => b.onclick = () => { Films.maj(fl.id, { dossier: b.dataset.ranger }); z.innerHTML = ''; toast(b.dataset.ranger === 'videos' ? 'Rangé dans 🎬 Vidéos' : 'Gardé dans le brouillon de l\'événement'); if (b.dataset.ranger === 'videos' && Equipe.actif()) { const it = Equipe._dernierFilm; if (it) Films.maj(fl.id, { equipe_id: it }); } ongletPublier(p); });
+          rendreFilmsEvt();
+        }).catch(e => toast('Film non gardé sur cet ordinateur : ' + e.message));
         $('#film-etat').textContent = `Film prêt en ${dureeTexte(sec)} (film de ${Math.round(r.duree)} s, ${(r.blob.size / 1e6).toFixed(1)} Mo, ${r.extension.toUpperCase()})`;
         Equipe.noter('film', 'Film — ' + (p.fiche.titre || ''), sec, p);
         if (Equipe.actif()) {
@@ -4509,7 +4608,20 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     const app = $('#app');
     app.innerHTML = `<div class="entete"><div><h1>🎬 Vidéos de l'équipe</h1><p>Tous les films terminés de l'équipe, au même endroit : regardez-les, téléchargez-les et publiez-les sur le site, dans la rubrique « Nos vidéos réalisées ».</p></div>
       <div class="ligne"><a class="btn" target="_blank" href="${esc(urlSite())}#films">Voir la rubrique sur le site ↗</a><label class="btn plein">+ Ajouter un film terminé<input type="file" id="vp-ajout" accept="video/mp4,video/webm,video/quicktime,.mp4,.mov,.webm" multiple hidden></label></div></div>
+      <div class="carte pile" id="vp-locaux" style="margin-bottom:14px"></div>
       <div id="vp-zone" class="muet">Chargement des vidéos de l'équipe…</div>`;
+    // mes films (sur cet ordinateur) : publiables sur le site même sans équipe
+    let voirBrouillons = false;
+    const rendreLocaux = () => {
+      const z = $('#vp-locaux'); if (!z) return;
+      const tous = Films.liste(), l = tous.filter(f => voirBrouillons || f.dossier === 'videos');
+      z.innerHTML = `<div class="ligne" style="justify-content:space-between;flex-wrap:wrap"><h3 style="margin:0">💻 Mes films <span class="muet" style="font-size:13px">sur cet ordinateur — ${tous.filter(f => f.dossier === 'videos').length} dans Vidéos, ${tous.filter(f => f.dossier !== 'videos').length} en brouillon</span></h3>
+        <label class="cases" style="margin:0"><input type="checkbox" id="vp-brou" ${voirBrouillons ? 'checked' : ''}> Voir aussi les brouillons</label></div>
+        ${l.length ? `<div class="grille" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-top:8px">${l.map(carteFilmLocal).join('')}</div>` : '<p class="muet" style="margin:6px 0 0">Les films que vous enregistrez (Film et publication → « Enregistrer le film ») arrivent ici quand vous les rangez dans 🎬 Vidéos. Chacun peut les publier sur le site.</p>'}`;
+      $('#vp-brou', z).onchange = e => { voirBrouillons = e.target.checked; rendreLocaux(); };
+      lierFilmsLocaux(z, rendreLocaux);
+    };
+    rendreLocaux();
     if (!Equipe.actif()) { $('#vp-zone').innerHTML = `<div class="carte pile" style="max-width:640px"><p>Les vidéos de l'équipe apparaissent ici quand vous êtes dans une équipe. Ouvrez le lien d'équipe reçu, ou créez l'équipe dans <a href="#/reglages">Réglages</a>.</p></div>`; return; }
     const zone = $('#vp-zone');
     const va = $('#vp-ajout'); va.onchange = async () => {
