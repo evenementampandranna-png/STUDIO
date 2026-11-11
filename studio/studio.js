@@ -395,7 +395,7 @@
 
   /* ================= Utilitaires UI ================= */
   let toastT;
-  function toast(t) { const e = $('#toast'); e.textContent = t; e.classList.add('vu'); clearTimeout(toastT); toastT = setTimeout(() => e.classList.remove('vu'), 2600); }
+  function toast(t, ms) { const e = $('#toast'); e.textContent = t; e.classList.add('vu'); clearTimeout(toastT); toastT = setTimeout(() => e.classList.remove('vu'), ms || 2600); }
   function modale(html, onOuvre) {
     const m = $('#modale');
     $('.modale-contenu', m).innerHTML = html;
@@ -687,6 +687,11 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-11-4', date: '11 novembre 2026', titre: 'Brouillon ou validé ; publier même quand la base est bloquée', points: [
+      '<b>Invitations</b> : en haut de chaque événement, <b>📁 Brouillon / ✅ Validé</b> (aussi sur les cartes de « Vos événements »). Publier une invitation en brouillon demande de la valider.',
+      '<b>Films</b> : après « Enregistrer le film », <b>📁 En brouillon</b> ou <b>✅ Validé</b> (rangé dans 🎬 Vidéos). Un film validé peut être publié sur le site.',
+      '<b>Publication malgré Supabase bloqué</b> : l\'invitation est mise en ligne quand même ; les réponses et l\'espace organisateur seront reliés automatiquement dès que la base répondra. Les films de l\'espace d\'équipe (bloqué) se publient depuis 💻 Mes films sur l\'ordinateur de leur auteur.'
+    ] },
     { id: '2026-11-11-3', date: '11 novembre 2026', titre: 'Ranger ses films (Vidéos ou brouillon) et les publier soi-même', points: [
       'Chaque film enregistré (Film et publication → « Enregistrer le film ») est <b>gardé sur l\'ordinateur</b>, dans le <b>brouillon de l\'événement</b> ; on choisit ensuite « 🎬 Dans Vidéos » ou « 📁 Dans le brouillon ». Liste « 🎞 Films de cet événement » : regarder, télécharger, ranger, publier, supprimer.',
       '<b>🎬 Vidéos → 💻 Mes films</b> : tous vos films rangés dans Vidéos (et les brouillons si on coche), même sans équipe ni connexion à la base.',
@@ -967,7 +972,7 @@
           <div><h3>${esc(p.fiche.titre)}</h3>
             <div class="muet">${esc(MoteurInfo.dateLisible(p.fiche.date, p.fiche.langue))}</div>
             <div class="muet">${p.plans.length} plans · ${(p.familles || []).length} familles</div>
-            <div style="margin-top:6px">${p.publie ? '<span class="badge ok">Publié</span>' : '<span class="badge">Brouillon</span>'}</div>
+            <div style="margin-top:6px">${p.statut === 'valide' ? '<span class="badge ok">✅ Validé</span>' : '<span class="badge">📁 Brouillon</span>'} ${p.publie ? '<span class="badge ok">🌐 Publié</span>' : ''}</div>
             <div class="ligne evt-actions"><button class="btn petit" data-evt-ouvrir="${p.id}" title="Ouvrir les plans">✎ Modifier</button><button class="btn petit" data-evt-fiche="${p.id}" title="Titre, date, lieux, contacts">ⓘ Infos</button><button class="btn petit" data-evt-dup="${p.id}" title="Faire une copie">⧉ Dupliquer</button><button class="btn petit danger" data-evt-suppr="${p.id}" title="Supprimer (récupérable dans la corbeille)">🗑</button></div></div>
         </div>`).join('')}</div>` : `
         <div class="carte vide"><h2>Aucun événement pour l'instant</h2><p class="muet">Collez le texte d'une invitation : le studio en tire les informations et propose les plans.</p><a class="btn plein" href="#/nouveau">Créer le premier événement</a>
@@ -1197,7 +1202,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
   function vueProjet(p, onglet) {
     $('#app').innerHTML = `
       <div class="entete ${onglet === 'plans' || !onglet ? 'compact' : ''}"><div><a href="#/" class="muet" style="text-decoration:none">‹ Événements</a><h1 style="margin-top:4px">${esc(p.fiche.titre)}</h1><p>${esc(MoteurInfo.dateLisible(p.fiche.date, p.fiche.langue))}${p.fiche.heure ? ' · ' + esc(p.fiche.heure) : ''}</p></div>
-        <div class="ligne"><a class="btn ${p.publie ? 'plein' : ''}" href="#/p/${p.id}/publier" title="Les 2 liens à donner au client">🔗 Liens du client</a><button class="btn petit" id="btn-versions" title="Versions enregistrées automatiquement (revenir en arrière)">🕘 Versions</button><span class="muet" id="etat-sauve">Enregistré</span></div></div>
+        <div class="ligne"><div class="seg" title="Statut de l'invitation"><button id="st-brou" class="${p.statut !== 'valide' ? 'on' : ''}">📁 Brouillon</button><button id="st-val" class="${p.statut === 'valide' ? 'on' : ''}">✅ Validé</button></div><a class="btn ${p.publie ? 'plein' : ''}" href="#/p/${p.id}/publier" title="Les 2 liens à donner au client">🔗 Liens du client</a><button class="btn petit" id="btn-versions" title="Versions enregistrées automatiquement (revenir en arrière)">🕘 Versions</button><span class="muet" id="etat-sauve">Enregistré</span></div></div>
       <div class="onglets">
         <a href="#/p/${p.id}/plans" class="${onglet === 'plans' ? 'actif' : ''}">Plans</a>
         <a href="#/p/${p.id}/fiche" class="${onglet === 'fiche' ? 'actif' : ''}">Fiche</a>
@@ -1206,6 +1211,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       </div><div id="onglet"></div>`;
     Sauve.etat(p);
     $('#btn-versions').onclick = () => ouvrirVersions(p);
+    const stat = v => { p.statut = v; enregistrer(p); $('#st-brou').classList.toggle('on', v !== 'valide'); $('#st-val').classList.toggle('on', v === 'valide'); toast(v === 'valide' ? '✅ Invitation validée : prête à publier' : '📁 Invitation remise en brouillon'); };
+    $('#st-brou').onclick = () => stat('brouillon'); $('#st-val').onclick = () => stat('valide');
     if (onglet === 'invites') return ongletInvites(p);
     if (onglet === 'publier') return ongletPublier(p);
     if (onglet === 'fiche') return ongletFiche(p);
@@ -3684,7 +3691,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       await IDB.mettre(src, blob);
       let vignette = '';
       try { const u = URL.createObjectURL(blob); const info = await Promise.race([vignetteVideo(u), new Promise(ok => setTimeout(() => ok({}), 12000))]); URL.revokeObjectURL(u); vignette = info.vignette || ''; } catch (e) {}
-      const f = { id, src, projet: p ? p.id : '', titre: (p && p.fiche.titre) || o.titre || 'Film', date: new Date().toISOString(), taille: blob.size, duree: Math.round(o.duree || 0), dossier: o.dossier || 'brouillon', auteur: (reglages.equipe && reglages.equipe.membre) || '', vignette: vignette.length < 150000 ? vignette : '' };
+      const f = { id, src, projet: p ? p.id : '', titre: o.titre || (p && p.fiche.titre) || 'Film', date: new Date().toISOString(), taille: blob.size, duree: Math.round(o.duree || 0), dossier: o.dossier || 'brouillon', auteur: (reglages.equipe && reglages.equipe.membre) || '', vignette: vignette.length < 150000 ? vignette : '' };
       this.ecrire([f].concat(this.liste())); return f;
     },
     maj(id, champs) { const l = this.liste(), f = l.find(x => x.id === id); if (f) Object.assign(f, champs); this.ecrire(l); return f; },
@@ -3725,11 +3732,10 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     const pr = projets[f.projet];
     return `<div class="carte pile film-local" data-fl="${esc(f.id)}" style="padding:10px">
       <div class="fl-video" style="position:relative;aspect-ratio:9/16;background:#000 center/cover no-repeat url('${esc(f.vignette || '')}');border-radius:8px;cursor:pointer" title="Regarder"><span style="position:absolute;inset:auto 0 0 0;padding:6px;color:#fff;font-size:22px;text-align:center;background:linear-gradient(transparent,rgba(0,0,0,.5))">▶</span></div>
-      <div class="ligne" style="justify-content:space-between;gap:4px;flex-wrap:wrap">${f.dossier === 'videos' ? '<span class="badge">🎬 Vidéos</span>' : '<span class="badge">📁 Brouillon</span>'}${f.site ? '<span class="badge ok">✓ sur le site</span>' : ''}${f.equipe_id ? '<span class="badge">équipe ✓</span>' : ''}</div>
+      <div class="ligne" style="justify-content:space-between;gap:4px;flex-wrap:wrap">${f.dossier === 'videos' ? '<span class="badge ok">✅ Validé</span>' : '<span class="badge">📁 Brouillon</span>'}${f.site ? '<span class="badge ok">✓ sur le site</span>' : ''}${f.equipe_id ? '<span class="badge">équipe ✓</span>' : ''}</div>
       <b style="font-size:13px">${esc(f.titre)}</b><div class="muet" style="font-size:12px">${pr ? '' : 'événement supprimé · '}${new Date(f.date).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}${f.duree ? ' · ' + f.duree + ' s' : ''} · ${(f.taille / 1e6).toFixed(1)} Mo</div>
       <div class="ligne" style="gap:4px;flex-wrap:wrap">
-        <button class="btn petit plein" data-fl-pub>${f.site ? 'Republier' : 'Publier sur le site'}</button>
-        ${f.dossier === 'videos' ? '<button class="btn petit" data-fl-dos="brouillon">→ Brouillon</button>' : '<button class="btn petit" data-fl-dos="videos">→ Vidéos</button>'}
+        ${f.dossier === 'videos' ? `<button class="btn petit plein" data-fl-pub>${f.site ? 'Republier' : 'Publier sur le site'}</button><button class="btn petit" data-fl-dos="brouillon">→ Brouillon</button>` : '<button class="btn petit plein" data-fl-dos="videos" title="Le film passe dans 🎬 Vidéos et peut être publié">✅ Valider</button>'}
         <button class="btn petit" data-fl-dl>Télécharger</button><button class="btn petit danger" data-fl-suppr title="Supprimer de cet ordinateur">🗑</button></div></div>`;
   }
   function lierFilmsLocaux(zone, relancer) {
@@ -3741,18 +3747,22 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       $$('[data-fl-dos]', el).forEach(b => b.onclick = async () => {
         const dos = b.dataset.flDos; Films.maj(id, { dossier: dos });
         if (dos === 'videos' && Equipe.actif() && !f().equipe_id) { toast('Rangé dans Vidéos · envoi à l\'équipe…'); try { const it = await Equipe.ajouterFilm(await Films.blob(f()), { titre: f().titre, vignette: f().vignette }); if (it && it.id) Films.maj(id, { equipe_id: it.id }); toast('Visible par toute l\'équipe ✓'); } catch (e) { toast('Rangé dans Vidéos (sur cet ordinateur) ; équipe : ' + e.message); } }
-        else toast(dos === 'videos' ? 'Rangé dans 🎬 Vidéos' : 'Rangé dans le brouillon de l\'événement');
+        else toast(dos === 'videos' ? '✅ Film validé : dans 🎬 Vidéos, prêt à publier' : '📁 Film remis en brouillon');
         relancer();
       });
-      $('[data-fl-pub]', el).onclick = async e => {
+      const fp = $('[data-fl-pub]', el); if (fp) fp.onclick = async e => {
         if (!peutPublierGitHub()) return aidePublier(f(), relancer);
         const b = e.currentTarget; b.disabled = true; b.textContent = 'Publication…';
         try { await publierFilmLocal(f()); toast('Film publié sur le site ✓ (visible dans quelques minutes)'); relancer(); } catch (er) { toast('Échec : ' + er.message); b.disabled = false; b.textContent = 'Publier sur le site'; }
       };
     });
   }
+  // Supabase (base + espace d'équipe) bloqué par le quota, ou injoignable
+  function baseBloquee(e) { return /restricted|exceed_\w*quota|\b402\b|spend cap|Failed to fetch|NetworkError/i.test((e && e.message) || String(e || '')); }
   async function publierFilmVitrine(f) {
-    const r = await fetch(Equipe.url(f.chemin)); if (!r.ok) throw new Error('film introuvable (' + r.status + ')');
+    const r = await fetch(Equipe.url(f.chemin)).catch(() => null);
+    if (!r || r.status === 402) throw new Error('le film est dans l\'espace d\'équipe (Supabase), bloqué par le quota : publiez-le depuis 💻 Mes films sur l\'ordinateur de ' + (f.auteur || 'son auteur') + ', ou après le déblocage');
+    if (!r.ok) throw new Error('film introuvable (' + r.status + ')');
     const ext = (f.chemin.split('.').pop() || 'mp4').toLowerCase(), chemin = 'medias/films/' + f.id + '.' + ext;
     await GitHub.envoyer(chemin, await r.blob(), 'Film ' + f.nom);
     let vignette = 'fonds/fond_2.jpg';
@@ -3922,8 +3932,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         // gardé sur cet ordinateur : on demande où le ranger
         Films.garder(r.blob, p, { duree: r.duree, dossier: 'brouillon' }).then(fl => {
           const z = $('#film-rangement'); if (!z) return;
-          z.innerHTML = `<div class="carte ligne" style="padding:10px 12px;margin-top:8px;gap:8px;flex-wrap:wrap;background:#fbf7f1"><b>Où ranger ce film ?</b><button class="btn petit plein" data-ranger="videos">🎬 Dans Vidéos${Equipe.actif() ? ' (visible par l\'équipe)' : ''}</button><button class="btn petit" data-ranger="brouillon">📁 Dans le brouillon de l'événement</button><span class="muet">(il est déjà gardé dans le brouillon)</span></div>`;
-          $$('[data-ranger]', z).forEach(b => b.onclick = () => { Films.maj(fl.id, { dossier: b.dataset.ranger }); z.innerHTML = ''; toast(b.dataset.ranger === 'videos' ? 'Rangé dans 🎬 Vidéos' : 'Gardé dans le brouillon de l\'événement'); if (b.dataset.ranger === 'videos' && Equipe.actif()) { const it = Equipe._dernierFilm; if (it) Films.maj(fl.id, { equipe_id: it }); } ongletPublier(p); });
+          z.innerHTML = `<div class="carte ligne" style="padding:10px 12px;margin-top:8px;gap:8px;flex-wrap:wrap;background:#fbf7f1"><b>Enregistrer ce film :</b><button class="btn petit" data-ranger="brouillon">📁 En brouillon</button><button class="btn petit plein" data-ranger="videos">✅ Validé (dans 🎬 Vidéos${Equipe.actif() ? ', visible par l\'équipe' : ''})</button><span class="muet">(par défaut : brouillon de l'événement)</span></div>`;
+          $$('[data-ranger]', z).forEach(b => b.onclick = () => { Films.maj(fl.id, { dossier: b.dataset.ranger }); z.innerHTML = ''; toast(b.dataset.ranger === 'videos' ? '✅ Film validé : dans 🎬 Vidéos, prêt à publier' : '📁 Film enregistré en brouillon'); if (b.dataset.ranger === 'videos' && Equipe.actif()) { const it = Equipe._dernierFilm; if (it) Films.maj(fl.id, { equipe_id: it }); } ongletPublier(p); });
           rendreFilmsEvt();
         }).catch(e => toast('Film non gardé sur cet ordinateur : ' + e.message));
         $('#film-etat').textContent = `Film prêt en ${dureeTexte(sec)} (film de ${Math.round(r.duree)} s, ${(r.blob.size / 1e6).toFixed(1)} Mo, ${r.extension.toUpperCase()})`;
@@ -3952,6 +3962,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     };
     const pb = $('#publier');
     if (pb) pb.onclick = async () => {
+      if (p.statut !== 'valide') { if (!confirm('Cette invitation est encore en brouillon.\nLa marquer « Validé » et la publier ?')) return; p.statut = 'valide'; enregistrer(p); const sv = $('#st-val'), sb = $('#st-brou'); if (sv) { sv.classList.add('on'); sb.classList.remove('on'); } }
       pb.disabled = true;
       const etat = $('#pub-etat');
       try {
@@ -3962,13 +3973,16 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           const blob = await IDB.lire(id);
           if (blob) await GitHub.envoyer('medias/' + id.slice(4), blob, 'Média ' + id.slice(4));
         }
+        const avert = [];
         if (reglages.supabase) {
           etat.textContent = 'Base des invités…';
           if (!p.cle_hote) p.cle_hote = Base.cle();
-          await Base.rpc(reglages.supabase, 'inv_studio_publier', { p_evt: p.id, p_cle: p.cle_hote, p_titre: p.fiche.titre || '', p_slug: p.slug, p_langue: p.fiche.langue || 'fr' });
-          await syncInvites(p);
+          try { await Base.rpc(reglages.supabase, 'inv_studio_publier', { p_evt: p.id, p_cle: p.cle_hote, p_titre: p.fiche.titre || '', p_slug: p.slug, p_langue: p.fiche.langue || 'fr' }); await syncInvites(p); delete p.base_a_faire; }
+          catch (e) { if (!baseBloquee(e) && navigator.onLine) throw e; p.base_a_faire = true; avert.push('base des invités indisponible (' + (baseBloquee(e) ? 'quota Supabase dépassé' : 'pas de connexion') + ') : réponses et espace organisateur reliés automatiquement dès le déblocage'); }
         }
-        await copierFichiersEquipe(fichiersEquipe, t => { etat.textContent = t; });
+        try { await copierFichiersEquipe(fichiersEquipe, t => { etat.textContent = t; }); }
+        catch (e) { if (!baseBloquee(e)) throw e; avert.push('fichiers de la bibliothèque d\'équipe non copiés (espace d\'équipe bloqué) : republiez après le déblocage'); }
+        setTimeout(() => { if (avert.length) { const e2 = $('#pub-etat'); if (e2) e2.innerHTML = '<span style="color:#8a5a00">⚠ Publiée, mais ' + esc(avert.join(' ; ')) + '</span>'; toast('Publiée ✓ — ' + avert.join(' ; '), 12000); } }, 1500);
         etat.textContent = 'Envoi de l\'invitation…';
         const pub = publication(p);
         await GitHub.envoyer('projets/' + p.slug + '.json', JSON.stringify(pub, null, 1), 'Invitation ' + p.fiche.titre);
@@ -4017,13 +4031,22 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     if (p.musique && /^idb:/.test(p.musique.src)) fichiersIdb.push(p.musique.src);
     (p.polices_perso || []).forEach(x => { if (/^idb:/.test(x.src || '')) fichiersIdb.push(x.src); });
     for (const id of [...new Set(fichiersIdb)]) { etat('Envoi de ' + id.slice(4) + '…'); const blob = await IDB.lire(id); if (blob) await GitHub.envoyer('medias/' + id.slice(4), blob, 'Média ' + id.slice(4)); }
+    const avert = [];
     if (!opts.demo && reglages.supabase) {
       etat('Base des invités…');
       if (!p.cle_hote) p.cle_hote = Base.cle();
-      await Base.rpc(reglages.supabase, 'inv_studio_publier', { p_evt: p.id, p_cle: p.cle_hote, p_titre: p.fiche.titre || '', p_slug: p.slug, p_langue: p.fiche.langue || 'fr' });
-      await syncInvites(p);
+      try {
+        await Base.rpc(reglages.supabase, 'inv_studio_publier', { p_evt: p.id, p_cle: p.cle_hote, p_titre: p.fiche.titre || '', p_slug: p.slug, p_langue: p.fiche.langue || 'fr' });
+        await syncInvites(p); delete p.base_a_faire;
+      } catch (e) {
+        // base bloquée (quota Supabase) ou injoignable : l'invitation part quand même, la base sera reliée plus tard toute seule
+        if (!baseBloquee(e) && navigator.onLine) throw e;
+        p.base_a_faire = true; avert.push('la base des invités est indisponible (' + (baseBloquee(e) ? 'quota Supabase dépassé' : 'pas de connexion') + ') : l\'invitation est en ligne, mais les réponses et l\'espace organisateur marcheront dès que la base sera débloquée (reliée automatiquement)');
+      }
     }
-    await copierFichiersEquipe(srcsEquipe(p), etat);
+    try { await copierFichiersEquipe(srcsEquipe(p), etat); }
+    catch (e) { if (!baseBloquee(e)) throw e; avert.push('des photos / vidéos de la bibliothèque d\'équipe n\'ont pas pu être copiées (espace d\'équipe bloqué) : republiez après le déblocage'); }
+    if (avert.length) { toast('Publiée, mais ' + avert.join(' ; '), 12000); etat('⚠ ' + avert.join(' ; ')); }
     etat('Envoi de l\'invitation…');
     const pub = publication(p);
     let slug = p.slug;
@@ -4622,16 +4645,18 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       lierFilmsLocaux(z, rendreLocaux);
     };
     rendreLocaux();
-    if (!Equipe.actif()) { $('#vp-zone').innerHTML = `<div class="carte pile" style="max-width:640px"><p>Les vidéos de l'équipe apparaissent ici quand vous êtes dans une équipe. Ouvrez le lien d'équipe reçu, ou créez l'équipe dans <a href="#/reglages">Réglages</a>.</p></div>`; return; }
     const zone = $('#vp-zone');
     const va = $('#vp-ajout'); va.onchange = async () => {
       for (const f of [...va.files]) {
         const titre = f.name.replace(/\.\w+$/, '').replace(/[-_]+/g, ' ').replace(/\s*film\s*$/i, '').trim();
-        toast('Envoi de « ' + titre + ' » à l\'équipe…');
-        try { await Equipe.ajouterFilm(f, { titre }); toast('« ' + titre + ' » ajouté aux vidéos de l\'équipe'); } catch (err) { toast('« ' + titre + ' » non envoyé : ' + err.message); }
+        // gardé sur cet ordinateur (publiable tout de suite), puis envoyé à l'équipe si possible
+        let fl = null; try { fl = await Films.garder(f, null, { titre, dossier: 'videos' }); } catch (err) { toast('Film non gardé : ' + err.message); }
+        if (Equipe.actif()) { toast('Envoi de « ' + titre + ' » à l\'équipe…'); try { const it = await Equipe.ajouterFilm(f, { titre }); if (fl && it) Films.maj(fl.id, { equipe_id: it.id }); toast('« ' + titre + ' » ajouté aux vidéos de l\'équipe'); } catch (err) { toast('« ' + titre + ' » gardé dans 💻 Mes films ; équipe : ' + err.message, 6000); } }
+        else toast('« ' + titre + ' » ajouté à 💻 Mes films');
       }
       vueVideos();
     };
+    if (!Equipe.actif()) { $('#vp-zone').innerHTML = `<div class="carte pile" style="max-width:640px"><p>Les vidéos de l'équipe apparaissent ici quand vous êtes dans une équipe. Ouvrez le lien d'équipe reçu, ou créez l'équipe dans <a href="#/reglages">Réglages</a>.</p></div>`; return; }
     let films = [], surSite = new Set(), horsLigne = '';
     try { await Equipe.charger(); } catch (err) { horsLigne = err.message; Equipe.items = Stock.lire('studio.equipe.biblio', []); }
     const tout = (Equipe.items || []).filter(x => x.type === 'film' || x.type === 'fond' || x.type === 'video').sort((a, b) => String(b.cree || '').localeCompare(String(a.cree || '')));
@@ -5228,6 +5253,13 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
   if (Sauve.accAttente) setTimeout(() => Sauve.accEnLigne(0), 6000);
   else if (Equipe.actif()) { const der = Stock.lire('studio.sauve.acc.date', 0); if (Date.now() - der > 24 * 3600e3) setTimeout(() => Sauve.accEnLigne(0), 20000); }
   if (Equipe.actif()) setTimeout(() => Equipe.rattraper(), 25000);
+  // invitations publiées pendant que la base était bloquée : on les relie dès qu'elle répond
+  const relierBases = async () => {
+    for (const p of Object.values(projets).filter(x => x.base_a_faire && x.publie && x.cle_hote)) {
+      try { await Base.rpc(reglages.supabase, 'inv_studio_publier', { p_evt: p.id, p_cle: p.cle_hote, p_titre: p.fiche.titre || '', p_slug: p.slug, p_langue: p.fiche.langue || 'fr' }); await syncInvites(p); delete p.base_a_faire; enregistrer(p); toast('« ' + p.fiche.titre + ' » : base des invités reliée ✓'); } catch (e) { break; }
+    }
+  };
+  if (reglages.supabase) { setTimeout(relierBases, 15000); setInterval(relierBases, 10 * 60e3); window.addEventListener('online', () => setTimeout(relierBases, 5000)); }
   window.addEventListener('online', () => setTimeout(() => Equipe.rattraper(), 8000));
   Sauve.reprendre().then(n => { if (n) { toast(n + ' invitation(s) reprise(s) depuis la sauvegarde automatique'); route(); } });
 })();
