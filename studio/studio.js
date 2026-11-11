@@ -687,6 +687,10 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-11-6', date: '11 novembre 2026', titre: 'Retirer une publication', points: [
+      'Événement → <b>Liens du client</b> : nouveau bouton <b>🚫 Retirer la publication</b>. L\'invitation disparaît du site (avec sa démo et sa place sur la vitrine) ; les invités voient « Invitation introuvable ».',
+      'Le projet, les invités et les réponses restent dans le studio : <b>Remettre en ligne</b> la republie avec le même lien.',
+      'Vitrine : si le service de commande est indisponible, la commande du client est gardée sur son appareil et repart toute seule.'] },
     { id: '2026-11-11-5', date: '11 novembre 2026', titre: 'Studio plus léger : allègement automatique et nettoyage', points: [
       '<b>Allègement automatique à l\'import</b> : photos réduites à 1440 px (souvent 3 à 10 fois plus légères), fonds vidéo de plus de 8 Mo ré-encodés en 720 × 1280. À l\'écran du téléphone, la différence ne se voit pas.',
       '<b>Réglages → 💾 Espace et légèreté</b> : place utilisée dans ce navigateur et taille du site, les 12 fichiers les plus lourds (« Alléger » pour les vidéos), suppression des fichiers que plus rien n\'utilise, et demande au navigateur de ne jamais effacer vos fichiers.'
@@ -976,7 +980,7 @@
           <div><h3>${esc(p.fiche.titre)}</h3>
             <div class="muet">${esc(MoteurInfo.dateLisible(p.fiche.date, p.fiche.langue))}</div>
             <div class="muet">${p.plans.length} plans · ${(p.familles || []).length} familles</div>
-            <div style="margin-top:6px">${p.statut === 'valide' ? '<span class="badge ok">✅ Validé</span>' : '<span class="badge">📁 Brouillon</span>'} ${p.publie ? '<span class="badge ok">🌐 Publié</span>' : ''}</div>
+            <div style="margin-top:6px">${p.statut === 'valide' ? '<span class="badge ok">✅ Validé</span>' : '<span class="badge">📁 Brouillon</span>'} ${p.publie ? '<span class="badge ok">🌐 Publié</span>' : p.retire ? '<span class="badge">🚫 Retiré du site</span>' : ''}</div>
             <div class="ligne evt-actions"><button class="btn petit" data-evt-ouvrir="${p.id}" title="Ouvrir les plans">✎ Modifier</button><button class="btn petit" data-evt-fiche="${p.id}" title="Titre, date, lieux, contacts">ⓘ Infos</button><button class="btn petit" data-evt-dup="${p.id}" title="Faire une copie">⧉ Dupliquer</button><button class="btn petit danger" data-evt-suppr="${p.id}" title="Supprimer (récupérable dans la corbeille)">🗑</button></div></div>
         </div>`).join('')}</div>` : `
         <div class="carte vide"><h2>Aucun événement pour l'instant</h2><p class="muet">Collez le texte d'une invitation : le studio en tire les informations et propose les plans.</p><a class="btn plein" href="#/nouveau">Créer le premier événement</a>
@@ -3886,7 +3890,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
               </div>
               ${p.vitrine_publiee ? '<button class="btn petit danger" id="demo-retirer" style="align-self:flex-start">Retirer de la vitrine</button>' : ''}
             </div>
-            <button class="btn plein" id="publier">Publier l'invitation</button><div id="pub-etat" class="muet"></div>`
+            ${p.retire && !p.publie ? `<div class="alerte-boite">Publication retirée le ${esc(new Date(p.retire).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }))} : les invités voient « Invitation introuvable ». « Remettre en ligne » la republie avec le même lien.</div>` : ''}
+            <div class="ligne"><button class="btn plein" id="publier">${p.retire && !p.publie ? 'Remettre en ligne' : p.publie ? 'Republier (mettre à jour)' : 'Publier l\'invitation'}</button>${p.publie ? '<button class="btn danger" id="pub-retirer" title="L\'invitation n\'est plus visible sur le site ; le projet reste dans le studio">🚫 Retirer la publication</button>' : ''}</div><div id="pub-etat" class="muet"></div>`
             : `<div class="alerte-boite">Publication automatique non configurée. Allez dans <a href="#/reglages">Réglages</a> pour relier votre dépôt GitHub (une seule fois).</div>
             <p class="muet">En attendant, vous pouvez télécharger le fichier de publication et l'envoyer à Claude.</p>`}
           <button class="btn" id="tele-pub">Télécharger le fichier de publication</button>
@@ -3974,6 +3979,12 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         p.vitrine = false; p.vitrine_publiee = false; enregistrer(p); ongletPublier(p); toast('Retirée de la vitrine (visible dans quelques minutes)');
       } catch (e) { toast('Échec : ' + e.message); }
     };
+    const pr = $('#pub-retirer'); if (pr) pr.onclick = async () => {
+      if (!confirm('Retirer « ' + (p.fiche.titre || p.slug) + ' » du site ?\n\nLes invités verront « Invitation introuvable » (dans 1 à 10 minutes). La démo et la vitrine sont retirées aussi.\nLe projet, les invités et les réponses restent dans le studio : vous pourrez la remettre en ligne.')) return;
+      pr.disabled = true; const etat = $('#pub-etat');
+      try { await retirerPublication(p, t => { etat.textContent = t; }); ongletPublier(p); $('#pub-etat').innerHTML = '<div class="ok-boite">Publication retirée. Le lien ne marchera plus d\'ici quelques minutes.</div>'; toast('Publication retirée du site'); }
+      catch (e) { console.error(e); etat.innerHTML = `<div class="erreur-boite">Échec : ${esc(e.message)}</div>`; pr.disabled = false; }
+    };
     const pb = $('#publier');
     if (pb) pb.onclick = async () => {
       if (p.statut !== 'valide') { if (!confirm('Cette invitation est encore en brouillon.\nLa marquer « Validé » et la publier ?')) return; p.statut = 'valide'; enregistrer(p); const sv = $('#st-val'), sb = $('#st-brou'); if (sv) { sv.classList.add('on'); sb.classList.remove('on'); } }
@@ -4003,7 +4014,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         await GitHub.envoyer('projets/' + p.slug + '.js', enJS(p.slug, pub), 'Invitation ' + p.fiche.titre + ' (js)');
         if (p.vitrine) { etat.textContent = 'Mise à jour de la vitrine…'; await publierVitrine(p, pub, p.vitrine_noms, Equipe.actif() ? Equipe.membre() : ''); }
         if (p.vitrine) p.vitrine_publiee = true;
-        p.publie = new Date().toISOString(); enregistrer(p);
+        p.publie = new Date().toISOString(); delete p.retire; enregistrer(p);
         ongletPublier(p);
         $('#pub-etat').innerHTML = `<div class="ok-boite">Publié. Visible dans quelques minutes : <a target="_blank" href="${esc(lienGeneral(p))}">${esc(lienGeneral(p))}</a>${p.cle_hote && reglages.supabase ? '<br>Le lien organisateur est prêt (carte Liens).' : ''}</div>`;
         return;
@@ -4418,8 +4429,30 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         if ((r.status === 409 || r.status === 422) && essai < 4) { await new Promise(ok => setTimeout(ok, 1500 * (essai + 1))); continue; }
         throw this.erreur(r.status, texte);
       }
+    },
+    // Supprime un fichier du site (rien à faire s'il n'existe pas)
+    async supprimer(chemin, message) {
+      for (let essai = 0; ; essai++) {
+        const sha = await this.sha(chemin); if (!sha) return false;
+        const r = await this.appel(this.api(chemin), { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, sha, branch: reglages.github.branche || 'main' }) });
+        if (r.ok || r.status === 404) return true;
+        const texte = await r.text();
+        if ((r.status === 409 || r.status === 422) && essai < 4) { await new Promise(ok => setTimeout(ok, 1500 * (essai + 1))); continue; }
+        throw this.erreur(r.status, texte);
+      }
     }
   };
+
+  // Retire une invitation du site : elle n'est plus visible pour les invités (le projet reste dans le studio, on peut republier)
+  async function retirerPublication(p, etat) {
+    etat = etat || (() => {});
+    const t = p.fiche.titre || p.slug;
+    for (const s of [p.slug, p.slug + '-demo', 'demo-' + p.slug]) for (const ext of ['.js', '.json']) { etat('Retrait de ' + s + ext + '…'); await GitHub.supprimer('projets/' + s + ext, 'Retrait ' + t + ' (' + s + ext + ')'); }
+    etat('Vitrine…');
+    const index = await lireVitrine(); if (index.some(x => x.slug === 'demo-' + p.slug)) await retirerVitrine(p.slug, t);
+    p.retire = new Date().toISOString(); p.publie_avant = p.publie; delete p.publie; p.vitrine_publiee = false; p.vitrine = false;
+    enregistrer(p);
+  }
 
   /* ================= Bibliothèque ================= */
   function vueBibliotheque() {
