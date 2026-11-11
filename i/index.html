@@ -51,10 +51,10 @@
 <button id="son" aria-label="Son">♪</button><button id="pause" aria-label="Pause">❚❚</button>
 <div id="bandeau" role="dialog"></div>
 <div id="erreur"></div>
-<script src="../config.js?v=202611111220"></script>
-<script src="../moteur/moteur.js?v=202611111220"></script>
-<script src="../moteur/fabrique.js?v=202611111220"></script>
-<script src="../moteur/base.js?v=202611111220"></script>
+<script src="../config.js?v=202611111254"></script>
+<script src="../moteur/moteur.js?v=202611111254"></script>
+<script src="../moteur/fabrique.js?v=202611111254"></script>
+<script src="../moteur/base.js?v=202611111254"></script>
 <script>
 (async function () {
   const q = new URLSearchParams(location.search);
@@ -244,7 +244,7 @@
           // pas de connexion / serveur indisponible : la réponse reste sur le téléphone et part dès que possible
           if (/places|Plus d|inconnu/i.test(e.message || '')) throw e;
           try { localStorage.setItem('inv.attente.' + projet.id, JSON.stringify(argsRep)); } catch (er) {}
-          console.warn('réponse gardée pour plus tard', e.message); return true;
+          console.warn('réponse gardée pour plus tard', e.message); return 'attente';
         }
         try { localStorage.removeItem('inv.attente.' + projet.id); } catch (er) {}
         return true;
@@ -326,6 +326,12 @@
       const lienWa = k ? 'https://wa.me/' + tel(k.telephone) + '?text=' + encodeURIComponent(messageReponse(oui, form)) : '';
       const merci = oui ? tr('Misaotra! Voaray ny valinteninareo.', 'Merci ! Votre réponse est enregistrée.', 'Thank you! Your reply has been saved.') : tr('Misaotra nampahafantatra.', 'Merci de nous avoir prévenus.', 'Thank you for letting us know.');
       const envoyer = tr('Alefaso amin\'ny WhatsApp', 'Envoyer sur WhatsApp', 'Send on WhatsApp');
+      if (ok === 'attente') {
+        // serveur des réponses indisponible : la réponse est gardée sur le téléphone (envoyée toute seule plus tard) ; WhatsApp pour prévenir tout de suite
+        bandeau(`<b>${merci}</b><div style="margin-top:6px;font-size:15px">${tr('Hotehirizina eto amin\'ny findainareo ny valinteninareo ary halefa ho azy. Alefaso koa amin\'ny WhatsApp mba ho fantatra avy hatrany.', 'Votre réponse est gardée sur ce téléphone et partira toute seule. Envoyez-la aussi sur WhatsApp pour prévenir tout de suite.', 'Your reply is kept on this phone and will be sent automatically. Also send it on WhatsApp so they know right away.')}</div><div class="actions">${lienWa ? `<a class="plein" target="_blank" href="${lienWa}">${envoyer}</a>` : ''}<button data-fermer>OK</button></div>`);
+        let parti = false; const suite = () => { if (parti) return; parti = true; $('#bandeau').style.display = 'none'; moteur.allerRemerciement(); }; $('#bandeau').querySelectorAll('a, [data-fermer]').forEach(x => x.addEventListener('click', () => setTimeout(suite, 150)));
+        return;
+      }
       if (ok) bandeau(`<b>${merci}</b>`, { haut: true, auto: 3500 });
       else bandeau(`<b>${tr('Alefaso amin\'ny WhatsApp ny valinteninareo', 'Envoyez votre réponse sur WhatsApp', 'Send your reply on WhatsApp')}</b><div style="margin-top:6px">${messageReponse(oui, form)}</div><div class="actions">${lienWa ? `<a class="plein" target="_blank" href="${lienWa}">${envoyer}</a>` : ''}<button data-fermer>${tr('Hidio', 'Fermer', 'Close')}</button></div>`);
       // réponse enregistrée : remerciement tout de suite ; sinon, d'abord l'envoi par WhatsApp, puis le remerciement

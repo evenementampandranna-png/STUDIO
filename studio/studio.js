@@ -690,7 +690,9 @@
     { id: '2026-11-11-6', date: '11 novembre 2026', titre: 'Retirer une publication', points: [
       'Événement → <b>Liens du client</b> : nouveau bouton <b>🚫 Retirer la publication</b>. L\'invitation disparaît du site (avec sa démo et sa place sur la vitrine) ; les invités voient « Invitation introuvable ».',
       'Le projet, les invités et les réponses restent dans le studio : <b>Remettre en ligne</b> la republie avec le même lien.',
-      'Vitrine : si le service de commande est indisponible, la commande du client est gardée sur son appareil et repart toute seule.'] },
+      'Vitrine : si le service de commande est indisponible, la commande du client est gardée sur son appareil et repart toute seule.',
+      'Publier : si la <b>date limite des réponses</b> est dépassée, le studio propose de la repousser à la veille de l\'événement (sinon les invités ne peuvent pas confirmer).',
+      'Invités : si le service des réponses est saturé, la réponse est gardée sur le téléphone et l\'invité peut aussi l\'envoyer sur WhatsApp. L\'espace organisateur affiche un message clair et réessaie tout seul.'] },
     { id: '2026-11-11-5', date: '11 novembre 2026', titre: 'Studio plus léger : allègement automatique et nettoyage', points: [
       '<b>Allègement automatique à l\'import</b> : photos réduites à 1440 px (souvent 3 à 10 fois plus légères), fonds vidéo de plus de 8 Mo ré-encodés en 720 × 1280. À l\'écran du téléphone, la différence ne se voit pas.',
       '<b>Réglages → 💾 Espace et légèreté</b> : place utilisée dans ce navigateur et taille du site, les 12 fichiers les plus lourds (« Alléger » pour les vidéos), suppression des fichiers que plus rien n\'utilise, et demande au navigateur de ne jamais effacer vos fichiers.'
@@ -3988,6 +3990,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     const pb = $('#publier');
     if (pb) pb.onclick = async () => {
       if (p.statut !== 'valide') { if (!confirm('Cette invitation est encore en brouillon.\nLa marquer « Validé » et la publier ?')) return; p.statut = 'valide'; enregistrer(p); const sv = $('#st-val'), sb = $('#st-brou'); if (sv) { sv.classList.add('on'); sb.classList.remove('on'); } }
+      if (!limiteOk(p)) return;
       pb.disabled = true;
       const etat = $('#pub-etat');
       try {
@@ -4442,6 +4445,21 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       }
     }
   };
+
+  // Date limite des réponses dépassée : les invités ne pourraient plus confirmer → proposer de la repousser avant de publier
+  function limiteOk(p) {
+    const f = p.fiche || {}; if (!f.date_limite) return true;
+    if (Date.now() <= Date.parse(f.date_limite + 'T23:59:59+03:00')) return true;
+    const jour = d => new Date(d + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+    let nd = '';
+    if (f.date && Date.parse(f.date + 'T23:59:59+03:00') > Date.now()) { const d = new Date(f.date + 'T12:00:00'); d.setDate(d.getDate() - 1); nd = d.toISOString().slice(0, 10); if (Date.parse(nd + 'T23:59:59+03:00') < Date.now()) nd = f.date; }
+    if (nd) {
+      const r = confirm('La date limite des réponses (' + jour(f.date_limite) + ') est dépassée : les invités ne pourront PAS confirmer leur présence.\n\nOK = la repousser au ' + jour(nd) + ' et publier\nAnnuler = publier quand même (réponses closes)');
+      if (r) { f.date_limite = nd; enregistrer(p); toast('Date limite repoussée au ' + jour(nd)); }
+      return true;
+    }
+    return confirm('La date limite des réponses (' + jour(f.date_limite) + ') est dépassée : les invités ne pourront pas confirmer. Publier quand même ?');
+  }
 
   // Retire une invitation du site : elle n'est plus visible pour les invités (le projet reste dans le studio, on peut republier)
   async function retirerPublication(p, etat) {
