@@ -713,6 +713,11 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-11-9', date: '11 novembre 2026', titre: 'Espace organisateur plus complet', points: [
+      'Cartes <b>Invitation générale</b> (voir, copier, partager) et <b>Invitation personnelle</b> (voir un exemple) en haut de la page du client.',
+      'Une carte par <b>catégorie</b> : familles, places, confirmés, sans réponse (toucher = filtrer).',
+      '<b>Total prévu</b>, filtre <b>« Pas encore envoyée »</b> (l\'invitation est notée envoyée dès que le lien est copié, partagé ou envoyé sur WhatsApp), <b>Côté</b> de chaque famille.',
+      'Table choisie dans la liste, <b>Plan de salle</b> imprimable, <b>Supprimer toute la liste</b>, export Excel avec la feuille Tables.'] },
     { id: '2026-11-11-8', date: '11 novembre 2026', titre: 'Bouton Maps direct et équipe synchronisée', points: [
       'Bouton <b>Maps</b> : plus besoin de lien. L\'invité touche le bouton → Google Maps s\'ouvre directement sur le lieu de la Fiche (ou sur le nom écrit dans le bouton).',
       'Si le nom d\'un lieu change dans la Fiche, Maps suit le nouveau nom.',
