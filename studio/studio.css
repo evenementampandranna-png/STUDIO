@@ -535,3 +535,23 @@ body.atelier-max main { padding: 6px 8px 0 !important; }
 
 #grille-apercu { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
 #grille-btn.on { background: var(--vin); color: #fff; border-color: var(--vin); }
+
+/* Barres d'outils rétractables (🛠 ou Tab) : la zone de travail prend la place */
+.editeur.ps { position: relative; }
+.editeur.ps.sans-outils > .barre-sel, .editeur.ps.sans-outils > .outils { display: none !important; }
+@media (min-width: 1001px) {
+  .editeur.ps.sans-outils, body.atelier-plein .editeur.ps.sans-outils { grid-template-columns: minmax(150px, 210px) minmax(300px, 1fr) minmax(330px, 420px) !important; grid-template-rows: minmax(0, 1fr) !important; }
+  .editeur.ps.sans-outils .col-plans { grid-column: 1 !important; } .editeur.ps.sans-outils .col-apercu { grid-column: 2 !important; } .editeur.ps.sans-outils .col-reglages { grid-column: 3 !important; }
+}
+@media (min-width: 1001px) and (max-width: 1500px) { body.atelier-plein .editeur.ps.sans-outils { grid-template-columns: 118px minmax(280px, 1fr) minmax(300px, 360px) !important; } }
+.outils-flottant { position: absolute; left: 4px; top: 4px; z-index: 30; width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--ligne); background: #fff; box-shadow: 0 4px 14px rgba(60,20,20,.15); cursor: pointer; font-size: 16px; }
+.outils-flottant:hover { background: var(--vin); color: #fff; }
+#bascule-outils.on { background: var(--vin); color: #fff; border-color: var(--vin); }
+
+/* Regarder le projet en plein écran */
+.visionneuse { position: fixed; inset: 0; z-index: 9999; background: #0d0a0a; display: flex; align-items: center; justify-content: center; }
+.visionneuse .vis-scene { position: relative; height: 100vh; width: calc(100vh * 9 / 16); max-width: 100vw; max-height: calc(100vw * 16 / 9); }
+.visionneuse .vis-btns { position: absolute; top: 14px; right: 14px; display: flex; gap: 8px; z-index: 5; opacity: .35; transition: opacity .2s; }
+.visionneuse:hover .vis-btns { opacity: 1; }
+.visionneuse .vis-b { width: 42px; height: 42px; border-radius: 50%; border: 0; background: rgba(255,255,255,.18); color: #fff; font-size: 18px; cursor: pointer; backdrop-filter: blur(6px); }
+.visionneuse .vis-b:hover { background: rgba(255,255,255,.35); }

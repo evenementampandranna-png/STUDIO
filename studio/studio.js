@@ -735,6 +735,11 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-12-6', date: '12 novembre 2026', titre: 'Groupe redimensionnable, animation commune, plein écran, outils rétractables', points: [
+      '<b>Plusieurs éléments choisis</b> (formes, textes…) : ⊖ / ⊕ dans la barre, ou « Taille du groupe » (−20 % à +25 %), ou Ctrl + Alt + ↑/↓ : tout grandit ou rétrécit ensemble.',
+      '<b>Animer ensemble</b> : même entrée et sortie pour toute la sélection, avec un décalage pour qu\'ils arrivent l\'un après l\'autre.',
+      '<b>⛶ Plein écran</b> sous l\'aperçu : regardez l\'invitation comme l\'invité, avec la musique (Échap pour sortir).',
+      '<b>🛠 Outils</b> (ou touche Tab) : masque / affiche les barres d\'outils pour agrandir la zone de travail ; le choix est mémorisé.'] },
     { id: '2026-11-12-5', date: '12 novembre 2026', titre: 'Films de l\'équipe visibles par tous', points: [
       'Chaque film <b>validé</b> sur n\'importe quel ordinateur est envoyé tout seul, même ceux validés avant cette version (à l\'ouverture du studio ou de 🎬 Vidéos).',
       'Le studio de l\'admin publie sur le site <b>tous</b> les films de l\'équipe, puis les retire de la base pour libérer la place : ils restent visibles par tous dans 🎬 Vidéos.'] },
@@ -1459,6 +1464,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <div class="astuce" hidden>Maj+clic ou cadre de sélection : choisir plusieurs éléments · Double-clic : écrire dans le texte · Coins : agrandir · Côtés : élargir · Ctrl+C / Ctrl+V : copier-coller (aussi entre plans) · Ctrl+Alt+C / Ctrl+Alt+V : copier-coller la mise en forme · 🖌 : pinceau · Ctrl+D : dupliquer · Suppr : supprimer · Flèches : déplacer · Clic droit : menu</div>
           <div class="temps"><span id="t-aff">0,0 s</span><input type="range" id="t-curseur" min="0" max="6" step="0.05" value="0"><span id="t-dur"></span></div>
           <div class="commandes">
+            <button class="btn petit" id="vis-plein" title="Regarder l'invitation en plein écran, comme l'invité (Échap pour sortir)">⛶ Plein écran</button><button class="btn petit" id="bascule-outils" title="Masquer / afficher les barres d'outils (touche Tab)">🛠 Outils</button>
             <button class="btn petit" id="jouer-plan">▶ Plan</button><button class="btn petit" id="jouer-tout">▶ Toute l'invitation</button><button class="btn petit" id="pause" title="Pause / reprendre (barre d'espace)" disabled>⏸ Pause</button><button class="btn petit" id="stop">■</button>
             <button class="btn petit ${Stock.lire('studio.regles', false) ? 'on' : ''}" id="regles-btn" title="Afficher les règles et les repères">📏 Règles</button><button class="btn petit" id="grille-btn" title="Grille d'alignement, règles et repères (Ctrl+')">▦ Grille</button>
             <select id="vue" class="btn petit"><option value="famille">Voir : lien personnel</option><option value="general">Voir : lien général</option></select>
@@ -1650,6 +1656,43 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     let son = null;
     const couperSon = () => { if (son) { son.pause(); son = null; } };
     nettoyeurs.push(couperSon);
+    // Regarder le projet en plein écran (comme l'invité, avec la musique)
+    $('#vis-plein').onclick = async () => {
+      const ov = document.createElement('div'); ov.className = 'visionneuse';
+      ov.innerHTML = '<div class="vis-scene"></div><div class="vis-btns"><button class="vis-b" data-v="rejouer" title="Revoir depuis le début">↺</button><button class="vis-b" data-v="pause" title="Pause / lecture">⏸</button><button class="vis-b" data-v="fermer" title="Fermer (Échap)">✕</button></div>';
+      document.body.appendChild(ov);
+      let v = null, audio = null, ferme = false;
+      const fermer = () => { if (ferme) return; ferme = true; try { v && v.detruire(); } catch (e) {} if (audio) { audio.pause(); audio = null; } ov.remove(); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); document.removeEventListener('keydown', clavier, true); };
+      const clavier = e => { if (e.key === 'Escape') { e.preventDefault(); fermer(); } if (e.key === ' ') { e.preventDefault(); $('[data-v="pause"]', ov).click(); } };
+      document.addEventListener('keydown', clavier, true);
+      ov.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) fermer(); });
+      try { await ov.requestFullscreen(); } catch (e) {}
+      couperSon(); if (eng.lecture) { eng.pause(); enLecture(false); }
+      v = new Moteur($('.vis-scene', ov), { mode: 'invitation', resolveur: resoudre, famille: eng.famille || FAMILLE_TEST });
+      await v.setProjet(p); if (ferme) return;
+      if (p.musique && p.musique.src) { try { audio = new Audio(await resoudre(p.musique.src)); audio.volume = p.musique.volume != null ? p.musique.volume : 0.8; audio.currentTime = Number(p.musique.debut) || 0; audio.loop = true; audio.play().catch(() => {}); } catch (e) {} }
+      const lancer = () => { v.jouer(v.plansInvitation(), 0); if (audio) { audio.currentTime = Number(p.musique.debut) || 0; audio.play().catch(() => {}); } };
+      lancer();
+      $$('.vis-b', ov).forEach(b => b.onclick = () => {
+        if (b.dataset.v === 'fermer') fermer();
+        if (b.dataset.v === 'rejouer') lancer();
+        if (b.dataset.v === 'pause') { if (v.lecture) { v.pause(); if (audio) audio.pause(); b.textContent = '▶'; } else { v.reprendre(); if (audio) audio.play().catch(() => {}); b.textContent = '⏸'; } }
+      });
+    };
+    // Barres d'outils rétractables (bouton 🛠 ou touche Tab) : le choix est mémorisé
+    const appliquerOutils = () => {
+      const cache = !!Stock.lire('studio.outils.masques', false), ed = $('.editeur.ps'); if (!ed) return;
+      ed.classList.toggle('sans-outils', cache);
+      const b = $('#bascule-outils'); if (b) { b.classList.toggle('on', cache); b.textContent = cache ? '🛠 Afficher les outils' : '🛠 Outils'; }
+      let f = $('#outils-flottant');
+      if (cache && !f) { f = document.createElement('button'); f.id = 'outils-flottant'; f.className = 'outils-flottant'; f.title = 'Afficher les barres d\'outils (Tab)'; f.textContent = '🛠'; f.onclick = basculerOutils; ed.appendChild(f); }
+      if (!cache && f) f.remove();
+      setTimeout(ajusterHauteur, 30); setTimeout(ajusterHauteur, 250);
+    };
+    const basculerOutils = () => { Stock.ecrire('studio.outils.masques', !Stock.lire('studio.outils.masques', false)); appliquerOutils(); };
+    E.basculerOutils = basculerOutils;
+    $('#bascule-outils').onclick = basculerOutils;
+    appliquerOutils();
     $('#jouer-tout').onclick = async () => {
       eng.mode = 'invitation'; enLecture(true); eng.jouer(eng.plansInvitation(), 0);
       couperSon();
@@ -2158,6 +2201,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       if (!mod && !e.altKey && e.key === 'v') { const b = $('#outils [data-outil="select"]'); if (b) b.click(); return; }
       if (!mod && !e.altKey && (e.key === 'u' || e.key === 'p')) { const b = $('#outils [data-outil="' + (e.key === 'u' ? 'rect' : 'plume') + '"]'); if (b) b.click(); return; }
       if (!mod && !e.altKey && e.key === 'f') { E.pleinEcran(); return; }
+      if (!mod && !e.altKey && e.key === 'Tab') { e.preventDefault(); E.basculerOutils(); return; }
       if (!mod && !e.altKey && e.key === 'h') { const b = $('#outils [data-outil="main"]'); if (b) b.click(); return; }
       if (!mod && !e.altKey && e.key === 'i' && c) { const b = $('#outils [data-outil="pipette"]'); if (b) b.click(); return; }
       if (mod && (e.code === 'BracketRight' || e.code === 'BracketLeft') && c) { e.preventDefault(); ordreCalque(c, e.code === 'BracketRight' ? (e.shiftKey ? 'avant' : 'avance') : (e.shiftKey ? 'arriere' : 'recule')); return; }
@@ -2170,6 +2214,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); supprimerCalque(c); return; }
       if (e.key === 'Enter' && E.multi.size <= 1 && (c.type === 'texte' || c.type === 'bouton' || c.type === 'compteur')) { e.preventDefault(); editer(c); return; }
       if (e.key === 'Escape') { choisir(null); return; }
+      if (mod && e.altKey && E.multi.size > 1 && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); redimGroupe(e.key === 'ArrowUp' ? 1.05 : 0.95); return; }
       const pas = e.shiftKey ? 2 : 0.5;
       const dep = { ArrowLeft: [-pas, 0], ArrowRight: [pas, 0], ArrowUp: [0, -pas], ArrowDown: [0, pas] }[e.key];
       if (dep) { e.preventDefault(); E.modif(); const cs = E.multi.size > 1 ? selection() : [c]; cs.forEach(x => { x.x = Math.round(Math.max(0, Math.min(100, Number(x.x) + dep[0])) * 10) / 10; x.y = Math.round(Math.max(0, Math.min(100, Number(x.y) + dep[1])) * 10) / 10; }); if (cs.some(x => I.TYPES_HTML.includes(x.type))) E.rafraichir(); majChamps(c); }
@@ -2221,8 +2266,9 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         const cs = selection(), ecrits = cs.filter(x => x.type === 'texte' || x.type === 'bouton' || x.type === 'compteur');
         bar.innerHTML = `<b class="type-sel">${cs.length} éléments</b>${ALIGN}<button class="btn petit icone" data-al="repartir-v" title="Répartir verticalement (espaces égaux)" ${cs.length > 2 ? '' : 'disabled'}>☰</button><button class="btn petit icone" data-al="repartir-h" title="Répartir horizontalement" ${cs.length > 2 ? '' : 'disabled'}>⫼</button><button class="btn petit icone" data-al="page" title="Centrer le groupe sur la page">◎</button>
           <span class="sep"></span>${ecrits.length ? `<input type="color" data-b="couleur" value="${ecrits[0].couleur || '#7a1f2b'}" title="Couleur de tous les textes choisis"><button class="btn petit" data-b="police" title="Police de tous les textes choisis">Police</button>` : ''}<button class="btn petit icone" data-b="moins" title="Tout réduire">−</button><button class="btn petit icone" data-b="plus" title="Tout agrandir">+</button>
+          <span class="sep"></span><button class="btn petit icone" data-mt="0.9" title="Réduire tout le groupe (−10 %)">⊖</button><button class="btn petit icone" data-mt="1.1" title="Agrandir tout le groupe (+10 %)">⊕</button>
           <span class="sep"></span><button class="btn petit icone" data-b="copier" title="Copier (Ctrl+C)">⧉</button><button class="btn petit icone" data-b="dupliquer" title="Dupliquer (Ctrl+D)">⊕</button><button class="btn petit icone" data-b="avant" title="Tout devant (premier plan) — Ctrl+Maj+]">⤒</button><button class="btn petit icone" data-b="avance" title="Avancer d'un cran — Ctrl+]">↑</button><button class="btn petit icone" data-b="recule" title="Reculer d'un cran — Ctrl+[">↓</button><button class="btn petit icone" data-b="arriere" title="Tout derrière (arrière-plan) — Ctrl+Maj+[">⤓</button><button class="btn petit icone danger" data-b="suppr" title="Supprimer (Suppr)">🗑</button>`;
-        lierBarre(bar, c); return;
+        lierBarre(bar, c); $$('[data-mt]', bar).forEach(b => b.onclick = () => redimGroupe(Number(b.dataset.mt))); return;
       }
       if (!c && pinceau) { bar.innerHTML = `<span class="muet">🖌 Pinceau actif : cliquez les calques à mettre en forme</span><button class="btn petit" data-b="pinceau">Arrêter</button>`; lierBarre(bar, c); return; }
       if (!c) {
@@ -2634,11 +2680,42 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <div class="ligne grille-align">${[['gauche', '⫷ Gauche'], ['centre-h', '⇔ Centre'], ['droite', '⫸ Droite'], ['haut', '⤒ Haut'], ['centre-v', '⇕ Milieu'], ['bas', '⤓ Bas']].map(([k, n]) => `<button class="btn petit" data-mal="${k}">${n}</button>`).join('')}</div>
         <div class="ligne grille-align"><button class="btn petit" data-mal="repartir-v" ${cs.length > 2 ? '' : 'disabled'}>☰ Répartir en hauteur</button><button class="btn petit" data-mal="repartir-h" ${cs.length > 2 ? '' : 'disabled'}>⫼ Répartir en largeur</button><button class="btn petit" data-mal="page">◎ Centrer sur la page</button></div>
         ${ecrits.length ? `<b style="font-size:12.5px">Textes et boutons choisis</b><div class="ligne" style="gap:6px"><label class="champ" style="flex:0 0 auto">Couleur<input type="color" data-mk="couleur" value="${ecrits[0].couleur || '#7a1f2b'}"></label><label class="champ" style="flex:1">Police<button class="btn police-btn" data-mpolice>${esc(ecrits[0].police || 'Cormorant Garamond')} ▾</button></label></div>` : ''}
+        <b style="font-size:12.5px">Taille du groupe</b>
+        <div class="ligne grille-align"><button class="btn petit" data-mtaille="0.8">−20 %</button><button class="btn petit" data-mtaille="0.9">−10 %</button><button class="btn petit" data-mtaille="0.97">−3 %</button><button class="btn petit" data-mtaille="1.03">+3 %</button><button class="btn petit" data-mtaille="1.1">+10 %</button><button class="btn petit" data-mtaille="1.25">+25 %</button></div>
+        <span class="muet" style="font-size:11.5px">Tout le groupe grandit ou rétrécit ensemble, en gardant les écarts (aussi Ctrl + Alt + flèche haut / bas).</span>
+        <b style="font-size:12.5px">Animer ensemble</b>
+        <div class="deux"><label class="champ">Entrée<select data-manim="animation">${opts(effets(I.ANIMATIONS), cs[0].animation || 'fondu-montee')}</select></label><label class="champ">Sortie<select data-manim="sortie">${opts(effets(I.SORTIES), cs[0].sortie || 'aucune')}</select></label></div>
+        <div class="trois"><label class="champ">Début (s)<input type="number" data-manim="debut" step="0.1" min="0" value="${Math.min(...cs.map(x => Number(x.debut) || 0))}"></label><label class="champ">Durée (s)<input type="number" data-manim="duree_animation" step="0.1" min="0.1" value="${cs[0].duree_animation || 0.8}"></label><label class="champ" title="Chaque élément commence un peu après le précédent (du haut vers le bas)">Décalage (s)<input type="number" data-manim="decalage" step="0.1" min="0" value="0.2"></label></div>
+        <button class="btn petit plein" data-manim-ok>✦ Appliquer l'animation aux ${cs.length} éléments</button>
         <div class="ligne" style="gap:6px"><button class="btn petit" data-mact="dupliquer">⊕ Dupliquer</button><button class="btn petit" data-mact="copier">⧉ Copier</button><button class="btn petit danger" data-mact="suppr">🗑 Supprimer</button><button class="btn petit" data-mact="aucun">Ne plus rien choisir</button></div>
       </div>`;
     }
+    // agrandir / réduire tout le groupe autour de son centre (positions, largeurs, hauteurs, tailles de texte)
+    function redimGroupe(k) {
+      const cs = selection(); if (cs.length < 2 || !k) return; E.modif(true);
+      const xs = cs.map(x => Number(x.x) || 50), ys = cs.map(x => Number(x.y) || 50);
+      const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2, r1 = v => Math.round(v * 10) / 10;
+      cs.forEach(x => {
+        x.x = r1(cx + ((Number(x.x) || 50) - cx) * k); x.y = r1(cy + ((Number(x.y) || 50) - cy) * k);
+        if (x.largeur) x.largeur = r1(Math.max(1, Math.min(400, Number(x.largeur) * k)));
+        if (x.hauteur) x.hauteur = r1(Math.max(1, Math.min(400, Number(x.hauteur) * k)));
+        if (x.taille && (x.type === 'texte' || x.type === 'bouton' || x.type === 'compteur' || x.type === 'emoji')) x.taille = Math.round(Math.max(0.5, Math.min(40, Number(x.taille) * k)) * 100) / 100;
+      });
+      E.rafraichir(); rendreReglages();
+    }
+    E.redimGroupe = redimGroupe;
     function lierMulti() {
       const cs = selection();
+      $$('#props [data-mtaille]').forEach(b => b.onclick = () => redimGroupe(Number(b.dataset.mtaille)));
+      const ok = $('#props [data-manim-ok]'); if (ok) ok.onclick = () => {
+        const val = k => { const el = $(`#props [data-manim="${k}"]`); return el ? el.value : ''; };
+        const deb = Number(val('debut')) || 0, dec = Number(val('decalage')) || 0, dur = Number(val('duree_animation')) || 0.8;
+        E.modif(true);
+        [...cs].sort((a, b) => (Number(a.y) || 0) - (Number(b.y) || 0) || (Number(a.x) || 0) - (Number(b.x) || 0)).forEach((x, i) => {
+          x.animation = val('animation'); x.sortie = val('sortie'); x.duree_animation = dur; x.debut = Math.round((deb + i * dec) * 100) / 100;
+        });
+        E.rafraichir(); rendreReglages(); toast('✦ Animation appliquée aux ' + cs.length + ' éléments — ▶ Plan pour voir');
+      };
       $$('#props [data-mal]').forEach(b => b.onclick = () => aligner(b.dataset.mal));
       const mk = $('#props [data-mk="couleur"]'); if (mk) mk.oninput = () => { E.modif(); cs.filter(x => x.type !== 'image' && x.type !== 'video').forEach(x => { x.couleur = mk.value; }); if (cs.some(x => I.TYPES_HTML.includes(x.type))) E.rafraichir(); };
       const mp = $('#props [data-mpolice]'); if (mp) mp.onclick = () => ouvrirPolices(mp, null, nom => { E.modif(true); cs.filter(x => x.type === 'texte' || x.type === 'bouton' || x.type === 'compteur').forEach(x => { x.police = nom; }); appliquerPolice(nom); });
