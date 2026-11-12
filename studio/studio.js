@@ -273,7 +273,19 @@
         if (n) { toast(n + ' fichier(s) de l\'équipe recopié(s) dans la nouvelle base'); await this.charger().catch(() => {}); }
       } finally { this._rest = false; }
     },
-    async charger() { if (!this.actif()) return; this.items = await this.rpc('equipe_biblio_lire') || []; Stock.ecrire('studio.equipe.biblio', this.items); },
+    // liste des fonds et vidéos de l'équipe : on ne télécharge que les nouveaux (les vignettes déjà connues restent sur l'ordinateur)
+    async charger() {
+      if (!this.actif()) return;
+      let ids;
+      try { ids = await this.rpc('equipe_biblio_ids'); }
+      catch (e) { if (!/Could not find the function|PGRST202|equipe_biblio_ids/i.test(e.message)) throw e; this.items = await this.rpc('equipe_biblio_lire') || []; Stock.ecrire('studio.equipe.biblio', this.items); return; }
+      ids = ids || [];
+      const cache = new Map(((this.items && this.items.length) ? this.items : Stock.lire('studio.equipe.biblio', [])).map(x => [x.id, x]));
+      const manquants = ids.filter(id => !cache.has(id));
+      for (let k = 0; k < manquants.length; k += 100) ((await this.rpc('equipe_biblio_lire_ids', { p_ids: manquants.slice(k, k + 100) })) || []).forEach(x => cache.set(x.id, x));
+      this.items = ids.map(id => cache.get(id)).filter(Boolean);
+      Stock.ecrire('studio.equipe.biblio', this.items);
+    },
     // éléments de l'équipe présentés comme des fichiers de la bibliothèque (sauf ceux qui sont déjà les miens en local)
     medias() {
       if (!this.actif()) return [];
@@ -288,9 +300,11 @@
     },
     async _partager(m, evtTitre) {
       const blob = await IDB.lire(m.src); if (!blob) throw new Error('fichier introuvable');
-      const id = (Date.now().toString(36) + Math.random().toString(36).slice(2, 8)), ext = (m.src.split('.').pop() || 'mp4').toLowerCase();
+      // identifiant fixé AVANT l'envoi : si l'envoi est interrompu, on renvoie au même endroit (pas de fichier en double dans la base)
+      if (!m.equipe_pid) { m.equipe_pid = Date.now().toString(36) + Math.random().toString(36).slice(2, 8); sauverMedias(); }
+      const id = m.equipe_pid, ext = (m.src.split('.').pop() || 'mp4').toLowerCase();
       const chemin = reglages.equipe.cle + '/' + id + '.' + ext;
-      await this.envoyerFichier(chemin, blob);
+      await this.envoyerFichier(chemin, blob, true);
       await this.rpc('equipe_biblio_ajouter', { p_item: { id, auteur: this.membre(), type: m.type, nom: m.nom, chemin, vignette: m.vignette || '', usage: m.usage || '', description: m.description || '', duree: m.duree || 0, l: m.l || 0, h: m.h || 0, secondes_creation: m.secondes_creation || null, evenement: evtTitre || '' } });
       m.equipe_id = id; sauverMedias();
       this.items.unshift({ id, auteur: this.membre(), type: m.type, nom: m.nom, chemin, vignette: m.vignette, secondes_creation: m.secondes_creation, cree: new Date().toISOString() });
@@ -348,7 +362,7 @@
     urls: Stock.lire('studio.equipe.urls', {}),
     urlDe(src) {
       const m = medias.find(x => x.src === src);
-      if (m && m.equipe_id) { const it = (this.items || []).find(x => x.id === m.equipe_id); if (it) return this.url(it.chemin); }
+      if (m && m.equipe_id) { const it = (this.items || []).find(x => x.id === m.equipe_id); if (it) return this.url(it.chemin); if (!this.urls[src] && reglages.equipe && reglages.equipe.cle) return this.url(reglages.equipe.cle + '/' + m.equipe_id + '.' + (m.src.split('.').pop() || 'mp4').toLowerCase()); }
       return this.urls[src] || null;
     },
     async envoyerSrc(src) {
@@ -357,8 +371,9 @@
       if (m && (m.type === 'fond' || m.anime) && !m.brouillon) { await this.partager(m, ''); if (this.urlDe(src)) return; }
       const blob = await IDB.lire(src); if (!blob) return;
       if (blob.size > 50e6) throw new Error('fichier de plus de 50 Mo');
-      const chemin = reglages.equipe.cle + '/' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7) + '.' + ((src.split('.').pop() || 'bin').toLowerCase());
-      await this.envoyerFichier(chemin, blob);
+      // chemin tiré du nom local : toujours le même pour ce fichier (jamais de doublon)
+      const chemin = reglages.equipe.cle + '/s-' + src.replace(/^idb:/, '').replace(/[^\w.-]+/g, '_').slice(-80);
+      await this.envoyerFichier(chemin, blob, true);
       this.urls[src] = this.url(chemin); Stock.ecrire('studio.equipe.urls', this.urls);
     },
     // le travail de chacun, visible par l'admin (avec ses fichiers, pour qu'il puisse le publier)
@@ -713,6 +728,10 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-12-1', date: '12 novembre 2026', titre: 'Équipe : tout le monde voit tout, sans saturer la base', points: [
+      'Bibliothèque et Vidéos : les fonds et vidéos de <b>tous les membres</b> se mettent à jour tout seuls toutes les 2 minutes.',
+      'Seuls les <b>nouveaux</b> éléments sont téléchargés (les vignettes déjà vues restent sur l\'ordinateur) : beaucoup moins de quota utilisé.',
+      'Correction : un envoi interrompu ne crée plus de fichier en double dans la base.'] },
     { id: '2026-11-11-12', date: '11 novembre 2026', titre: 'Site moderne, prix par modèle, traduction automatique', points: [
       'Site : en-tête et pied de page <b>fixes</b>, contact <b>WhatsApp 033 46 261 16</b> et <b>e-mail</b>, prix affiché sur <b>chaque modèle</b>.',
       'Commandes → Conditions de la vitrine : e-mail, <b>tarifs</b>, <b>prix par défaut</b> et <b>prix de chaque modèle</b> modifiables.',
@@ -1005,6 +1024,14 @@
     return vueAccueil();
   }
   window.addEventListener('hashchange', route);
+  // Équipe : la liste des fonds et vidéos de tous les membres se met à jour toute seule (toutes les 2 minutes)
+  setInterval(async () => {
+    if (!Equipe.actif() || document.visibilityState !== 'visible' || !navigator.onLine) return;
+    const avant = (Equipe.items || []).length;
+    try { await Equipe.charger(); } catch (e) { return; }
+    const v = location.hash.replace(/^#\/?/, '').split('/')[0];
+    if ((Equipe.items || []).length !== avant && (v === 'bibliotheque' || v === 'videos') && !document.querySelector('dialog[open], .modale-fond')) { const y = scrollY; route(); setTimeout(() => scrollTo(0, y), 50); }
+  }, 120000);
 
   /* ================= Accueil ================= */
   // Barre de recherche : filtre les cartes d'une page (nom, date, valeurs des champs…)
