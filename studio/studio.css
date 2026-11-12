@@ -598,3 +598,13 @@ body.atelier-plein.haut-replie main { padding-top: 14px !important; }
 .chevron-haut.replie .ch { transform: translateY(-3px) rotate(225deg); }
 .chevron-haut.dans-onglets { position: static; transform: none; margin-left: auto; align-self: center; width: 40px; height: 28px; border: 1px solid var(--ligne); border-radius: 10px; box-shadow: none; flex: none; }
 .chevron-haut.dans-onglets:hover { height: 28px; }
+/* plein écran : barre de lecture (avancer / reculer) */
+.visionneuse .vis-barre { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); width: min(680px, 94vw); background: rgba(20,14,14,.62); backdrop-filter: blur(10px); border-radius: 18px; padding: 10px 14px 8px; display: flex; flex-direction: column; gap: 6px; z-index: 6; opacity: .25; transition: opacity .25s; }
+.visionneuse:hover .vis-barre, .visionneuse .vis-barre:focus-within { opacity: 1; }
+.visionneuse .vis-temps { width: 100%; -webkit-appearance: none; appearance: none; height: 6px; border-radius: 999px; background: linear-gradient(to right, #e7c38b var(--pc, 0%), rgba(255,255,255,.25) var(--pc, 0%)); cursor: pointer; }
+.visionneuse .vis-temps::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 6px rgba(0,0,0,.4); }
+.visionneuse .vis-temps::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 0; }
+.visionneuse .vis-cmd { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.visionneuse .vis-cmd .vis-b { width: 38px; height: 38px; font-size: 15px; }
+.visionneuse .vis-cmd .vis-b.gros { width: 48px; height: 48px; font-size: 19px; background: rgba(255,255,255,.28); }
+.visionneuse .vis-heure { color: #fff; font: 600 12.5px Inter, sans-serif; margin-left: 8px; font-variant-numeric: tabular-nums; min-width: 82px; }

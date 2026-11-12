@@ -735,6 +735,8 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-12-9', date: '12 novembre 2026', titre: 'Plein écran : avancer et reculer', points: [
+      '⛶ Plein écran : barre de lecture en bas — glissez pour aller où vous voulez, ⏪ −5 s, ⏩ +5 s, ⏮ / ⏭ plan précédent / suivant, ↺ depuis le début, ⏸ pause. Clavier : ← / → (5 s), Maj + ← / → (plan), espace.'] },
     { id: '2026-11-12-8', date: '12 novembre 2026', titre: 'Replier le haut de l\'atelier', points: [
       'Chevron <b>⌃</b> au bout de la ligne des onglets (Plans · Fiche · Invités…) : replie le menu du site, le titre et les onglets pour agrandir la zone de travail. La petite languette <b>⌄</b> en haut de l\'écran les redéplie. Aussi Maj + Tab. Mémorisé.'] },
     { id: '2026-11-12-7', date: '12 novembre 2026', titre: 'Lieux sur Maps, poignées de groupe, panneau en accordéon', points: [
@@ -1666,11 +1668,20 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     // Regarder le projet en plein écran (comme l'invité, avec la musique)
     $('#vis-plein').onclick = async () => {
       const ov = document.createElement('div'); ov.className = 'visionneuse';
-      ov.innerHTML = '<div class="vis-scene"></div><div class="vis-btns"><button class="vis-b" data-v="rejouer" title="Revoir depuis le début">↺</button><button class="vis-b" data-v="pause" title="Pause / lecture">⏸</button><button class="vis-b" data-v="fermer" title="Fermer (Échap)">✕</button></div>';
+      ov.innerHTML = '<div class="vis-scene"></div><div class="vis-btns"><button class="vis-b" data-v="fermer" title="Fermer (Échap)">✕</button></div>'
+        + '<div class="vis-barre"><input type="range" class="vis-temps" min="0" max="100" step="0.1" value="0" title="Glisser pour avancer ou reculer"><div class="vis-cmd">'
+        + '<button class="vis-b" data-v="debut" title="Revoir depuis le début">↺</button><button class="vis-b" data-v="plan-" title="Plan précédent (Maj + ←)">⏮</button><button class="vis-b" data-v="recul" title="Reculer de 5 s (←)">⏪</button>'
+        + '<button class="vis-b gros" data-v="pause" title="Pause / lecture (espace)">⏸</button>'
+        + '<button class="vis-b" data-v="avance" title="Avancer de 5 s (→)">⏩</button><button class="vis-b" data-v="plan+" title="Plan suivant (Maj + →)">⏭</button><span class="vis-heure">0:00 / 0:00</span></div></div>';
       document.body.appendChild(ov);
       let v = null, audio = null, ferme = false;
       const fermer = () => { if (ferme) return; ferme = true; try { v && v.detruire(); } catch (e) {} if (audio) { audio.pause(); audio = null; } ov.remove(); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); document.removeEventListener('keydown', clavier, true); };
-      const clavier = e => { if (e.key === 'Escape') { e.preventDefault(); fermer(); } if (e.key === ' ') { e.preventDefault(); $('[data-v="pause"]', ov).click(); } };
+      const clavier = e => {
+        if (e.key === 'Escape') { e.preventDefault(); fermer(); }
+        if (e.key === ' ') { e.preventDefault(); $('[data-v="pause"]', ov).click(); }
+        if (e.key === 'ArrowRight') { e.preventDefault(); $(`[data-v="${e.shiftKey ? 'plan+' : 'avance'}"]`, ov).click(); }
+        if (e.key === 'ArrowLeft') { e.preventDefault(); $(`[data-v="${e.shiftKey ? 'plan-' : 'recul'}"]`, ov).click(); }
+      };
       document.addEventListener('keydown', clavier, true);
       ov.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) fermer(); });
       try { await ov.requestFullscreen(); } catch (e) {}
@@ -1678,12 +1689,29 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       v = new Moteur($('.vis-scene', ov), { mode: 'invitation', resolveur: resoudre, famille: eng.famille || FAMILLE_TEST });
       await v.setProjet(p); if (ferme) return;
       if (p.musique && p.musique.src) { try { audio = new Audio(await resoudre(p.musique.src)); audio.volume = p.musique.volume != null ? p.musique.volume : 0.8; audio.currentTime = Number(p.musique.debut) || 0; audio.loop = true; audio.play().catch(() => {}); } catch (e) {} }
-      const lancer = () => { v.jouer(v.plansInvitation(), 0); if (audio) { audio.currentTime = Number(p.musique.debut) || 0; audio.play().catch(() => {}); } };
+      // ligne du temps : durées des plans du film (les plans fixes — confirmation, remerciement — comptent 6 s)
+      const seq = v.plansInvitation(), dur = seq.map(i => Number(p.plans[i].duree) || 6), total = dur.reduce((a, b) => a + b, 0);
+      const debutDe = k => dur.slice(0, k).reduce((a, b) => a + b, 0);
+      const fmt = x => Math.floor(x / 60) + ':' + String(Math.floor(x % 60)).padStart(2, '0');
+      const tempsGlobal = () => Math.min(total, debutDe(v.pos) + Math.min(v.t, dur[v.pos] || 0));
+      const aller = T => { T = Math.max(0, Math.min(total - 0.05, T)); let k = 0; while (k < seq.length - 1 && T >= debutDe(k + 1)) k++; v.chercher(k, T - debutDe(k)); if (audio) { try { audio.currentTime = (Number(p.musique.debut) || 0) + T; } catch (e) {} } maj(); };
+      const barre = $('.vis-temps', ov), heure = $('.vis-heure', ov); barre.max = total;
+      let glisse = false;
+      const maj = () => { if (!glisse) barre.value = tempsGlobal(); heure.textContent = fmt(tempsGlobal()) + ' / ' + fmt(total); barre.style.setProperty('--pc', (tempsGlobal() / total * 100) + '%'); };
+      barre.addEventListener('input', () => { glisse = true; aller(Number(barre.value)); });
+      barre.addEventListener('change', () => { glisse = false; });
+      const tic = setInterval(() => { if (ferme) clearInterval(tic); else maj(); }, 200);
+      const lancer = () => { v.jouer(seq, 0); if (audio) { audio.currentTime = Number(p.musique.debut) || 0; audio.play().catch(() => {}); } const pb = $('[data-v="pause"]', ov); if (pb) pb.textContent = '⏸'; };
       lancer();
       $$('.vis-b', ov).forEach(b => b.onclick = () => {
-        if (b.dataset.v === 'fermer') fermer();
-        if (b.dataset.v === 'rejouer') lancer();
-        if (b.dataset.v === 'pause') { if (v.lecture) { v.pause(); if (audio) audio.pause(); b.textContent = '▶'; } else { v.reprendre(); if (audio) audio.play().catch(() => {}); b.textContent = '⏸'; } }
+        const a = b.dataset.v;
+        if (a === 'fermer') fermer();
+        if (a === 'debut') lancer();
+        if (a === 'avance') aller(tempsGlobal() + 5);
+        if (a === 'recul') aller(tempsGlobal() - 5);
+        if (a === 'plan+') aller(debutDe(Math.min(seq.length - 1, v.pos + 1)));
+        if (a === 'plan-') aller(debutDe(Math.max(0, v.t > 1 ? v.pos : v.pos - 1)));
+        if (a === 'pause') { const pb = $('[data-v="pause"]', ov); if (v.lecture) { v.pause(); if (audio) audio.pause(); pb.textContent = '▶'; } else { v.reprendre(); if (audio) audio.play().catch(() => {}); pb.textContent = '⏸'; } }
       });
     };
     // Barres d'outils rétractables (bouton 🛠 ou touche Tab) : le choix est mémorisé

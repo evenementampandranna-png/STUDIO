@@ -367,6 +367,18 @@
     plansuivant() { return this.projet && this.projet.plans ? this.projet.plans[this.seq[this.pos + 1]] : null; }
 
     allerA(pos) { if (pos < 0 || pos >= this.seq.length) return; this.pos = pos; this.t = 0; this.lecture = true; this._entrerPlan(); }
+    // se placer à l'instant t du plan pos (avancer / reculer), en gardant la lecture ou la pause
+    chercher(pos, t) {
+      if (!this.seq || pos < 0 || pos >= this.seq.length) return;
+      const enLecture = this.lecture, change = pos !== this.pos;
+      this.pos = pos; this.t = Math.max(0, t || 0);
+      const p = this.planCourant(); if (!p) return;
+      if (change) { this.lecture = false; this._entrerPlan(); }
+      this._caler(p, this.t);
+      this.lecture = enLecture;
+      if (enLecture) this._lancerVideos(p, false);
+      this._construireHTML();
+    }
     suivant() { if (this.pos < this.seq.length - 1) this.allerA(this.pos + 1); }
     precedent() { if (this.pos > 0) this.allerA(this.pos - 1); }
     // Aller au plan de remerciement (après « Je confirme » / « Je ne pourrai pas venir »)
