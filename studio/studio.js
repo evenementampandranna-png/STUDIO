@@ -735,6 +735,11 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-12-7', date: '12 novembre 2026', titre: 'Lieux sur Maps, poignées de groupe, panneau en accordéon', points: [
+      'Bouton <b>Maps</b> : tous les lieux de la Fiche (⛪ église, 🎉 espace…) — « Tous les lieux » : l\'invité <b>choisit</b> lequel ouvrir. « ➕ Ajouter un lieu » directement depuis le bouton.',
+      'Plusieurs éléments choisis : un <b>cadre de groupe</b> avec 4 coins — tirez un coin pour tout agrandir ou réduire ensemble.',
+      'Barre du haut (plusieurs éléments) : <b>✦ Animer ensemble</b>.',
+      'Panneau de droite en <b>accordéon</b> : chaque section se déplie / se replie avec un chevron et une animation fluide ; « Tout déplier / Tout replier » ; mémorisé.'] },
     { id: '2026-11-12-6', date: '12 novembre 2026', titre: 'Groupe redimensionnable, animation commune, plein écran, outils rétractables', points: [
       '<b>Plusieurs éléments choisis</b> (formes, textes…) : ⊖ / ⊕ dans la barre, ou « Taille du groupe » (−20 % à +25 %), ou Ctrl + Alt + ↑/↓ : tout grandit ou rétrécit ensemble.',
       '<b>Animer ensemble</b> : même entrée et sortie pour toute la sélection, avec un décalage pour qu\'ils arrivent l\'un après l\'autre.',
@@ -1764,6 +1769,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         const rot = Number(c.rotation) || 0;
         return `<div class="poignee ${actif && seule ? 'actif' : ''} ${groupe ? 'groupe' : ''}" data-id="${c.id}" style="left:${b.x}%;top:${b.y}%;width:${b.w}%;height:${b.h}%${rot ? `;transform:rotate(${rot}deg)` : ''}"><span class="nom">${esc(nomType(c))}${drag && drag.mode === 'rotation' && drag.c === c ? ' · ' + rot + '°' : ''}</span>${hs}</div>`;
       }).join('') + (regles ? p.guides.v.map((x, k) => `<div class="guide guide-v" data-gv="${k}" style="left:${x}%" title="Glisser pour déplacer · double-clic ou glisser hors du cadre pour effacer"></div>`).join('') + p.guides.h.map((y, k) => `<div class="guide guide-h" data-gh="${k}" style="top:${y}%" title="Glisser pour déplacer · double-clic ou glisser hors du cadre pour effacer"></div>`).join('') : '')
+        + (!seule ? (() => { const bs = [...E.multi].map(id => eng.bbox[id]).filter(Boolean); if (bs.length < 2) return ''; const x0 = Math.min(...bs.map(b => b.x)), y0 = Math.min(...bs.map(b => b.y)), x1 = Math.max(...bs.map(b => b.x + b.w)), y1 = Math.max(...bs.map(b => b.y + b.h));
+            return `<div class="groupe-cadre" style="left:${x0}%;top:${y0}%;width:${x1 - x0}%;height:${y1 - y0}%">${['nw', 'ne', 'sw', 'se'].map(k => `<i class="gh gh-${k}" data-gh="${k}" title="Glisser : agrandir ou réduire tout le groupe"></i>`).join('')}</div>`; })() : '')
         + (cadreSel ? `<div class="cadre-selection" style="left:${Math.min(cadreSel.x0, cadreSel.x1)}%;top:${Math.min(cadreSel.y0, cadreSel.y1)}%;width:${Math.abs(cadreSel.x1 - cadreSel.x0)}%;height:${Math.abs(cadreSel.y1 - cadreSel.y0)}%"></div>` : '');
       if (zone._html !== html) { zone.innerHTML = html; zone._html = html; dessinerRegles(); }
     }
@@ -1823,6 +1830,16 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       // repère : déplacer
       const gd = e.target.closest('.guide');
       if (gd) { drag = { mode: 'guide', axe: gd.dataset.gv != null ? 'v' : 'h', k: Number(gd.dataset.gv != null ? gd.dataset.gv : gd.dataset.gh), w: r.width, h: r.height, r }; zone.setPointerCapture(e.pointerId); e.preventDefault(); return; }
+      // cadre du groupe : un coin tiré agrandit / réduit toute la sélection ensemble
+      const gh = e.target.closest('[data-gh]');
+      if (gh && E.multi.size > 1) {
+        const cs = selection(), bs = cs.map(c => eng.bbox[c.id]).filter(Boolean);
+        const bx0 = Math.min(...bs.map(b => b.x)), by0 = Math.min(...bs.map(b => b.y)), bx1 = Math.max(...bs.map(b => b.x + b.w)), by1 = Math.max(...bs.map(b => b.y + b.h));
+        const xs = cs.map(c => Number(c.x) || 50), ys = cs.map(c => Number(c.y) || 50);
+        const cxp = r.left + (bx0 + bx1) / 2 / 100 * r.width, cyp = r.top + (by0 + by1) / 2 / 100 * r.height;
+        drag = { mode: 'groupe-taille', orig: cs.map(c => ({ c, x: Number(c.x) || 50, y: Number(c.y) || 50, largeur: c.largeur, hauteur: c.hauteur, taille: c.taille })), gcx: (Math.min(...xs) + Math.max(...xs)) / 2, gcy: (Math.min(...ys) + Math.max(...ys)) / 2, cxp, cyp, d0: Math.max(8, Math.hypot(e.clientX - cxp, e.clientY - cyp)), bouge: false };
+        zone.setPointerCapture(e.pointerId); e.preventDefault(); return;
+      }
       const h = e.target.closest('.h');
       if (h && calqueSel() && calqueSel().verrou) { toast('🔒 Calque verrouillé (outil 🔒 pour le libérer)'); return; }
       if (h && h.dataset.h === 'rot' && calqueSel()) {
@@ -1870,6 +1887,17 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         const dedans = (plan().calques || []).filter(c => { const b = eng.bbox[c.id]; return b && !c.masque && b.x < x2 && b.x + b.w > x1 && b.y < y2 && b.y + b.h > y1; }).map(c => c.id);
         const ids = drag.ajout ? [...new Set([...drag.avant, ...dedans])] : dedans;
         E.multi = new Set(ids); E.sel = ids[ids.length - 1] || null; zone._html = '';
+        return;
+      }
+      if (drag.mode === 'groupe-taille') {
+        const k = Math.max(0.15, Math.min(5, Math.hypot(e.clientX - drag.cxp, e.clientY - drag.cyp) / drag.d0));
+        if (!drag.bouge) { if (Math.abs(k - 1) < 0.01) return; snapshot(); drag.bouge = true; }
+        const r1 = v => Math.round(v * 10) / 10;
+        drag.orig.forEach(o => { const c = o.c; c.x = r1(drag.gcx + (o.x - drag.gcx) * k); c.y = r1(drag.gcy + (o.y - drag.gcy) * k);
+          if (o.largeur) c.largeur = r1(Math.max(1, Number(o.largeur) * k)); if (o.hauteur) c.hauteur = r1(Math.max(1, Number(o.hauteur) * k));
+          if (o.taille && (c.type === 'texte' || c.type === 'bouton' || c.type === 'compteur' || c.type === 'emoji')) c.taille = Math.round(Math.max(0.5, Number(o.taille) * k) * 100) / 100; });
+        zone._html = '';
+        if (drag.orig.some(o => I.TYPES_HTML.includes(o.c.type))) E.rafraichir();
         return;
       }
       if (drag.mode === 'rotation') {
@@ -1920,7 +1948,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         enregistrer(p); drag = null; zone._html = ''; return;
       }
       if (drag && drag.mode === 'cadre') { cadreSel = null; zone._html = ''; drag = null; rendreReglages(); return; }
-      if (drag && drag.bouge) { enregistrer(p); if (drag.mode === 'taille' || drag.mode === 'rotation' || (drag.groupe && drag.groupe.length > 1)) rendreReglages(); }
+      if (drag && drag.bouge) { enregistrer(p); if (drag.mode === 'taille' || drag.mode === 'rotation' || drag.mode === 'groupe-taille' || (drag.groupe && drag.groupe.length > 1)) rendreReglages(); }
       drag = null; aimants.innerHTML = '';
     });
     zone.addEventListener('dblclick', e => { const gd = e.target.closest('.guide'); if (!gd) return; e.stopPropagation(); if (gd.dataset.gv != null) p.guides.v.splice(Number(gd.dataset.gv), 1); else p.guides.h.splice(Number(gd.dataset.gh), 1); enregistrer(p); zone._html = ''; }, true);
@@ -2208,7 +2236,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       if (mod && (e.key === '=' || e.key === '+')) { e.preventDefault(); E.zoomer(1.2); return; }
       if (mod && (e.key === '-' || e.key === '_')) { e.preventDefault(); E.zoomer(1 / 1.2); return; }
       if (mod && e.key === '0') { e.preventDefault(); E.zoomer(0); return; }
-      if (mod && e.key.toLowerCase() === 'a') { e.preventDefault(); choisirPlusieurs((plan().calques || []).filter(x => !x.masque).map(x => x.id)); toast('Tout est choisi : glissez pour déplacer ensemble'); return; }
+      if (mod && e.key.toLowerCase() === 'a') { e.preventDefault(); try { window.getSelection().removeAllRanges(); } catch (er) {} choisirPlusieurs((plan().calques || []).filter(x => !x.masque).map(x => x.id)); toast('Tout est choisi : glissez pour déplacer ensemble'); return; }
       if (e.key === ' ' && (eng.lecture || E.enPause)) { e.preventDefault(); E.basculerPause(); return; }
       if (!c) return;
       if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); supprimerCalque(c); return; }
@@ -2266,9 +2294,11 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         const cs = selection(), ecrits = cs.filter(x => x.type === 'texte' || x.type === 'bouton' || x.type === 'compteur');
         bar.innerHTML = `<b class="type-sel">${cs.length} éléments</b>${ALIGN}<button class="btn petit icone" data-al="repartir-v" title="Répartir verticalement (espaces égaux)" ${cs.length > 2 ? '' : 'disabled'}>☰</button><button class="btn petit icone" data-al="repartir-h" title="Répartir horizontalement" ${cs.length > 2 ? '' : 'disabled'}>⫼</button><button class="btn petit icone" data-al="page" title="Centrer le groupe sur la page">◎</button>
           <span class="sep"></span>${ecrits.length ? `<input type="color" data-b="couleur" value="${ecrits[0].couleur || '#7a1f2b'}" title="Couleur de tous les textes choisis"><button class="btn petit" data-b="police" title="Police de tous les textes choisis">Police</button>` : ''}<button class="btn petit icone" data-b="moins" title="Tout réduire">−</button><button class="btn petit icone" data-b="plus" title="Tout agrandir">+</button>
-          <span class="sep"></span><button class="btn petit icone" data-mt="0.9" title="Réduire tout le groupe (−10 %)">⊖</button><button class="btn petit icone" data-mt="1.1" title="Agrandir tout le groupe (+10 %)">⊕</button>
+          <span class="sep"></span><button class="btn petit" data-manim-voir title="Animer tous les éléments choisis ensemble">✦ Animer ensemble</button><button class="btn petit icone" data-mt="0.9" title="Réduire tout le groupe (−10 %)">⊖</button><button class="btn petit icone" data-mt="1.1" title="Agrandir tout le groupe (+10 %)">⊕</button>
           <span class="sep"></span><button class="btn petit icone" data-b="copier" title="Copier (Ctrl+C)">⧉</button><button class="btn petit icone" data-b="dupliquer" title="Dupliquer (Ctrl+D)">⊕</button><button class="btn petit icone" data-b="avant" title="Tout devant (premier plan) — Ctrl+Maj+]">⤒</button><button class="btn petit icone" data-b="avance" title="Avancer d'un cran — Ctrl+]">↑</button><button class="btn petit icone" data-b="recule" title="Reculer d'un cran — Ctrl+[">↓</button><button class="btn petit icone" data-b="arriere" title="Tout derrière (arrière-plan) — Ctrl+Maj+[">⤓</button><button class="btn petit icone danger" data-b="suppr" title="Supprimer (Suppr)">🗑</button>`;
-        lierBarre(bar, c); $$('[data-mt]', bar).forEach(b => b.onclick = () => redimGroupe(Number(b.dataset.mt))); return;
+        lierBarre(bar, c); $$('[data-mt]', bar).forEach(b => b.onclick = () => redimGroupe(Number(b.dataset.mt)));
+        const va = $('[data-manim-voir]', bar); if (va) va.onclick = () => { const d = $$('#col-reglages details.bloc').find(x => x.querySelector('[data-manim-ok]')); const cible = $('#props [data-manim="animation"]'); if (d) d.classList.remove('ferme'); if (cible) { cible.scrollIntoView({ block: 'center', behavior: 'smooth' }); cible.focus(); } };
+        return;
       }
       if (!c && pinceau) { bar.innerHTML = `<span class="muet">🖌 Pinceau actif : cliquez les calques à mettre en forme</span><button class="btn petit" data-b="pinceau">Arrêter</button>`; lierBarre(bar, c); return; }
       if (!c) {
@@ -2500,33 +2530,36 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     }
     E.rendreReglages = rendreReglages;
     // Panneau façon Photoshop : une seule rubrique ouverte à la fois (la dernière utilisée), « Calques » toujours visible
-    const titreBloc = d => { const sm = d.querySelector('summary'); return sm ? (sm.childNodes[0] && sm.childNodes[0].textContent || sm.textContent).trim() : ''; };
+    const titreBloc = d => { const sm = d.querySelector('summary'); if (!sm) return ''; if (sm.dataset.titre == null) sm.dataset.titre = (sm.childNodes[0] && sm.childNodes[0].textContent || sm.textContent).trim(); return sm.dataset.titre; };
     const ICONES_PANNEAU = [[/^Fond/, '▦'], [/^Durée/, '⏱'], [/^Calques/, '☰'], [/^Texte/, 'T'], [/^Style|^Arrière|^Ombre|^Contour/, '🎨'], [/^⏱|^Compte/, '⏳'], [/^Traduction/, '🌐'], [/^Animation/, '✦'], [/^Position/, '✥'], [/^Ordre/, '⇅'], [/^Bouton/, '⏺'], [/^Compteur/, '±'], [/^▭/, '▭'], [/^◇/, '◇'], [/^Photo/, '🖼'], [/^Alignement|^Plusieurs|^Sélection/, '⊞']];
     const iconePanneau = t => (ICONES_PANNEAU.find(([r]) => r.test(t)) || [0, '•'])[1];
     // Panneaux façon Photoshop : liste d'icônes à droite, un seul panneau ouvert à la fois ; « Calques » toujours visible en bas
+    // Panneau de droite en accordéon : chaque section se déplie / se replie (chevron, animation fluide) ; mémorisé par type
     function accordeon(col, quoi) {
-      const blocs = $$('details.bloc', col).filter(d => !/^Calques/.test(titreBloc(d)));
-      const calques = $$('details.bloc', col).find(d => /^Calques/.test(titreBloc(d)));
-      if (calques) { calques.open = true; calques.classList.add('ps-calques'); const sm = calques.querySelector('summary'); if (sm) sm.onclick = e => e.preventDefault(); }
-      if (!blocs.length) return;
-      const cle = 'studio.panneau.' + quoi;
-      let ouvert = Stock.lire(cle, null);
-      if (!blocs.some(d => titreBloc(d) === ouvert)) ouvert = titreBloc(blocs.find(d => !/^Fond$|^Durée/.test(titreBloc(d))) || blocs[0]);
-      const montrer = t => {
-        if (!blocs.some(d => titreBloc(d) === t)) t = titreBloc(blocs[0]);
-        ouvert = t;
-        blocs.forEach(d => { const on = titreBloc(d) === t; d.open = true; d.hidden = !on; d.classList.add('ps-panneau'); });
-        $$('.ps-liste button', col).forEach(b => b.classList.toggle('on', b.dataset.p === t));
-        if (Stock.lire(cle, null) !== t) Stock.ecrire(cle, t);
-      };
-      blocs.forEach(d => { const sm = d.querySelector('summary'); if (sm) sm.onclick = e => e.preventDefault(); });
-      const liste = document.createElement('div'); liste.className = 'ps-liste';
-      liste.innerHTML = blocs.map(d => { const t = titreBloc(d); return `<button type="button" data-p="${esc(t)}" title="${esc(t)}"><span class="ps-ic">${iconePanneau(t)}</span><span class="ps-nom">${esc(t.replace(/^[^\wÀ-ÿ]+\s*/, ''))}</span></button>`; }).join('');
-      col.classList.add('ps-col'); col.appendChild(liste);
-      $$('button', liste).forEach(b => b.onclick = () => montrer(b.dataset.p));
-      montrer(ouvert);
+      const blocs = $$('details.bloc', col); if (!blocs.length) return;
+      const cle = 'studio.accordeon.' + quoi;
+      let ouverts = Stock.lire(cle, null);
+      if (!Array.isArray(ouverts)) { const prem = blocs.find(d => !/^Fond$|^Durée|^Calques/.test(titreBloc(d))) || blocs[0]; ouverts = [titreBloc(prem), 'Calques']; }
+      const memoriser = () => Stock.ecrire(cle, blocs.filter(d => !d.classList.contains('ferme')).map(titreBloc));
+      col.classList.add('acc-col');
+      blocs.forEach(d => {
+        const t = titreBloc(d), sm = d.querySelector('summary'); if (!sm) return;
+        d.open = true; d.classList.add('acc');
+        if (!sm.querySelector('.acc-chev')) { sm.insertAdjacentHTML('afterbegin', `<span class="acc-ic">${iconePanneau(t)}</span>`); sm.insertAdjacentHTML('beforeend', '<span class="acc-chev" aria-hidden="true"></span>'); }
+        if (!d.querySelector(':scope > .acc-corps')) {
+          const corps = document.createElement('div'); corps.className = 'acc-corps'; const inner = document.createElement('div'); inner.className = 'acc-inner';
+          [...d.childNodes].filter(n => n !== sm).forEach(n => inner.appendChild(n)); corps.appendChild(inner); d.appendChild(corps);
+        }
+        const ouvert = ouverts.some(o => t === o || (o === 'Calques' && /^Calques/.test(t)));
+        d.classList.toggle('ferme', !ouvert); sm.setAttribute('aria-expanded', ouvert);
+        sm.onclick = e => { e.preventDefault(); const f = !d.classList.contains('ferme'); d.classList.toggle('ferme', f); sm.setAttribute('aria-expanded', !f); memoriser(); };
+      });
+      const outils = document.createElement('div'); outils.className = 'acc-outils';
+      outils.innerHTML = '<button type="button" data-acc="tout">⊞ Tout déplier</button><button type="button" data-acc="rien">⊟ Tout replier</button>';
+      $$('button', outils).forEach(b => b.onclick = () => { blocs.forEach(d => { d.classList.toggle('ferme', b.dataset.acc === 'rien'); }); memoriser(); });
+      const premier = blocs[0]; premier.parentNode.insertBefore(outils, premier);
     }
-    E.ouvrirSection = nom => { const b = $$('#col-reglages .ps-liste button').find(x => x.dataset.p.startsWith(nom)); if (b) b.click(); const d = $$('#col-reglages details.bloc').find(x => titreBloc(x).startsWith(nom)); if (d) { d.open = true; d.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } };
+    E.ouvrirSection = nom => { const d = $$('#col-reglages details.bloc').find(x => titreBloc(x).replace(/^\S+\s/, '').startsWith(nom) || titreBloc(x).startsWith(nom)); if (d) { d.open = true; d.classList.remove('ferme'); d.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } };
 
     // Police choisie : on la charge puis on redessine (le canvas a besoin de la vraie police)
     ouvrirPolices.projet = p;
@@ -2821,10 +2854,17 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       const a = c.action || 'suivant', f = p.fiche || {}, lieux = f.lieux || [], contacts = f.contacts || [];
       const t = TYPES_BOUTON.find(x => x.a === a) || TYPES_BOUTON[0];
       let h = `<div class="aide-bouton">${t.i} ${esc(t.aide)}</div>`;
-      if (a === 'map') h += `${lieux.length ? `<label class="champ">Lieu (de la Fiche)<select data-k="cible">${lieux.map((l, i) => `<option value="${i}" ${Number(c.cible || 0) === i ? 'selected' : ''}>${esc(l.nom || 'Lieu ' + (i + 1))}</option>`).join('')}</select></label>
-        <div class="muet" style="font-size:12px">✓ Rien d'autre à faire : l'invité touche le bouton → <b>Google Maps s'ouvre directement sur ce lieu</b>.</div>` : ''}
-        <label class="champ">${lieux.length ? 'Autre lieu (facultatif) : écrivez simplement son nom' : 'Nom du lieu (Google Maps le trouve tout seul, pas besoin de lien)'}<input type="text" data-k="lien" placeholder="ex. Hôtel Colbert Antananarivo" value="${esc(c.lien || '')}"></label>
-        <button class="btn petit" data-tester-bouton>Ouvrir pour tester ↗</button>`;
+      if (a === 'map') {
+        const ROLES = { ceremonie: '⛪', eglise: '⛪', reception: '🎉', espace: '🎉', mairie: '🏛', autre: '📍' };
+        const cib = c.cible == null || c.cible === '' ? (lieux.length > 1 ? 'tous' : '0') : String(c.cible);
+        h += `<label class="champ">Lieu(x) de la Fiche<select data-lieu-sel>
+            ${lieux.length > 1 ? `<option value="tous" ${cib === 'tous' ? 'selected' : ''}>📍 Tous les lieux (${lieux.length}) — l'invité choisit</option>` : ''}
+            ${lieux.map((l, i) => `<option value="${i}" ${cib === String(i) ? 'selected' : ''}>${ROLES[l.role] || '📍'} ${esc(l.nom || 'Lieu ' + (i + 1))}</option>`).join('')}
+            <option value="__ajout">➕ Ajouter un lieu (église, espace, salle…)</option></select></label>
+          <div class="muet" style="font-size:12px">${lieux.length ? `✓ L'invité touche le bouton → ${cib === 'tous' ? '<b>il choisit</b> parmi ' + lieux.map(l => esc(l.nom)).join(', ') + ', puis Google Maps s\'ouvre' : '<b>Google Maps s\'ouvre directement sur ce lieu</b>'}.` : 'Ajoutez les lieux (église, espace de réception…) : ils seront proposés à l\'invité.'}</div>
+          <label class="champ">Autre lieu (facultatif) : nom ou lien Google Maps<input type="text" data-k="lien" placeholder="ex. Hôtel Colbert Antananarivo" value="${esc(c.lien || '')}"></label>
+          <button class="btn petit" data-tester-lien>Ouvrir pour tester ↗</button>`;
+      }
       if (a === 'appeler' || a === 'whatsapp') h += `<label class="champ">Contact<select data-k="cible">${contacts.map((k, i) => `<option value="${i}" ${Number(c.cible || 0) === i ? 'selected' : ''}>${esc((k.nom || 'Contact ' + (i + 1)) + ' — ' + (k.telephone || ''))}</option>`).join('') || '<option value="0">— aucun contact dans la Fiche —</option>'}</select></label>
         <label class="champ">Ou un autre numéro<input type="tel" data-k="tel" placeholder="ex. 034 12 345 67" value="${esc(c.tel || '')}"></label>
         <button class="btn petit" data-tester-bouton>${a === 'whatsapp' ? 'Ouvrir WhatsApp pour tester ↗' : 'Tester le numéro'}</button>`;
@@ -3014,6 +3054,17 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       if (ac) ac.onclick = () => { E.modif(true); c.texte = (c.texte ? c.texte + '\n' : '') + '{compte_a_rebours}'; E.rafraichir(); rendreReglages(); };
       const va = $('#props [data-voir-anim]');
       if (va) va.onclick = () => { eng.mode = 'invitation'; eng.jouerPlan(E.i); };
+      const ls = $('#props [data-lieu-sel]'); if (ls) ls.onchange = () => {
+        const f = p.fiche || (p.fiche = {}); f.lieux = f.lieux || [];
+        if (ls.value === '__ajout') {
+          const nom = (prompt('Nom du lieu (ex. FJKM Ambohitantely, Espace Fenitra Ivato) :') || '').trim();
+          if (!nom) { rendreReglages(); return; }
+          const eglise = confirm('« ' + nom + ' » est-il le lieu de la CÉRÉMONIE (église, mairie) ?\n\nOK = cérémonie ⛪   ·   Annuler = réception / espace 🎉');
+          E.modif(true); f.lieux.push({ nom, adresse: '', role: eglise ? 'ceremonie' : 'reception', maps: '' });
+          c.cible = f.lieux.length > 1 ? 'tous' : 0; enregistrer(p); toast('Lieu ajouté à la Fiche : ' + nom); rendreReglages(); return;
+        }
+        E.modif(true); c.cible = ls.value === 'tous' ? 'tous' : Number(ls.value); enregistrer(p); rendreReglages();
+      };
       $$('#props [data-k]').forEach(inp => {
         const k = inp.dataset.k;
         const ev = inp.tagName === 'SELECT' || inp.type === 'checkbox' || inp.type === 'color' ? 'change' : 'input';

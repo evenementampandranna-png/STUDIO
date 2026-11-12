@@ -555,3 +555,34 @@ body.atelier-max main { padding: 6px 8px 0 !important; }
 .visionneuse:hover .vis-btns { opacity: 1; }
 .visionneuse .vis-b { width: 42px; height: 42px; border-radius: 50%; border: 0; background: rgba(255,255,255,.18); color: #fff; font-size: 18px; cursor: pointer; backdrop-filter: blur(6px); }
 .visionneuse .vis-b:hover { background: rgba(255,255,255,.35); }
+
+/* Panneau de droite en accordéon (chevrons, animation fluide) */
+.col-reglages.acc-col { display: flex; flex-direction: column; padding: 0; }
+.col-reglages.acc-col > .acc-outils { order: -3; }
+.col-reglages.acc-col > #props { order: -2; }
+.col-reglages.acc-col > details.ps-calques, .col-reglages.acc-col > details.acc:has(.calque-ligne) { order: 50; }
+.col-reglages.acc-col #props:empty { display: none; }
+.col-reglages.acc-col .ps-liste { display: none !important; }
+.acc-outils { display: flex; gap: 6px; justify-content: flex-end; padding: 8px 12px 2px; }
+.acc-outils button { border: 0; background: none; color: var(--gris); font: 600 11px Inter, sans-serif; cursor: pointer; padding: 3px 6px; border-radius: 6px; }
+.acc-outils button:hover { background: #f4ece1; color: var(--vin); }
+details.bloc.acc { border-top: 1px solid var(--ligne); padding: 0 !important; margin: 0; }
+details.bloc.acc > summary { display: flex !important; align-items: center; gap: 8px; margin: 0 !important; padding: 11px 14px !important; cursor: pointer !important; background: #fbf6f0; color: var(--vin); font-size: 12px; transition: background .2s; user-select: none; }
+details.bloc.acc > summary:hover { background: #f4ece1; }
+details.bloc.acc > summary::after { content: none !important; }
+details.bloc.acc > summary .acc-ic { width: 20px; height: 20px; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; background: #fff; box-shadow: 0 1px 3px rgba(60,20,20,.1); font-size: 12px; }
+details.bloc.acc > summary .acc-chev { margin-left: auto; width: 9px; height: 9px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); transition: transform .3s cubic-bezier(.4,0,.2,1); opacity: .7; flex: none; }
+details.bloc.acc.ferme > summary .acc-chev { transform: rotate(-45deg); }
+details.bloc.acc.ferme > summary { color: var(--gris); }
+details.bloc.acc > .acc-corps { display: grid; grid-template-rows: 1fr; opacity: 1; transition: grid-template-rows .32s cubic-bezier(.4,0,.2,1), opacity .25s ease; }
+details.bloc.acc.ferme > .acc-corps { grid-template-rows: 0fr; opacity: 0; }
+details.bloc.acc > .acc-corps > .acc-inner { overflow: hidden; min-height: 0; padding: 0 14px; }
+details.bloc.acc:not(.ferme) > .acc-corps > .acc-inner { padding: 10px 14px 14px; }
+details.bloc.acc > .acc-corps > .acc-inner { transition: padding .32s cubic-bezier(.4,0,.2,1); }
+details.bloc.acc.ferme > .acc-corps > .acc-inner { padding-top: 0; padding-bottom: 0; }
+details.bloc.acc[hidden] { display: block !important; }
+/* cadre d'un groupe choisi : coins pour agrandir / réduire ensemble */
+.groupe-cadre { position: absolute; border: 1.5px dashed var(--vin); pointer-events: none; z-index: 5; }
+.groupe-cadre .gh { position: absolute; width: 14px; height: 14px; background: #fff; border: 2px solid var(--vin); border-radius: 3px; pointer-events: auto; box-shadow: 0 1px 4px rgba(0,0,0,.25); }
+.groupe-cadre .gh-nw { left: -8px; top: -8px; cursor: nwse-resize; } .groupe-cadre .gh-se { right: -8px; bottom: -8px; cursor: nwse-resize; }
+.groupe-cadre .gh-ne { right: -8px; top: -8px; cursor: nesw-resize; } .groupe-cadre .gh-sw { left: -8px; bottom: -8px; cursor: nesw-resize; }
