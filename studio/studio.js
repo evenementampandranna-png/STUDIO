@@ -735,6 +735,8 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-12-8', date: '12 novembre 2026', titre: 'Replier le haut de l\'atelier', points: [
+      'Chevron <b>⌃</b> au bout de la ligne des onglets (Plans · Fiche · Invités…) : replie le menu du site, le titre et les onglets pour agrandir la zone de travail. La petite languette <b>⌄</b> en haut de l\'écran les redéplie. Aussi Maj + Tab. Mémorisé.'] },
     { id: '2026-11-12-7', date: '12 novembre 2026', titre: 'Lieux sur Maps, poignées de groupe, panneau en accordéon', points: [
       'Bouton <b>Maps</b> : tous les lieux de la Fiche (⛪ église, 🎉 espace…) — « Tous les lieux » : l\'invité <b>choisit</b> lequel ouvrir. « ➕ Ajouter un lieu » directement depuis le bouton.',
       'Plusieurs éléments choisis : un <b>cadre de groupe</b> avec 4 coins — tirez un coin pour tout agrandir ou réduire ensemble.',
@@ -1038,7 +1040,7 @@
 
   function route() {
     nettoyer();
-    document.body.classList.remove('atelier-plein'); document.body.classList.remove('atelier-max');
+    document.body.classList.remove('atelier-plein'); document.body.classList.remove('atelier-max'); document.body.classList.remove('haut-replie'); const chv = document.getElementById('chevron-haut'); if (chv) chv.remove();
     const h = location.hash.replace(/^#\/?/, '').split('/');
     $$('.barre nav a').forEach(a => a.classList.toggle('actif', a.dataset.nav === (h[0] || 'accueil') || (h[0] === 'p' && a.dataset.nav === 'accueil')));
     window.scrollTo(0, 0);
@@ -1696,6 +1698,22 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     };
     const basculerOutils = () => { Stock.ecrire('studio.outils.masques', !Stock.lire('studio.outils.masques', false)); appliquerOutils(); };
     E.basculerOutils = basculerOutils;
+    // Chevron : replier / déplier le haut (menu du site, titre de l'événement, onglets) ; mémorisé
+    const appliquerHaut = () => {
+      const r = !!Stock.lire('studio.haut.replie', false);
+      document.body.classList.toggle('haut-replie', r);
+      let b = document.getElementById('chevron-haut');
+      if (!b) { b = document.createElement('button'); b.id = 'chevron-haut'; b.className = 'chevron-haut'; b.type = 'button'; b.onclick = () => { Stock.ecrire('studio.haut.replie', !Stock.lire('studio.haut.replie', false)); appliquerHaut(); }; document.body.appendChild(b); }
+      b.classList.toggle('replie', r);
+      // déplié : le chevron se range au bout de la ligne des onglets ; replié : petite languette en haut de l'écran
+      const ong = document.querySelector('.onglets');
+      if (!r && ong) { b.classList.add('dans-onglets'); if (b.parentNode !== ong) ong.appendChild(b); } else { b.classList.remove('dans-onglets'); if (b.parentNode !== document.body) document.body.appendChild(b); }
+      b.title = r ? 'Déplier le haut : menu, titre, onglets (Maj + Tab)' : 'Replier le haut pour agrandir la zone de travail (Maj + Tab)';
+      b.innerHTML = '<span class="ch"></span>';
+      setTimeout(ajusterHauteur, 60); setTimeout(ajusterHauteur, 400);
+    };
+    E.basculerHaut = () => { Stock.ecrire('studio.haut.replie', !Stock.lire('studio.haut.replie', false)); appliquerHaut(); };
+    appliquerHaut();
     $('#bascule-outils').onclick = basculerOutils;
     appliquerOutils();
     $('#jouer-tout').onclick = async () => {
@@ -2229,7 +2247,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       if (!mod && !e.altKey && e.key === 'v') { const b = $('#outils [data-outil="select"]'); if (b) b.click(); return; }
       if (!mod && !e.altKey && (e.key === 'u' || e.key === 'p')) { const b = $('#outils [data-outil="' + (e.key === 'u' ? 'rect' : 'plume') + '"]'); if (b) b.click(); return; }
       if (!mod && !e.altKey && e.key === 'f') { E.pleinEcran(); return; }
-      if (!mod && !e.altKey && e.key === 'Tab') { e.preventDefault(); E.basculerOutils(); return; }
+      if (!mod && !e.altKey && e.key === 'Tab') { e.preventDefault(); if (e.shiftKey) E.basculerHaut(); else E.basculerOutils(); return; }
       if (!mod && !e.altKey && e.key === 'h') { const b = $('#outils [data-outil="main"]'); if (b) b.click(); return; }
       if (!mod && !e.altKey && e.key === 'i' && c) { const b = $('#outils [data-outil="pipette"]'); if (b) b.click(); return; }
       if (mod && (e.code === 'BracketRight' || e.code === 'BracketLeft') && c) { e.preventDefault(); ordreCalque(c, e.code === 'BracketRight' ? (e.shiftKey ? 'avant' : 'avance') : (e.shiftKey ? 'arriere' : 'recule')); return; }

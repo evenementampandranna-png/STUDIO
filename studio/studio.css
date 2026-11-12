@@ -586,3 +586,15 @@ details.bloc.acc[hidden] { display: block !important; }
 .groupe-cadre .gh { position: absolute; width: 14px; height: 14px; background: #fff; border: 2px solid var(--vin); border-radius: 3px; pointer-events: auto; box-shadow: 0 1px 4px rgba(0,0,0,.25); }
 .groupe-cadre .gh-nw { left: -8px; top: -8px; cursor: nwse-resize; } .groupe-cadre .gh-se { right: -8px; bottom: -8px; cursor: nwse-resize; }
 .groupe-cadre .gh-ne { right: -8px; top: -8px; cursor: nesw-resize; } .groupe-cadre .gh-sw { left: -8px; bottom: -8px; cursor: nesw-resize; }
+
+/* Chevron : replier / déplier le haut de l'atelier (menu, titre, onglets) */
+body.atelier-plein .barre, body.atelier-plein .entete, body.atelier-plein .onglets { max-height: 260px; transition: max-height .38s cubic-bezier(.4,0,.2,1), opacity .28s ease, padding .38s ease, margin .38s ease; }
+body.atelier-plein.haut-replie .barre, body.atelier-plein.haut-replie .entete, body.atelier-plein.haut-replie .onglets { max-height: 0 !important; opacity: 0; padding-top: 0 !important; padding-bottom: 0 !important; margin-top: 0 !important; margin-bottom: 0 !important; overflow: hidden !important; border-width: 0 !important; pointer-events: none; }
+body.atelier-plein.haut-replie main { padding-top: 14px !important; }
+.chevron-haut { position: fixed; top: 0; left: 50%; transform: translateX(-50%); z-index: 60; width: 54px; height: 20px; border: 1px solid var(--ligne); border-top: 0; border-radius: 0 0 12px 12px; background: #fff; box-shadow: 0 3px 10px rgba(60,20,20,.12); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; transition: background .2s, height .2s; }
+.chevron-haut:hover { background: var(--vin); height: 24px; }
+.chevron-haut:hover .ch { border-color: #fff; }
+.chevron-haut .ch { width: 9px; height: 9px; border-left: 2px solid var(--vin); border-top: 2px solid var(--vin); transform: translateY(2px) rotate(45deg); transition: transform .35s cubic-bezier(.4,0,.2,1); }
+.chevron-haut.replie .ch { transform: translateY(-3px) rotate(225deg); }
+.chevron-haut.dans-onglets { position: static; transform: none; margin-left: auto; align-self: center; width: 40px; height: 28px; border: 1px solid var(--ligne); border-radius: 10px; box-shadow: none; flex: none; }
+.chevron-haut.dans-onglets:hover { height: 28px; }
