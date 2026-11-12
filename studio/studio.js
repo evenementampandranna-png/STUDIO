@@ -239,7 +239,7 @@
     membre() { return (reglages.equipe && reglages.equipe.membre) || ''; },
     cleAcces() { return reglages.equipe.cle_admin || reglages.equipe.cle; },
     rpc(fn, args) { return Base.rpc(reglages.supabase, fn, Object.assign({ p_cle: this.cleAcces() }, args || {})); },
-    url(chemin) { return reglages.supabase.url.replace(/\/+$/, '') + '/storage/v1/object/public/equipe/' + chemin; },
+    url(chemin) { if (/^site:/.test(chemin || '')) return urlSite() + chemin.slice(5); return reglages.supabase.url.replace(/\/+$/, '') + '/storage/v1/object/public/equipe/' + chemin; },
     // adresses de la base actuelle et des anciennes (après un changement de base, les fichiers gardent le même chemin)
     prefixes() { return reglages.supabase ? [reglages.supabase.url].concat(reglages.supabase_anciens || []).map(u => u.replace(/\/+$/, '') + '/storage/v1/object/public/equipe/') : []; },
     estUrl(src) { return typeof src === 'string' && this.prefixes().some(x => src.startsWith(x)); },
@@ -728,6 +728,9 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-12-3', date: '12 novembre 2026', titre: 'Compteur animé par défaut, film validé visible par tous', points: [
+      'Le compte à rebours est maintenant <b>animé par défaut</b> (pulsation à chaque seconde) sur toutes les invitations, même déjà publiées. Choisissez une autre animation, ou « Aucune », dans le bloc ⏱ Compte à rebours.',
+      'Un film validé et publié apparaît <b>tout de suite</b> dans 🎬 Vidéos chez tous les membres (le fichier reste sur le site, il ne prend pas de place dans la base).'] },
     { id: '2026-11-12-2', date: '12 novembre 2026', titre: 'Film validé = publié, compteur animé, films de toute l\'équipe', points: [
       '<b>✅ Validé = publié</b> : un film validé part tout seul sur le site. Sans GitHub sur ce studio, il est envoyé à l\'équipe et le studio de l\'admin le publie automatiquement.',
       'Les films ne sont plus envoyés dans la base à chaque fabrication (seulement une fois validés) : la base ne se remplit plus de brouillons.',
@@ -2686,7 +2689,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <div class="deux"><label class="champ">Jusqu'au<input type="date" data-k="compte_date" value="${esc(c.compte_date || '')}"></label><label class="champ">À<input type="time" data-k="compte_heure" value="${esc(c.compte_heure || '')}"></label></div>
         <span class="muet">Vide = date et heure de l'événement (${esc(fiche.date || 'à remplir dans Informations')}${fiche.heure ? ' à ' + esc(fiche.heure) : ''}).</span>
         <label class="champ">Texte le jour J<input type="text" data-k="compte_fini" placeholder="${fiche.langue === 'mg' ? 'Androany ny andro lehibe !' : 'C\'est aujourd\'hui !'}" value="${esc(c.compte_fini || '')}"></label>
-        <div class="deux"><label class="champ">Animation du compteur<select data-k="compte_anim">${opts([['aucune', 'Aucune (fixe)'], ['pulsation', 'Pulsation à chaque seconde'], ['battement', 'Battement de cœur'], ['rebond', 'Petit rebond'], ['clignote', 'Clignotement doux'], ['balance', 'Balancement'], ['lueur', 'Lueur qui respire'], ['vague', 'Vague (ligne par ligne)']], c.compte_anim || 'aucune')}</select></label>
+        <div class="deux"><label class="champ">Animation du compteur<select data-k="compte_anim">${opts([['aucune', 'Aucune (fixe)'], ['pulsation', 'Pulsation à chaque seconde'], ['battement', 'Battement de cœur'], ['rebond', 'Petit rebond'], ['clignote', 'Clignotement doux'], ['balance', 'Balancement'], ['lueur', 'Lueur qui respire'], ['vague', 'Vague (ligne par ligne)']], c.compte_anim || 'pulsation')}</select></label>
           <label class="champ">Intensité<select data-k="compte_anim_force">${opts([['0.5', 'Légère'], ['1', 'Normale'], ['1.8', 'Forte']], String(c.compte_anim_force || '1'))}</select></label></div>
         <span class="muet">Le texte autour reste modifiable au-dessus (ex. « Plus que {compte_a_rebours} ! »).</span>
       </div></details>`;
@@ -3867,7 +3870,14 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     Films.maj(id, { dossier: 'videos' });
     if (peutPublierGitHub()) {
       toast('✅ Validé · publication sur le site…', 6000);
-      try { await publierFilmLocal(Films.liste().find(x => x.id === id)); toast('✅ Film validé et publié : visible sur le site et par toute l\'équipe (dans quelques minutes)', 7000); }
+      try {
+        await publierFilmLocal(Films.liste().find(x => x.id === id));
+        // fiche légère dans la liste de l'équipe (le fichier reste sur le site) : tous les membres le voient tout de suite
+        if (Equipe.actif()) { f = Films.liste().find(x => x.id === id); const ext = (f.src.split('.').pop() || 'mp4').toLowerCase();
+          await Equipe.rpc('equipe_biblio_ajouter', { p_item: { id: 'site-' + f.id, auteur: Equipe.membre(), type: 'film', nom: 'Film — ' + f.titre, chemin: 'site:medias/films/' + f.id + '.' + ext, vignette: /^data:/.test(f.vignette || '') && f.vignette.length < 150000 ? f.vignette : '', evenement: f.titre, duree: f.duree || 0 } }).catch(e => console.warn('fiche équipe', e.message));
+          Equipe.charger().catch(() => {}); }
+        toast('✅ Film validé et publié : visible tout de suite par toute l\'équipe (🎬 Vidéos), sur le site dans quelques minutes', 8000);
+      }
       catch (e) { toast('Film validé, mais la publication a échoué : ' + e.message + ' — bouton « Publier sur le site » pour réessayer', 9000); }
       return;
     }
@@ -4958,12 +4968,12 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     let indexSite = [];
     try { const r = await fetch(urlSite() + 'vitrine/index.json?v=' + Date.now(), { cache: 'no-store' }); if (r.ok) { indexSite = await r.json(); surSite = new Set(indexSite.map(x => x.slug)); } } catch (e) {}
     // films déjà publiés sur le site (par n'importe quel membre) : visibles par toute l'équipe, sans passer par la base
-    const idsEq = new Set(films.map(f => 'film-' + f.id));
+    const idsEq = new Set(films.map(f => 'film-' + String(f.id).replace(/^site-/, '')));
     const filmsSite = indexSite.filter(x => x.film && x.video && !idsEq.has(x.slug)).map(x => ({ id: 'site:' + x.slug, type: 'film', site: true, nom: x.titre, evenement: x.titre, auteur: x.auteur || '—', cree: x.date, url: urlSite() + x.video, vignette: x.vignette ? (/^https?:/.test(x.vignette) ? x.vignette : urlSite() + x.vignette) : '' }));
     films = films.concat(filmsSite).sort((a, b) => String(b.cree || '').localeCompare(String(a.cree || '')));
     tout.push(...filmsSite);
     if (horsLigne && !films.length) { zone.textContent = 'Impossible de lire les vidéos de l\'équipe : ' + horsLigne; return; }
-    const pub = f => f.site || surSite.has('film-' + f.id);
+    const pub = f => f.site || /^site:/.test(f.chemin || '') || surSite.has('film-' + f.id);
     const demandesFilms = {}; try { (await mesDemandes()).filter(d => d.type === 'film').forEach(d => { if (!demandesFilms[d.objet] || d.statut === 'attente') demandesFilms[d.objet] = d.statut; }); } catch (e) {}
     const g = reglages.github || {}, peutPublier = !!(g.owner && g.repo && g.token);
     const membres = [...new Set(tout.map(x => x.auteur || '—'))].sort();
@@ -4983,7 +4993,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         ${peutPublier ? `<span style="margin-left:auto" class="ligne"><label class="cases" style="margin:0"><input type="checkbox" id="vp-tous"> Tout cocher</label><button class="btn petit plein" id="vp-pub-sel" disabled>Publier la sélection</button><button class="btn petit" id="vp-pub-tout">Publier tout ce qui manque (${films.length - nPub})</button></span>` : ''}</div>
       <div class="muet" id="vp-etat" style="margin:0 0 8px"></div>
       <div class="grille" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr))">${visibles.map(f => { const u = f.url || Equipe.url(f.chemin), sv = pub(f), estFilm = f.type === 'film'; return `<div class="carte pile" style="padding:10px">
-        <video src="${esc(u)}" ${f.chemin ? `data-chemin="${esc(f.chemin)}"` : ''} poster="${esc(f.vignette || '')}" controls preload="none" playsinline style="width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:8px;background:#000"></video>
+        <video src="${esc(u)}" ${f.chemin && !/^site:/.test(f.chemin) ? `data-chemin="${esc(f.chemin)}"` : ''} poster="${esc(f.vignette || '')}" controls preload="none" playsinline style="width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:8px;background:#000"></video>
         <div class="ligne" style="justify-content:space-between">${!estFilm ? '<span class="badge">🎞 fond vidéo</span>' : sv ? '<span class="badge ok">✓ sur le site</span>' : '<span class="badge">pas encore publié</span>'}${peutPublier && estFilm && !sv ? `<input type="checkbox" data-vp-sel="${esc(f.id)}" title="Sélectionner">` : ''}</div>
         <b style="font-size:13px">${esc((f.evenement || f.nom || '').replace(/^Film — /, ''))}</b><div class="muet" style="font-size:12px">par <b>${esc(f.auteur || '—')}</b> · ${date(f.cree)}${f.duree ? ' · ' + Math.round(f.duree) + ' s' : ''}</div>
         <div class="ligne"><a class="btn petit" href="${esc(u)}" download target="_blank">Télécharger</a>${!estFilm ? '<a class="btn petit" href="#/bibliotheque">Dans la bibliothèque</a>' : !peutPublier ? (sv ? '' : demandesFilms[f.id] ? `<span class="badge">${demandesFilms[f.id] === 'attente' ? '⏳ demandé' : demandesFilms[f.id] === 'refusee' ? 'refusé' : ''}</span>` : `<button class="btn petit plein" data-vp-demander="${esc(f.id)}">Demander la publication</button>`) : peutPublier ? (sv ? `<button class="btn petit danger" data-vp-retirer="${esc(f.id)}">Retirer du site</button>` : `<button class="btn petit plein" data-vp-pub="${esc(f.id)}">Publier sur le site</button>`) : ''}</div></div>`; }).join('') || '<p class="muet">Aucune vidéo ici. Les films fabriqués par l\'équipe arrivent tout seuls ; on peut aussi en ajouter avec « + Ajouter un film terminé ».</p>'}</div>`;
