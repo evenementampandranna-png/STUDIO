@@ -251,6 +251,13 @@
         headers: Object.assign({ apikey: a, 'Content-Type': blob.type || 'video/mp4', 'x-upsert': 'false', 'cache-control': 'max-age=31536000' }, /^eyJ/.test(a) ? { Authorization: 'Bearer ' + a } : {}) });
       if (!r.ok) { const t = await r.text(); if (dejaOk && /duplicate|already exists|409/i.test(t + r.status)) return; throw new Error('Envoi du fichier impossible (' + r.status + ') ' + t.slice(0, 120)); }
     },
+    // retire un fichier de l'espace d'équipe (libère de la place ; rien si déjà absent)
+    async supprimerFichier(chemin) {
+      if (!chemin || /^site:/.test(chemin)) return;
+      const a = reglages.supabase.anon;
+      const r = await fetch(reglages.supabase.url.replace(/\/+$/, '') + '/storage/v1/object/equipe/' + chemin, { method: 'DELETE', headers: Object.assign({ apikey: a }, /^eyJ/.test(a) ? { Authorization: 'Bearer ' + a } : {}) });
+      if (!r.ok && r.status !== 404 && r.status !== 400) throw new Error('suppression impossible (' + r.status + ')');
+    },
     // après un changement de base : chaque membre renvoie les fichiers d'équipe qu'il a sur son ordinateur (même chemin, même fiche)
     async restaurer() {
       const l = Stock.lire('studio.equipe.arestaurer', []);
@@ -728,6 +735,9 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-12-5', date: '12 novembre 2026', titre: 'Films de l\'équipe visibles par tous', points: [
+      'Chaque film <b>validé</b> sur n\'importe quel ordinateur est envoyé tout seul, même ceux validés avant cette version (à l\'ouverture du studio ou de 🎬 Vidéos).',
+      'Le studio de l\'admin publie sur le site <b>tous</b> les films de l\'équipe, puis les retire de la base pour libérer la place : ils restent visibles par tous dans 🎬 Vidéos.'] },
     { id: '2026-11-12-4', date: '12 novembre 2026', titre: 'Compteur et boutons animés, publication des gros films', points: [
       'Compteur (− 2 +) et boutons : nouveau bloc <b>Animation</b> — entrée (zoom, rebond, glissement…) et <b>effet en continu</b> (pulsation, battement de cœur, lueur, petits sauts, secousse).',
       'Publication des films : les gros films (plus de 8 Mo) passent par une autre voie GitHub qui accepte jusqu\'à 100 Mo.'] },
@@ -3910,19 +3920,32 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     if (autoPubEnCours || !Equipe.admin() || !peutPublierGitHub() || !navigator.onLine) return;
     autoPubEnCours = true;
     try {
-      const att = (await mesDemandes()).filter(d => d.statut === 'attente' && d.type === 'film');
-      if (!att.length) return;
+      // tous les films de l'équipe encore dans la base : publiés sur le site, puis retirés de la base (place libérée)
+      let att = []; try { att = (await mesDemandes()).filter(d => d.statut === 'attente' && d.type === 'film'); } catch (e) {}
       await Equipe.charger().catch(() => {});
+      const aDeplacer = (Equipe.items || []).filter(x => x.type === 'film' && x.chemin && !/^site:/.test(x.chemin));
       let n = 0;
-      for (const d of att) {
-        const f = (Equipe.items || []).find(x => x.id === d.objet); if (!f) continue;
-        try { await publierFilmVitrine(f); await Equipe.rpc('equipe_pub_maj', { p_id: d.id, p_statut: 'publiee', p_message: 'publié automatiquement', p_resultat: { date: new Date().toISOString(), auto: true } }); n++; }
-        catch (e) { console.warn('publication auto', d.titre, e.message); if (baseBloquee(e)) break; }
+      for (const f of aDeplacer) {
+        try {
+          await publierFilmVitrine(f);
+          const ext = (f.chemin.split('.').pop() || 'mp4').toLowerCase();
+          await Equipe.rpc('equipe_biblio_deplacer', { p_id: f.id, p_chemin: 'site:medias/films/' + f.id + '.' + ext }).then(() => Equipe.supprimerFichier(f.chemin)).catch(e => console.warn('déplacement', e.message));
+          const d = att.find(x => x.objet === f.id); if (d) await Equipe.rpc('equipe_pub_maj', { p_id: d.id, p_statut: 'publiee', p_message: 'publié automatiquement', p_resultat: { date: new Date().toISOString(), auto: true } }).catch(() => {});
+          n++;
+        } catch (e) { console.warn('publication auto', f.nom, e.message); if (baseBloquee(e)) break; }
       }
-      if (n) toast(n + ' film(s) validé(s) par l\'équipe publié(s) sur le site ✓', 7000);
+      if (n) { toast(n + ' film(s) de l\'équipe publié(s) sur le site ✓ (visibles par tous)', 7000); Equipe.charger().catch(() => {}); }
     } catch (e) { console.warn('publication auto', e.message); } finally { autoPubEnCours = false; }
   }
   setTimeout(autoPublierFilms, 20000); setInterval(autoPublierFilms, 5 * 60 * 1000);
+  // films validés sur cet ordinateur mais jamais partagés (ex. faits avant cette version) : envoyés pour que toute l'équipe les voie
+  let filmsRattrapes = false;
+  async function rattraperFilms() {
+    if (filmsRattrapes || !navigator.onLine || !(peutPublierGitHub() || Equipe.actif())) return;
+    filmsRattrapes = true;
+    for (const f of Films.liste().filter(x => x.dossier === 'videos' && !x.site && !x.equipe_id)) { try { await validerFilm(f.id); } catch (e) { console.warn('film', f.titre, e.message); } }
+  }
+  setTimeout(rattraperFilms, 40000);
   // carte d'un film de cet ordinateur (Vidéos et Film et publication)
   function carteFilmLocal(f) {
     const pr = projets[f.projet];
@@ -4956,6 +4979,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
   /* ---------- Rubrique « Vidéos » : tous les films terminés de l'équipe, à publier sur le site ---------- */
   const vpFiltre = Object.assign({ etat: 'tout', membre: '', type: 'film' }, Stock.lire('studio.vp.filtre', {}));
   async function vueVideos() {
+    setTimeout(() => { rattraperFilms(); autoPublierFilms(); }, 1500);
     const app = $('#app');
     app.innerHTML = `<div class="entete"><div><h1>🎬 Vidéos de l'équipe</h1><p>Tous les films terminés de l'équipe, au même endroit : regardez-les, téléchargez-les et publiez-les sur le site, dans la rubrique « Nos vidéos réalisées ».</p></div>
       <div class="ligne"><a class="btn" target="_blank" href="${esc(urlSite())}#films">Voir la rubrique sur le site ↗</a><label class="btn plein">+ Ajouter un film terminé<input type="file" id="vp-ajout" accept="video/mp4,video/webm,video/quicktime,.mp4,.mov,.webm" multiple hidden></label></div></div>
