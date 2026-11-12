@@ -728,6 +728,9 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-12-4', date: '12 novembre 2026', titre: 'Compteur et boutons animés, publication des gros films', points: [
+      'Compteur (− 2 +) et boutons : nouveau bloc <b>Animation</b> — entrée (zoom, rebond, glissement…) et <b>effet en continu</b> (pulsation, battement de cœur, lueur, petits sauts, secousse).',
+      'Publication des films : les gros films (plus de 8 Mo) passent par une autre voie GitHub qui accepte jusqu\'à 100 Mo.'] },
     { id: '2026-11-12-3', date: '12 novembre 2026', titre: 'Compteur animé par défaut, film validé visible par tous', points: [
       'Le compte à rebours est maintenant <b>animé par défaut</b> (pulsation à chaque seconde) sur toutes les invitations, même déjà publiées. Choisissez une autre animation, ou « Aucune », dans le bloc ⏱ Compte à rebours.',
       'Un film validé et publié apparaît <b>tout de suite</b> dans 🎬 Vidéos chez tous les membres (le fichier reste sur le site, il ne prend pas de place dans la base).'] },
@@ -2659,6 +2662,14 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     function optsVitesse(v) { return opts([['0.25', '×0,25 (très lent)'], ['0.5', '×0,5 (ralenti)'], ['0.75', '×0,75'], ['1', 'Normale'], ['1.25', '×1,25'], ['1.5', '×1,5'], ['2', '×2 (rapide)'], ['3', '×3']], String(Number(v) || 1)); }
     function opts(liste, val) { return liste.map(o => { const [v, t] = Array.isArray(o) ? o : [o, o]; return `<option value="${esc(v)}" ${String(val) === String(v) ? 'selected' : ''}>${esc(t)}</option>`; }).join(''); }
     const effets = liste => liste.map(v => [v, I.NOMS_EFFETS[v] || v]);
+    // boutons et compteurs : animation d'entrée + effet en continu
+    function blocAnimationHTML(c) {
+      return `<details class="bloc" open><summary>Animation</summary><div class="pile">
+        <div class="deux"><label class="champ">Entrée<select data-k="animation">${opts([['fondu-montee', 'Monte en fondu'], ['fondu', 'Fondu'], ['zoom', 'Zoom'], ['zoom-arriere', 'Zoom arrière'], ['rebond', 'Rebond'], ['glissement-gauche', 'Glisse depuis la gauche'], ['glissement-droite', 'Glisse depuis la droite'], ['fondu-descente', 'Descend en fondu'], ['aucune', 'Aucune']], c.animation || 'fondu-montee')}</select></label>
+          <label class="champ">Durée (s)<input type="number" data-k="duree_animation" step="0.1" min="0.1" max="5" value="${c.duree_animation || 0.7}"></label></div>
+        <label class="champ">Effet en continu<select data-k="effet_continu">${opts([['', 'Aucun'], ['pulsation', 'Pulsation'], ['respire', 'Respire (lent)'], ['battement', 'Battement de cœur'], ['lueur', 'Lueur'], ['rebond', 'Petits sauts'], ['secousse', 'Attire l\'œil (secousse)']], c.effet_continu || '')}</select></label>
+        <span class="muet">L'effet en continu attire l'attention de l'invité sur ${c.type === 'compteur' ? 'le compteur' : 'le bouton'}.</span></div></details>`;
+    }
     function blocAnimation(c) {
       return `<details class="bloc" open><summary>Animation</summary>
         <div class="anim-grille">
@@ -2803,12 +2814,12 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         ${champsAction(c)}
         <div class="trois"><label class="champ">Style<select data-k="style">${opts([['plein', 'Plein'], ['contour', 'Contour'], ['lien', 'Lien']], c.style || 'plein')}</select></label><label class="champ">Taille<input type="number" data-k="taille" step="0.1" min="1" max="6" value="${c.taille || 2.4}"></label><label class="champ">Couleur<input type="color" data-k="couleur" value="${c.couleur || '#7a1f2b'}"></label></div>
         <label class="champ">Police<button class="btn police-btn" data-police style="font-family:'${esc(c.police || 'Cormorant Garamond')}',serif">${esc(c.police || 'Cormorant Garamond')} ▾</button></label>
-        <label class="champ">Apparaît à (s)<input type="number" data-k="debut" step="0.1" min="0" value="${c.debut || 0}"></label></div></details>` + blocApparenceBouton(c) + blocTraductions(c);
+        <label class="champ">Apparaît à (s)<input type="number" data-k="debut" step="0.1" min="0" value="${c.debut || 0}"></label></div></details>` + blocApparenceBouton(c) + blocAnimationHTML(c) + blocTraductions(c);
       if (c.type === 'compteur') s += `<details class="bloc" open><summary>Compteur</summary><div class="pile">
         <label class="champ">Libellé<input type="text" data-k="texte" value="${esc(c.texte)}"></label>
         <div class="trois"><label class="champ">Champ<select data-k="champ">${opts(['adultes', 'enfants', 'places_transport'], c.champ)}</select></label><label class="champ">Min<input type="number" data-k="min" value="${c.min || 0}"></label><label class="champ">Max<input type="number" data-k="max" value="${c.max || ''}" placeholder="places"></label></div>
         <div class="deux"><label class="champ">Taille<input type="number" data-k="taille" step="0.1" min="1" max="6" value="${c.taille || 2.3}"></label><label class="champ">Couleur<input type="color" data-k="couleur" value="${c.couleur || '#7a1f2b'}"></label></div></div></details>`;
-      if (c.type === 'compteur') s += blocTraductions(c);
+      if (c.type === 'compteur') s += blocAnimationHTML(c) + blocTraductions(c);
       if (c.type === 'forme') s += `<details class="bloc" open><summary>▭ Forme</summary><div class="pile">
         ${grilleFormes(c, ratioCalque(c)).replace(/<button class="forme-btn[^"]*" data-forme=""[\s\S]*?<\/button>/, '')}
         ${c.forme === 'arrondi' ? `<label class="champ">Arrondi des coins<input type="range" data-k="arrondi" min="0" max="100" step="1" value="${c.arrondi != null && c.arrondi !== '' ? c.arrondi : 16}"></label>` : ''}
@@ -4599,7 +4610,23 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       const blob = contenu instanceof Blob ? contenu : new Blob([contenu], { type: 'text/plain' });
       return new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result).split(',')[1]); fr.readAsDataURL(blob); });
     },
+    // gros fichiers (films) : par l'API Git (blob → arbre → commit), qui accepte jusqu'à 100 Mo
+    async envoyerGros(chemin, contenu, message) {
+      const g = this.frais(), base = `https://api.github.com/repos/${g.owner}/${g.repo}/git`, br = reglages.github.branche || 'main';
+      const json = async (url, opts) => { const r = await this.appel(url, Object.assign({ headers: { 'Content-Type': 'application/json' } }, opts || {})); const t = await r.text(); if (!r.ok) { const e = this.erreur(r.status, t); e.status = r.status; throw e; } return t ? JSON.parse(t) : {}; };
+      const content = await this.base64(contenu);
+      const blob = await json(base + '/blobs', { method: 'POST', body: JSON.stringify({ content, encoding: 'base64' }) });
+      for (let essai = 0; ; essai++) {
+        const ref = await json(base + '/ref/heads/' + br);
+        const commit = await json(base + '/commits/' + ref.object.sha);
+        const arbre = await json(base + '/trees', { method: 'POST', body: JSON.stringify({ base_tree: commit.tree.sha, tree: [{ path: chemin, mode: '100644', type: 'blob', sha: blob.sha }] }) });
+        const nouveau = await json(base + '/commits', { method: 'POST', body: JSON.stringify({ message, tree: arbre.sha, parents: [ref.object.sha] }) });
+        try { await json(base + '/refs/heads/' + br, { method: 'PATCH', body: JSON.stringify({ sha: nouveau.sha }) }); return nouveau; }
+        catch (e) { if (e.status === 422 && essai < 4) { await new Promise(ok => setTimeout(ok, 1500 * (essai + 1))); continue; } throw e; }
+      }
+    },
     async envoyer(chemin, contenu, message) {
+      if (contenu && contenu.size > 8e6) return this.envoyerGros(chemin, contenu, message);
       const content = await this.base64(contenu);
       // GitHub peut répondre avec un temps de retard : on réessaie (avec le bon « sha ») si besoin
       for (let essai = 0; ; essai++) {

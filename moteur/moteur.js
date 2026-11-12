@@ -826,7 +826,14 @@
         if (c.opacite != null && c.opacite !== '' && Number(c.opacite) < 1) el.style.opacity = Number(c.opacite);
         if (c.miroir_h || c.miroir_v) el.style.scale = (c.miroir_h ? -1 : 1) + ' ' + (c.miroir_v ? -1 : 1);
         const t0 = Number(c.debut) || 0;
-        if (this.mode !== 'edition' && t0 > 0) { el.style.animationDelay = t0 + 's'; }
+        // animation d'entrée (au choix) + effet en continu (pulsation, lueur…) pour les boutons et compteurs
+        const ENTREES_HTML = { fondu: 'mtFondu', zoom: 'mtZoom', 'zoom-arriere': 'mtZoomArr', rebond: 'mtRebondIn', 'glissement-gauche': 'mtGauche', 'glissement-droite': 'mtDroite', 'fondu-descente': 'mtDescente', 'fondu-montee': 'mtEntree' };
+        const CONTINUS = { pulsation: 'mtPulse 1.2s ease-in-out infinite', respire: 'mtPulse 2.6s ease-in-out infinite', lueur: 'mtLueur 1.8s ease-in-out infinite', rebond: 'mtSaut 1.6s ease-in-out infinite', secousse: 'mtAttire 2.5s ease-in-out infinite', battement: 'mtCoeur 1.3s ease-in-out infinite' };
+        const dE = Number(c.duree_animation) || 0.7, retard = this.mode !== 'edition' && t0 > 0 ? t0 : 0;
+        const anims = [];
+        if (c.animation !== 'aucune') anims.push(`${ENTREES_HTML[c.animation] || 'mtEntree'} ${dE}s ease ${retard}s both`);
+        if (c.effet_continu && CONTINUS[c.effet_continu]) anims.push(CONTINUS[c.effet_continu].replace(' infinite', ` ${retard + dE}s infinite`));
+        el.style.animation = anims.join(', ') || 'none';
         if (c.type === 'bouton') {
           const b = document.createElement('button');
           b.type = 'button';
@@ -1109,10 +1116,22 @@
 .mt-racine{position:relative;aspect-ratio:9/16;overflow:hidden;container-type:size;background:#f4ede2;user-select:none;-webkit-user-select:none}
 .mt-canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .mt-html{position:absolute;inset:0;pointer-events:none}
-.mt-compteur.mt-max{animation:mtSecoue .35s ease}
+.mt-compteur.mt-max{animation:mtSecoue .35s ease !important}
 @keyframes mtSecoue{25%{transform:translateY(-50%) translateX(-5px)}75%{transform:translateY(-50%) translateX(5px)}}
 .mt-el{position:absolute;transform:translateY(-50%);pointer-events:auto;display:flex;justify-content:center;align-items:center;font-size:calc(var(--mt-taille) * 1cqh);animation:mtEntree .7s ease both;font-family:"Cormorant Garamond",serif}
 @keyframes mtEntree{from{opacity:0;transform:translateY(-30%)}to{opacity:1;transform:translateY(-50%)}}
+@keyframes mtFondu{from{opacity:0}to{opacity:1}}
+@keyframes mtZoom{from{opacity:0;scale:.6}to{opacity:1;scale:1}}
+@keyframes mtZoomArr{from{opacity:0;scale:1.5}to{opacity:1;scale:1}}
+@keyframes mtRebondIn{0%{opacity:0;scale:.3}55%{opacity:1;scale:1.12}75%{scale:.94}100%{scale:1}}
+@keyframes mtGauche{from{opacity:0;translate:-40% 0}to{opacity:1;translate:0 0}}
+@keyframes mtDroite{from{opacity:0;translate:40% 0}to{opacity:1;translate:0 0}}
+@keyframes mtDescente{from{opacity:0;translate:0 -40%}to{opacity:1;translate:0 0}}
+@keyframes mtPulse{0%,100%{scale:1}50%{scale:1.06}}
+@keyframes mtCoeur{0%,40%,100%{scale:1}10%{scale:1.08}20%{scale:1}30%{scale:1.05}}
+@keyframes mtSaut{0%,60%,100%{translate:0 0}30%{translate:0 -12%}}
+@keyframes mtAttire{0%,80%,100%{translate:0 0}84%{translate:-3% 0}88%{translate:3% 0}92%{translate:-2% 0}96%{translate:2% 0}}
+@keyframes mtLueur{0%,100%{filter:drop-shadow(0 0 0 transparent)}50%{filter:drop-shadow(0 0 .45em color-mix(in srgb,var(--mt-couleur) 75%,#fff))}}
 .mt-bouton button{font:inherit;font-weight:600;width:100%;padding:.55em .8em;border-radius:999px;cursor:pointer;border:1.5px solid var(--mt-couleur);line-height:1.15;transition:transform .15s}
 .mt-bouton button:active{transform:scale(.96)}
 .mt-style-plein button{background:var(--mt-couleur);color:#fff;box-shadow:0 .3em .9em rgba(60,10,20,.25)}
