@@ -702,6 +702,18 @@
         if (brut && brut.indexOf('{compte_a_rebours}') >= 0) vars = Object.assign({}, vars, { compte_a_rebours: compteDe(c, this.projet, this.langue || (this.projet.fiche || {}).langue || 'fr') });
         let txt = remplacer(brut, vars);
         if (c.majuscules) txt = txt.toUpperCase();
+        // animation du compte à rebours : rythmée par les secondes de l'horloge
+        let vagueCompte = 0;
+        if (c.compte_anim && c.compte_anim !== 'aucune' && brut && brut.indexOf('{compte_a_rebours}') >= 0) {
+          const ph = (Date.now() % 1000) / 1000, k = Number(c.compte_anim_force) || 1;
+          if (c.compte_anim === 'pulsation') { const z = 1 + 0.06 * k * Math.pow(1 - ph, 3); ctx.scale(z, z); }
+          else if (c.compte_anim === 'battement') { const b = (ph < 0.15 ? Math.sin(ph / 0.15 * Math.PI) : 0) + (ph > 0.25 && ph < 0.4 ? 0.7 * Math.sin((ph - 0.25) / 0.15 * Math.PI) : 0); const z = 1 + 0.07 * k * b; ctx.scale(z, z); }
+          else if (c.compte_anim === 'rebond') ctx.translate(0, -Math.abs(Math.sin(ph * Math.PI)) * Math.pow(1 - ph, 1.5) * taille * 0.35 * k);
+          else if (c.compte_anim === 'clignote') ctx.globalAlpha *= 1 - 0.35 * Math.min(1, k) * (0.5 - 0.5 * Math.cos(ph * 2 * Math.PI));
+          else if (c.compte_anim === 'balance') ctx.rotate(Math.sin(ph * 2 * Math.PI) * 0.035 * k);
+          else if (c.compte_anim === 'lueur') { ctx.shadowColor = c.couleur || '#7a1f2b'; ctx.shadowBlur = taille * (0.15 + 0.5 * k * (0.5 - 0.5 * Math.cos(ph * 2 * Math.PI))); }
+          else if (c.compte_anim === 'vague') vagueCompte = ph;
+        }
         const ls = lignes(ctx, txt, larg);
         const inter = taille * (Number(c.interligne) || 1.25);
         const hTot = inter * ls.length;
@@ -736,7 +748,7 @@
         }
         let compte = 0;
         ls.forEach((l, i) => {
-          const y = -hTot / 2 + inter * (i + 0.5);
+          const y = -hTot / 2 + inter * (i + 0.5) + (vagueCompte ? Math.sin((vagueCompte + i * 0.25) * 2 * Math.PI) * taille * 0.12 * (Number(c.compte_anim_force) || 1) : 0);
           let morceau = l;
           if (e.entree === 'ecriture' || e.entree === 'mot-par-mot') { const reste = montrer - compte; morceau = reste <= 0 ? '' : l.slice(0, reste); compte += l.length + 1; }
           if (c.contour) { ctx.lineWidth = Number(c.contour_epaisseur) || taille * 0.06; ctx.lineJoin = 'round'; ctx.miterLimit = 2; ctx.strokeStyle = c.contour; ecrire(morceau, l, ax, y, i, true); }

@@ -728,6 +728,11 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-12-2', date: '12 novembre 2026', titre: 'Film validé = publié, compteur animé, films de toute l\'équipe', points: [
+      '<b>✅ Validé = publié</b> : un film validé part tout seul sur le site. Sans GitHub sur ce studio, il est envoyé à l\'équipe et le studio de l\'admin le publie automatiquement.',
+      'Les films ne sont plus envoyés dans la base à chaque fabrication (seulement une fois validés) : la base ne se remplit plus de brouillons.',
+      '🎬 Vidéos : tous les films déjà publiés sur le site, de <b>tous les membres</b>, sont visibles par toute l\'équipe.',
+      'Compte à rebours : <b>animation au choix</b> (pulsation, battement de cœur, rebond, clignotement, balancement, lueur, vague) et intensité.'] },
     { id: '2026-11-12-1', date: '12 novembre 2026', titre: 'Équipe : tout le monde voit tout, sans saturer la base', points: [
       'Bibliothèque et Vidéos : les fonds et vidéos de <b>tous les membres</b> se mettent à jour tout seuls toutes les 2 minutes.',
       'Seuls les <b>nouveaux</b> éléments sont téléchargés (les vignettes déjà vues restent sur l\'ordinateur) : beaucoup moins de quota utilisé.',
@@ -2681,6 +2686,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <div class="deux"><label class="champ">Jusqu'au<input type="date" data-k="compte_date" value="${esc(c.compte_date || '')}"></label><label class="champ">À<input type="time" data-k="compte_heure" value="${esc(c.compte_heure || '')}"></label></div>
         <span class="muet">Vide = date et heure de l'événement (${esc(fiche.date || 'à remplir dans Informations')}${fiche.heure ? ' à ' + esc(fiche.heure) : ''}).</span>
         <label class="champ">Texte le jour J<input type="text" data-k="compte_fini" placeholder="${fiche.langue === 'mg' ? 'Androany ny andro lehibe !' : 'C\'est aujourd\'hui !'}" value="${esc(c.compte_fini || '')}"></label>
+        <div class="deux"><label class="champ">Animation du compteur<select data-k="compte_anim">${opts([['aucune', 'Aucune (fixe)'], ['pulsation', 'Pulsation à chaque seconde'], ['battement', 'Battement de cœur'], ['rebond', 'Petit rebond'], ['clignote', 'Clignotement doux'], ['balance', 'Balancement'], ['lueur', 'Lueur qui respire'], ['vague', 'Vague (ligne par ligne)']], c.compte_anim || 'aucune')}</select></label>
+          <label class="champ">Intensité<select data-k="compte_anim_force">${opts([['0.5', 'Légère'], ['1', 'Normale'], ['1.8', 'Forte']], String(c.compte_anim_force || '1'))}</select></label></div>
         <span class="muet">Le texte autour reste modifiable au-dessus (ex. « Plus que {compte_a_rebours} ! »).</span>
       </div></details>`;
     }
@@ -3854,6 +3861,47 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       };
     });
   }
+  // « ✅ Validé » = publié : sur le site directement (studio relié à GitHub), sinon envoyé à l'équipe et publié automatiquement par le studio de l'admin
+  async function validerFilm(id) {
+    let f = Films.liste().find(x => x.id === id); if (!f) return;
+    Films.maj(id, { dossier: 'videos' });
+    if (peutPublierGitHub()) {
+      toast('✅ Validé · publication sur le site…', 6000);
+      try { await publierFilmLocal(Films.liste().find(x => x.id === id)); toast('✅ Film validé et publié : visible sur le site et par toute l\'équipe (dans quelques minutes)', 7000); }
+      catch (e) { toast('Film validé, mais la publication a échoué : ' + e.message + ' — bouton « Publier sur le site » pour réessayer', 9000); }
+      return;
+    }
+    if (Equipe.actif()) {
+      toast('✅ Validé · envoi pour publication…', 6000);
+      try {
+        let eid = f.equipe_id;
+        if (!eid) { const it = await Equipe.ajouterFilm(await Films.blob(f), { titre: f.titre, vignette: f.vignette }); eid = it && it.id; if (eid) Films.maj(id, { equipe_id: eid }); }
+        if (eid) await demanderPublication('film', eid, f.titre);
+        toast('✅ Film validé : il sera publié sur le site automatiquement (par le studio de l\'admin)', 8000);
+      } catch (e) { toast('Film validé, mais l\'envoi a échoué : ' + e.message, 9000); }
+      return;
+    }
+    toast('✅ Film validé : dans 🎬 Vidéos');
+  }
+  // studio de l'admin : publie tout seul les films validés par les membres (demandes en attente)
+  let autoPubEnCours = false;
+  async function autoPublierFilms() {
+    if (autoPubEnCours || !Equipe.admin() || !peutPublierGitHub() || !navigator.onLine) return;
+    autoPubEnCours = true;
+    try {
+      const att = (await mesDemandes()).filter(d => d.statut === 'attente' && d.type === 'film');
+      if (!att.length) return;
+      await Equipe.charger().catch(() => {});
+      let n = 0;
+      for (const d of att) {
+        const f = (Equipe.items || []).find(x => x.id === d.objet); if (!f) continue;
+        try { await publierFilmVitrine(f); await Equipe.rpc('equipe_pub_maj', { p_id: d.id, p_statut: 'publiee', p_message: 'publié automatiquement', p_resultat: { date: new Date().toISOString(), auto: true } }); n++; }
+        catch (e) { console.warn('publication auto', d.titre, e.message); if (baseBloquee(e)) break; }
+      }
+      if (n) toast(n + ' film(s) validé(s) par l\'équipe publié(s) sur le site ✓', 7000);
+    } catch (e) { console.warn('publication auto', e.message); } finally { autoPubEnCours = false; }
+  }
+  setTimeout(autoPublierFilms, 20000); setInterval(autoPublierFilms, 5 * 60 * 1000);
   // carte d'un film de cet ordinateur (Vidéos et Film et publication)
   function carteFilmLocal(f) {
     const pr = projets[f.projet];
@@ -3872,9 +3920,10 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       $('[data-fl-dl]', el).onclick = async () => { try { telecharger((f().titre || 'film').replace(/[^\wÀ-ÿ -]+/g, '') + '.' + f().src.split('.').pop(), await Films.blob(f())); } catch (e) { toast(e.message); } };
       $('[data-fl-suppr]', el).onclick = async () => { if (!confirm('Supprimer ce film de cet ordinateur ?')) return; await Films.supprimer(id); relancer(); };
       $$('[data-fl-dos]', el).forEach(b => b.onclick = async () => {
-        const dos = b.dataset.flDos; Films.maj(id, { dossier: dos });
-        if (dos === 'videos' && Equipe.actif() && !f().equipe_id) { toast('Rangé dans Vidéos · envoi à l\'équipe…'); try { const it = await Equipe.ajouterFilm(await Films.blob(f()), { titre: f().titre, vignette: f().vignette }); if (it && it.id) Films.maj(id, { equipe_id: it.id }); toast('Visible par toute l\'équipe ✓'); } catch (e) { toast('Rangé dans Vidéos (sur cet ordinateur) ; équipe : ' + e.message); } }
-        else toast(dos === 'videos' ? '✅ Film validé : dans 🎬 Vidéos, prêt à publier' : '📁 Film remis en brouillon');
+        const dos = b.dataset.flDos;
+        if (dos === 'videos') { b.disabled = true; await validerFilm(id); relancer(); return; }
+        Films.maj(id, { dossier: dos });
+        toast('📁 Film remis en brouillon');
         relancer();
       });
       const fp = $('[data-fl-pub]', el); if (fp) fp.onclick = async e => {
@@ -4071,22 +4120,11 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         Films.garder(r.blob, p, { duree: r.duree, dossier: 'brouillon' }).then(fl => {
           const z = $('#film-rangement'); if (!z) return;
           z.innerHTML = `<div class="carte ligne" style="padding:10px 12px;margin-top:8px;gap:8px;flex-wrap:wrap;background:#fbf7f1"><b>Enregistrer ce film :</b><button class="btn petit" data-ranger="brouillon">📁 En brouillon</button><button class="btn petit plein" data-ranger="videos">✅ Validé (dans 🎬 Vidéos${Equipe.actif() ? ', visible par l\'équipe' : ''})</button><span class="muet">(par défaut : brouillon de l'événement)</span></div>`;
-          $$('[data-ranger]', z).forEach(b => b.onclick = () => { Films.maj(fl.id, { dossier: b.dataset.ranger }); z.innerHTML = ''; toast(b.dataset.ranger === 'videos' ? '✅ Film validé : dans 🎬 Vidéos, prêt à publier' : '📁 Film enregistré en brouillon'); if (b.dataset.ranger === 'videos' && Equipe.actif()) { const it = Equipe._dernierFilm; if (it) Films.maj(fl.id, { equipe_id: it }); } ongletPublier(p); });
+          $$('[data-ranger]', z).forEach(b => b.onclick = async () => { z.innerHTML = ''; if (b.dataset.ranger === 'videos') { await validerFilm(fl.id); } else { Films.maj(fl.id, { dossier: 'brouillon' }); toast('📁 Film enregistré en brouillon'); } ongletPublier(p); });
           rendreFilmsEvt();
         }).catch(e => toast('Film non gardé sur cet ordinateur : ' + e.message));
         $('#film-etat').textContent = `Film prêt en ${dureeTexte(sec)} (film de ${Math.round(r.duree)} s, ${(r.blob.size / 1e6).toFixed(1)} Mo, ${r.extension.toUpperCase()})`;
         Equipe.noter('film', 'Film — ' + (p.fiche.titre || ''), sec, p);
-        if (Equipe.actif()) {
-          if (r.blob.size > 50e6) toast('Film trop lourd (plus de 50 Mo) pour être partagé avec l\'équipe');
-          else {
-            const envoyer = () => {
-              const et = $('#film-etat'); if (!et) return; et.textContent = et.textContent.replace(/ · (envoi à l'équipe…|non partagé.*)$/, '') + ' · envoi à l\'équipe…';
-              Equipe.partagerFilm(r.blob, p, sec).then(() => { const e2 = $('#film-etat'); if (e2) e2.textContent = e2.textContent.replace(' · envoi à l\'équipe…', ' · visible par toute l\'équipe ✓'); toast('Film visible par toute l\'équipe (page Équipe)'); })
-                .catch(e => { const e2 = $('#film-etat'); if (!e2) return; e2.textContent = e2.textContent.replace(' · envoi à l\'équipe…', ' · non partagé (' + e.message + ') '); const bt = document.createElement('button'); bt.className = 'btn petit'; bt.textContent = 'Réessayer l\'envoi à l\'équipe'; bt.onclick = () => { bt.remove(); envoyer(); }; e2.appendChild(bt); });
-            };
-            envoyer();
-          }
-        }
       } catch (e) { console.error(e); $('#film-etat').textContent = 'Erreur : ' + e.message; }
       b.disabled = false;
     };
@@ -4904,6 +4942,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         const titre = f.name.replace(/\.\w+$/, '').replace(/[-_]+/g, ' ').replace(/\s*film\s*$/i, '').trim();
         // gardé sur cet ordinateur (publiable tout de suite), puis envoyé à l'équipe si possible
         let fl = null; try { fl = await Films.garder(f, null, { titre, dossier: 'videos' }); } catch (err) { toast('Film non gardé : ' + err.message); }
+        if (fl) { await validerFilm(fl.id); continue; }
         if (Equipe.actif()) { toast('Envoi de « ' + titre + ' » à l\'équipe…'); try { const it = await Equipe.ajouterFilm(f, { titre }); if (fl && it) Films.maj(fl.id, { equipe_id: it.id }); toast('« ' + titre + ' » ajouté aux vidéos de l\'équipe'); } catch (err) { toast('« ' + titre + ' » gardé dans 💻 Mes films ; équipe : ' + err.message, 6000); } }
         else toast('« ' + titre + ' » ajouté à 💻 Mes films');
       }
@@ -4916,9 +4955,15 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     films = tout.filter(x => x.type === 'film');
     const fondsEq = tout.filter(x => x.type !== 'film');
     const aPartager = medias.filter(m => (m.type === 'fond' || m.type === 'video' || m.anime) && !m.equipe_id && !m.brouillon && /^idb:/.test(m.src || '')).length;
-    try { const r = await fetch(urlSite() + 'vitrine/index.json?v=' + Date.now(), { cache: 'no-store' }); if (r.ok) surSite = new Set((await r.json()).map(x => x.slug)); } catch (e) {}
+    let indexSite = [];
+    try { const r = await fetch(urlSite() + 'vitrine/index.json?v=' + Date.now(), { cache: 'no-store' }); if (r.ok) { indexSite = await r.json(); surSite = new Set(indexSite.map(x => x.slug)); } } catch (e) {}
+    // films déjà publiés sur le site (par n'importe quel membre) : visibles par toute l'équipe, sans passer par la base
+    const idsEq = new Set(films.map(f => 'film-' + f.id));
+    const filmsSite = indexSite.filter(x => x.film && x.video && !idsEq.has(x.slug)).map(x => ({ id: 'site:' + x.slug, type: 'film', site: true, nom: x.titre, evenement: x.titre, auteur: x.auteur || '—', cree: x.date, url: urlSite() + x.video, vignette: x.vignette ? (/^https?:/.test(x.vignette) ? x.vignette : urlSite() + x.vignette) : '' }));
+    films = films.concat(filmsSite).sort((a, b) => String(b.cree || '').localeCompare(String(a.cree || '')));
+    tout.push(...filmsSite);
     if (horsLigne && !films.length) { zone.textContent = 'Impossible de lire les vidéos de l\'équipe : ' + horsLigne; return; }
-    const pub = f => surSite.has('film-' + f.id);
+    const pub = f => f.site || surSite.has('film-' + f.id);
     const demandesFilms = {}; try { (await mesDemandes()).filter(d => d.type === 'film').forEach(d => { if (!demandesFilms[d.objet] || d.statut === 'attente') demandesFilms[d.objet] = d.statut; }); } catch (e) {}
     const g = reglages.github || {}, peutPublier = !!(g.owner && g.repo && g.token);
     const membres = [...new Set(tout.map(x => x.auteur || '—'))].sort();
@@ -4937,8 +4982,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         <select id="vp-membre"><option value="">Tous les membres</option>${membres.map(m => `<option ${vpFiltre.membre === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select>
         ${peutPublier ? `<span style="margin-left:auto" class="ligne"><label class="cases" style="margin:0"><input type="checkbox" id="vp-tous"> Tout cocher</label><button class="btn petit plein" id="vp-pub-sel" disabled>Publier la sélection</button><button class="btn petit" id="vp-pub-tout">Publier tout ce qui manque (${films.length - nPub})</button></span>` : ''}</div>
       <div class="muet" id="vp-etat" style="margin:0 0 8px"></div>
-      <div class="grille" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr))">${visibles.map(f => { const u = Equipe.url(f.chemin), sv = pub(f), estFilm = f.type === 'film'; return `<div class="carte pile" style="padding:10px">
-        <video src="${esc(u)}" data-chemin="${esc(f.chemin)}" poster="${esc(f.vignette || '')}" controls preload="none" playsinline style="width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:8px;background:#000"></video>
+      <div class="grille" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr))">${visibles.map(f => { const u = f.url || Equipe.url(f.chemin), sv = pub(f), estFilm = f.type === 'film'; return `<div class="carte pile" style="padding:10px">
+        <video src="${esc(u)}" ${f.chemin ? `data-chemin="${esc(f.chemin)}"` : ''} poster="${esc(f.vignette || '')}" controls preload="none" playsinline style="width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:8px;background:#000"></video>
         <div class="ligne" style="justify-content:space-between">${!estFilm ? '<span class="badge">🎞 fond vidéo</span>' : sv ? '<span class="badge ok">✓ sur le site</span>' : '<span class="badge">pas encore publié</span>'}${peutPublier && estFilm && !sv ? `<input type="checkbox" data-vp-sel="${esc(f.id)}" title="Sélectionner">` : ''}</div>
         <b style="font-size:13px">${esc((f.evenement || f.nom || '').replace(/^Film — /, ''))}</b><div class="muet" style="font-size:12px">par <b>${esc(f.auteur || '—')}</b> · ${date(f.cree)}${f.duree ? ' · ' + Math.round(f.duree) + ' s' : ''}</div>
         <div class="ligne"><a class="btn petit" href="${esc(u)}" download target="_blank">Télécharger</a>${!estFilm ? '<a class="btn petit" href="#/bibliotheque">Dans la bibliothèque</a>' : !peutPublier ? (sv ? '' : demandesFilms[f.id] ? `<span class="badge">${demandesFilms[f.id] === 'attente' ? '⏳ demandé' : demandesFilms[f.id] === 'refusee' ? 'refusé' : ''}</span>` : `<button class="btn petit plein" data-vp-demander="${esc(f.id)}">Demander la publication</button>`) : peutPublier ? (sv ? `<button class="btn petit danger" data-vp-retirer="${esc(f.id)}">Retirer du site</button>` : `<button class="btn petit plein" data-vp-pub="${esc(f.id)}">Publier sur le site</button>`) : ''}</div></div>`; }).join('') || '<p class="muet">Aucune vidéo ici. Les films fabriqués par l\'équipe arrivent tout seuls ; on peut aussi en ajouter avec « + Ajouter un film terminé ».</p>'}</div>`;
