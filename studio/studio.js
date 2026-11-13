@@ -220,11 +220,18 @@
     if (typeof Equipe !== 'undefined' && Equipe.estUrl(src)) {
       if (urlsIdb[src]) return urlsIdb[src];
       const cle = 'cache:' + src.split('/object/public/')[1];
-      try {
+      const direct = Equipe.actuelle(src);
+      // copie locale si elle est là ; sinon on n'attend pas le téléchargement entier (fond qui « ne change pas ») :
+      // au-delà de 2,5 s, la vidéo est lue en direct et la copie se termine en arrière-plan pour la prochaine fois
+      const charge = (async () => { try {
         let b = await IDB.lire(cle);
-        if (!b) { const r = await fetch(Equipe.actuelle(src)); if (!r.ok) return src; b = await r.blob(); if (b.size < 80e6) IDB.mettre(cle, b).catch(() => {}); }
-        return (urlsIdb[src] = URL.createObjectURL(b));
-      } catch (e) { return src; }
+        if (!b) { const r = await fetch(direct); if (!r.ok) return null; b = await r.blob(); if (b.size < 80e6) IDB.mettre(cle, b).catch(() => {}); }
+        return b;
+      } catch (e) { return null; } })();
+      const b = await Promise.race([charge, new Promise(ok => setTimeout(() => ok('lent'), 2500))]);
+      if (b && b !== 'lent') return (urlsIdb[src] = URL.createObjectURL(b));
+      if (b === 'lent') charge.then(x => { if (x && !urlsIdb[src]) urlsIdb[src] = URL.createObjectURL(x); });
+      return direct;
     }
     if (/^(https?:|blob:|data:)/.test(src)) return src;
     return BASE + src;
@@ -735,6 +742,9 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-13-2', date: '13 novembre 2026', titre: 'Changer le fond : visible tout de suite', points: [
+      'Choisir ou importer un fond s\'affiche aussitôt : le studio n\'attend plus que tous les fichiers de l\'invitation soient chargés, ni le téléchargement complet d\'une vidéo de l\'équipe (elle est lue en direct, la copie se fait derrière).',
+      'Si une photo ou une vidéo posée sur tout le plan cache le fond, le studio le signale : ○ dans Calques pour la masquer, ✕ pour la retirer.'] },
     { id: '2026-11-13-1', date: '13 novembre 2026', titre: 'Redimensionner un bouton partie par partie', points: [
       'Bouton choisi : 8 poignées. <b>Côtés</b> = largeur seulement, <b>haut / bas</b> = hauteur seulement, <b>coins</b> = largeur et hauteur ; le <b>texte garde sa taille</b> (A− / A+ pour le texte). Maj + coin : tout grandit ensemble, texte compris.'] },
     { id: '2026-11-12-9', date: '12 novembre 2026', titre: 'Plein écran : avancer et reculer', points: [
@@ -1647,6 +1657,17 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     $('#refaire').onclick = () => { if (!E.refaire.length) return; E.annuler.push(JSON.stringify(p.plans)); restaurer(E.refaire.pop()); };
 
     function plan() { return p.plans[E.i]; }
+    // n'attendre que les fichiers du plan affiché (le reste se charge derrière) : le nouveau fond apparaît tout de suite
+    function prechargerPlan() {
+      const pl = plan(), l = [];
+      if (pl && pl.fond && pl.fond.media && pl.fond.type !== 'couleur' && pl.fond.type !== 'aucun') l.push(eng.media(pl.fond.media, pl.fond.type === 'image' ? 'image' : 'video'));
+      ((pl && pl.calques) || []).forEach(c => { if ((c.type === 'image' || c.type === 'video') && c.media) l.push(eng.media(c.media, c.type)); });
+      eng.precharger().catch(() => {});
+      // une photo / vidéo posée sur tout le plan cache le fond : on le dit
+      const cache = ((pl && pl.calques) || []).find(c => (c.type === 'image' || c.type === 'video') && !c.masque && !c.illu && (Number(c.largeur) || 0) >= 90 && (Number(c.hauteur) || 0) >= 85);
+      if (cache) setTimeout(() => { const n = nomMedia(cache.media); toast('Fond changé, mais une ' + (cache.type === 'video' ? 'vidéo' : 'photo') + (n ? ' (« ' + n + ' »)' : '') + ' posée sur tout le plan le cache. Dans Calques : ○ pour la masquer, ✕ pour la retirer.', 7000); }, 600);
+      return Promise.race([Promise.all(l).catch(() => {}), new Promise(ok => setTimeout(ok, 4000))]);
+    }
     function afficher() {
       const cd = $('#cadre'); if (cd) cd.classList.remove('en-lecture');
       rendrePlans(); rendreReglages();
@@ -2515,7 +2536,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         </details>
         <div id="props">${E.multi.size > 1 ? formulaireMulti() : c ? formulaireCalque(c) : '<p class="muet" style="margin-top:12px">Cliquez un calque dans la liste ou sur l\'aperçu pour le modifier. Glissez-le sur l\'aperçu pour le déplacer.</p>'}</div>`;
       const surFond = (id, ev, fn) => { const el = $('#' + id, col); if (el) el[ev] = fn; };
-      const majFond = (fort) => { E.modif(fort); eng.precharger().then(() => { eng._entrerPlan(); afficher(); }); };
+      const majFond = (fort) => { E.modif(fort); prechargerPlan().then(() => { eng._entrerPlan(); afficher(); }); };
       $$('[data-ftype]', col).forEach(b => b.onclick = () => {
         const t = b.dataset.ftype; E.modif(true);
         if (t === 'video') { delete pl.fond.type; if (!pl.fond.media || MoteurInfo.typeFond({ media: pl.fond.media }) !== 'video') { const f = fonds[0]; pl.fond.media = f ? f.src : ''; } delete pl.fond.recadrage; }
@@ -2537,14 +2558,14 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       surFond('p-angle', 'oninput', e => { E.modif(); pl.fond.angle = Number(e.target.value); });
       surFond('p-fond-choisir', 'onclick', e => choisirFond(e.currentTarget.dataset.kind));
       surFond('fond-tous', 'onclick', () => { if (!confirm('Mettre ce fond (et ses réglages) sur tous les plans de l\'invitation ?')) return; E.modif(true); const modele = JSON.stringify(pl.fond); p.plans.forEach(x => { x.fond = JSON.parse(modele); }); majFond(true); toast('Fond appliqué à tous les plans (↶ pour annuler)'); });
-      surFond('p-fond', 'onchange', e => { E.modif(true); pl.fond.media = e.target.value; eng.precharger().then(() => { eng._entrerPlan(); afficher(); }); });
+      surFond('p-fond', 'onchange', e => { E.modif(true); pl.fond.media = e.target.value; prechargerPlan().then(() => { eng._entrerPlan(); afficher(); }); });
       if ($('#imp-fond-plan', col)) $('#imp-fond-plan').onchange = async e => {
         const f = e.target.files[0]; if (!f) return;
         const m = await importerFichier(f, 'fond', p.id); sauverMedias(); Equipe.apresAjout(m, p);
-        E.modif(true); pl.fond.media = m.src; eng.precharger().then(() => { eng._entrerPlan(); afficher(); }); toast('Fond importé et appliqué à ce plan');
+        E.modif(true); pl.fond.media = m.src; prechargerPlan().then(() => { eng._entrerPlan(); afficher(); }); toast('Fond importé et appliqué à ce plan');
       };
       surFond('fond-ia', 'onclick', () => allerCreateur(p, E.i, {}));
-      if ($('#fond-couper', col)) $('#fond-couper').onclick = () => modaleCouper(pl.fond, pl.fond.media, () => { E.modif(true); eng.precharger().then(() => { eng._entrerPlan(); afficher(); }); });
+      if ($('#fond-couper', col)) $('#fond-couper').onclick = () => modaleCouper(pl.fond, pl.fond.media, () => { E.modif(true); prechargerPlan().then(() => { eng._entrerPlan(); afficher(); }); });
       $('#empiler').onclick = () => { E.modif(true); if (eng.empilerTextes(pl)) { E.rafraichir(); rendreReglages(); toast('Textes réorganisés (↶ pour annuler)'); } else toast('Rien à réorganiser'); };
       $('#p-duree').oninput = e => { E.modif(); pl.duree = Math.max(0, Number(e.target.value) || 0); $('#t-curseur').max = Number(pl.duree) || 6; rendrePlans(); };
       $('#p-trans').onchange = e => { E.modif(true); pl.transition = pl.transition || {}; pl.transition.type = e.target.value; pl.transition.duree = pl.transition.duree || 0.8; voirTransition(); };
@@ -2694,7 +2715,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           const cibles = portee === 'tous' ? p.plans : portee === 'role' ? p.plans.filter(x => x.role === pl.role) : [pl];
           cibles.forEach(x => { x.fond = x.fond || {}; if (estVideo) { if (x.fond.type === 'image' || x.fond.type === 'couleur' || x.fond.type === 'aucun') delete x.fond.type; x.fond.media = src; } else { x.fond.type = 'image'; x.fond.media = src; delete x.fond.recadrage; } });
           fermer(); toast(cibles.length > 1 ? 'Fond mis sur ' + cibles.length + ' plans' : 'Fond changé');
-          eng.precharger().then(() => { eng._entrerPlan(); afficher(); });
+          prechargerPlan().then(() => { eng._entrerPlan(); afficher(); });
         };
         $('#cf-q', box).oninput = e => { q = e.target.value; rendre(); };
         $$('#cf-mode [data-m]', box).forEach(b => b.onclick = () => { mode = b.dataset.m; Stock.ecrire('studio.choixfond.mode', mode); $$('#cf-mode [data-m]', box).forEach(x => x.classList.toggle('on', x === b)); rendre(); });
