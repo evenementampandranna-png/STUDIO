@@ -735,6 +735,8 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-13-1', date: '13 novembre 2026', titre: 'Redimensionner un bouton partie par partie', points: [
+      'Bouton choisi : 8 poignées. <b>Côtés</b> = largeur seulement, <b>haut / bas</b> = hauteur seulement, <b>coins</b> = largeur et hauteur ; le <b>texte garde sa taille</b> (A− / A+ pour le texte). Maj + coin : tout grandit ensemble, texte compris.'] },
     { id: '2026-11-12-9', date: '12 novembre 2026', titre: 'Plein écran : avancer et reculer', points: [
       '⛶ Plein écran : barre de lecture en bas — glissez pour aller où vous voulez, ⏪ −5 s, ⏩ +5 s, ⏮ / ⏭ plan précédent / suivant, ↺ depuis le début, ⏸ pause. Clavier : ← / → (5 s), Maj + ← / → (plan), espace.'] },
     { id: '2026-11-12-8', date: '12 novembre 2026', titre: 'Replier le haut de l\'atelier', points: [
@@ -1796,7 +1798,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     const zone = $('#poignees');
     const cadre = $('#cadre');
     let drag = null, editeur = null;
-    const POIGNEES = { texte: ['nw', 'ne', 'sw', 'se', 'e', 'w'], bouton: ['nw', 'ne', 'sw', 'se', 'e', 'w'], compteur: ['e', 'w'], champ: ['e', 'w'], image: ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'], video: ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'], forme: ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] };
+    const POIGNEES = { texte: ['nw', 'ne', 'sw', 'se', 'e', 'w'], bouton: ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'], compteur: ['e', 'w'], champ: ['e', 'w'], image: ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'], video: ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'], forme: ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] };
     function calqueSel() { return (plan().calques || []).find(x => x.id === E.sel); }
     // ---- Sélection multiple : E.multi contient tous les éléments choisis (E.sel = le dernier cliqué)
     E.multi = new Set();
@@ -1896,7 +1898,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       }
       if (h && calqueSel() && E.multi.size <= 1) {
         const c = calqueSel(), b = eng.bbox[c.id];
-        drag = { mode: 'taille', h: h.dataset.h, c, x0: e.clientX, y0: e.clientY, w: r.width, hz: r.height, b: Object.assign({}, b), v: { largeur: Number(c.largeur) || 60, taille: Number(c.taille) || 4, hauteur: Number(c.hauteur) || 22, x: Number(c.x), y: Number(c.y) }, bouge: false };
+        drag = { mode: 'taille', h: h.dataset.h, c, x0: e.clientX, y0: e.clientY, w: r.width, hz: r.height, b: Object.assign({}, b), v: { largeur: Number(c.largeur) || 60, taille: Number(c.taille) || 4, hauteur: Number(c.hauteur) || 22, b_hauteur: Number(c.b_hauteur) || 1, x: Number(c.x), y: Number(c.y) }, bouge: false };
         zone.setPointerCapture(e.pointerId); e.preventDefault(); return;
       }
       const c = calqueA(e);
@@ -1973,7 +1975,11 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         const dx = dxp / drag.w * 100, dy = dyp / drag.hz * 100;
         const sx = H.includes('e') ? 1 : H.includes('w') ? -1 : 0, sy = H.includes('s') ? 1 : H.includes('n') ? -1 : 0;
         const coin = sx && sy;
-        if (coin) {
+        // bouton : chaque poignée ne change que sa partie — côtés = largeur, haut/bas = hauteur, coins = les deux ; le texte garde sa taille (Maj + coin : tout ensemble)
+        if (c.type === 'bouton' && !(coin && e.shiftKey)) {
+          if (sx) c.largeur = Math.round(Math.max(5, Math.min(100, v.largeur + 2 * sx * dx)) * 10) / 10;
+          if (sy && b.h > 0) c.b_hauteur = Math.round(Math.max(0.4, Math.min(5, v.b_hauteur * (b.h + 2 * sy * dy) / b.h)) * 100) / 100;
+        } else if (coin) {
           // agrandir proportionnellement depuis le centre
           const f = Math.max(0.2, Math.min(5, (b.w + 2 * sx * dx) / b.w));
           if (aHauteur(c)) { c.largeur = Math.round(Math.min(100, v.largeur * f) * 10) / 10; c.hauteur = Math.round(Math.min(100, v.hauteur * f) * 10) / 10; }
