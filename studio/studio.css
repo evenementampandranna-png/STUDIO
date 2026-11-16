@@ -614,3 +614,5 @@ body.atelier-plein.haut-replie main { padding-top: 14px !important; }
 .masque-btn span { font-size: 18px; line-height: 1.1; }
 .masque-btn:hover { border-color: var(--bordeaux, #7a1f2b); }
 .masque-btn.on { background: var(--bordeaux, #7a1f2b); color: #fff; border-color: transparent; }
+/* plein écran en pause : image seule (un clic cache / rend les contrôles) */
+.visionneuse.sans-controles .vis-barre, .visionneuse.sans-controles .vis-btns { opacity: 0 !important; visibility: hidden; pointer-events: none; transition: opacity .25s, visibility 0s .25s; }

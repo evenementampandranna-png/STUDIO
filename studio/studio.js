@@ -745,6 +745,8 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-16-2', date: '16 novembre 2026', titre: 'Plein écran : image seule en pause', points: [
+      'En ⛶ Plein écran, vidéo en pause : un clic sur l\'écran cache la barre de lecture et tous les boutons, pour ne voir que l\'image. Un deuxième clic les fait revenir, sans relancer la lecture.'] },
     { id: '2026-11-16-1', date: '16 novembre 2026', titre: 'Masque, plein écran jusqu\'au remerciement, derniers fonds en premier', points: [
       '<b>◐ Masque</b> (photo ou vidéo posée sur le plan, panneau « Masque ») : Linéaire, Miroir, Cercle / ovale, Rectangle, Cœur, Étoile. Réglez la position, la taille, la rotation et <b>Adoucir les bords</b> pour fondre la superposition dans le fond ; « Inverser » cache l\'intérieur. Le film et l\'invitation en ligne le montrent aussi.',
       '<b>⛶ Plein écran</b> : le plan de confirmation (qui attend l\'invité) continue tout seul après 6 s, et le <b>remerciement</b> s\'affiche.',
@@ -1739,6 +1741,12 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       }, 200);
       const lancer = () => { v.jouer(seq, 0); if (audio) { audio.currentTime = Number(p.musique.debut) || 0; audio.play().catch(() => {}); } const pb = $('[data-v="pause"]', ov); if (pb) pb.textContent = '⏸'; };
       lancer();
+      // en pause : un clic sur l'écran cache la barre et tous les contrôles (image seule) ; un 2e clic les rend, sans relancer
+      ov.addEventListener('click', e => {
+        if (e.target.closest('.vis-barre, .vis-btns, button, a, input, select, textarea, [role="button"]')) return;
+        if (ov.classList.contains('sans-controles')) { ov.classList.remove('sans-controles'); return; }
+        if (v && !v.lecture) ov.classList.add('sans-controles');
+      });
       $$('.vis-b', ov).forEach(b => b.onclick = () => {
         const a = b.dataset.v;
         if (a === 'fermer') fermer();
