@@ -608,3 +608,9 @@ body.atelier-plein.haut-replie main { padding-top: 14px !important; }
 .visionneuse .vis-cmd .vis-b { width: 38px; height: 38px; font-size: 15px; }
 .visionneuse .vis-cmd .vis-b.gros { width: 48px; height: 48px; font-size: 19px; background: rgba(255,255,255,.28); }
 .visionneuse .vis-heure { color: #fff; font: 600 12.5px Inter, sans-serif; margin-left: 8px; font-variant-numeric: tabular-nums; min-width: 82px; }
+/* ◐ Masque d'une photo / vidéo posée */
+.masques-grille { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+.masque-btn { display: flex; flex-direction: column; align-items: center; gap: 1px; border: 1px solid var(--ligne); background: #fff; border-radius: 10px; padding: 5px 2px; cursor: pointer; font: 500 10.5px Inter, sans-serif; color: #5b4a44; }
+.masque-btn span { font-size: 18px; line-height: 1.1; }
+.masque-btn:hover { border-color: var(--bordeaux, #7a1f2b); }
+.masque-btn.on { background: var(--bordeaux, #7a1f2b); color: #fff; border-color: transparent; }

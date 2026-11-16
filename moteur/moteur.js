@@ -150,6 +150,44 @@
     ['vague', 'Bas en vague', (w, h) => { const a = h * 0.06; return `M0 0H${f2(w)}V${f2(h - a)}C${f2(w * 0.75)} ${f2(h - 3 * a)} ${f2(w * 0.75)} ${f2(h + a)} ${f2(w / 2)} ${f2(h - a)}C${f2(w * 0.25)} ${f2(h - 3 * a)} ${f2(w * 0.25)} ${f2(h + a)} 0 ${f2(h - a)}Z`; }],
     ['libre', 'Forme libre (à dessiner)', (w, h, c) => { const pts = (Array.isArray(c.forme_points) && c.forme_points.length >= 3 ? c.forme_points : [[0.5, 0], [1, 0.35], [0.82, 1], [0.18, 1], [0, 0.35]]).map(p => [clamp(Number(p[0]), 0, 1) * w, clamp(Number(p[1]), 0, 1) * h]); return c.forme_lisse ? lisser(pts) : polygone(pts); }]
   ];
+  /* Masque d'une photo / vidéo posée (superposition) : linéaire, miroir, cercle, rectangle, cœur, étoile…
+     mq = { type, x, y (centre, % du calque), taille (%), adoucir (0-100), angle (°), inverse } */
+  const MASQUES = [['aucun', 'Aucun'], ['lineaire', 'Linéaire'], ['miroir', 'Miroir (bande)'], ['cercle', 'Cercle / ovale'], ['rectangle', 'Rectangle'], ['coeur', 'Cœur'], ['etoile', 'Étoile']];
+  function dessinerMasque(m, mq, w, h) {
+    m.setTransform(1, 0, 0, 1, 0, 0); m.globalCompositeOperation = 'source-over'; m.globalAlpha = 1; m.shadowBlur = 0; m.shadowColor = 'transparent'; m.clearRect(0, 0, w, h);
+    const cx = clamp(Number(mq.x != null ? mq.x : 50), -50, 150) / 100 * w, cy = clamp(Number(mq.y != null ? mq.y : 50), -50, 150) / 100 * h;
+    const taille = clamp(Number(mq.taille != null ? mq.taille : 70), 1, 200) / 100;
+    const ad = clamp(Number(mq.adoucir != null ? mq.adoucir : 20), 0, 100) / 100 * Math.min(w, h) * 0.3;
+    const ang = (Number(mq.angle) || 0) * Math.PI / 180;
+    m.fillStyle = '#000';
+    if (mq.type === 'lineaire' || mq.type === 'miroir') {
+      // normale à la ligne : angle 0 = garder le haut (ligne horizontale)
+      const nx = Math.sin(ang), ny = -Math.cos(ang);
+      const f = Math.max(1, ad);
+      let gr;
+      if (mq.type === 'lineaire') {
+        gr = m.createLinearGradient(cx - nx * f / 2, cy - ny * f / 2, cx + nx * f / 2, cy + ny * f / 2);
+        gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, '#000');
+      } else {
+        const demi = taille * h / 2, R = demi + f / 2 + 1;
+        gr = m.createLinearGradient(cx - nx * R, cy - ny * R, cx + nx * R, cy + ny * R);
+        const a = clamp((R - demi - f / 2) / (2 * R), 0, 0.5), b = clamp((R - Math.max(0, demi - f / 2)) / (2 * R), a, 0.5);
+        gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(a, 'rgba(0,0,0,0)'); gr.addColorStop(b, '#000'); gr.addColorStop(1 - b, '#000'); gr.addColorStop(1 - a, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      }
+      m.fillStyle = gr; m.fillRect(0, 0, w, h);
+    } else {
+      const sw = mq.type === 'rectangle' || mq.type === 'cercle' ? taille * w : taille * Math.min(w, h), sh = mq.type === 'rectangle' || mq.type === 'cercle' ? taille * h : sw;
+      const id = mq.type === 'cercle' ? 'rond' : mq.type === 'rectangle' ? (Number(mq.coins) ? 'arrondi' : 'rect') : mq.type;
+      const d = cheminForme({ forme: id, coins: mq.coins }, sw, sh);
+      const chemin = new Path2D(); chemin.addPath(new Path2D(d), new DOMMatrix().translate(cx, cy).rotate(Number(mq.angle) || 0).translate(-sw / 2, -sh / 2));
+      if (ad > 0.5) {
+        // bords adoucis : on ne garde que l'ombre floue de la forme (fonctionne sur tous les navigateurs)
+        const loin = w + h + ad * 4;
+        m.save(); m.shadowColor = '#000'; m.shadowBlur = ad; m.shadowOffsetX = loin; m.translate(-loin, 0); m.fill(chemin); m.restore();
+      } else m.fill(chemin);
+    }
+    if (mq.inverse) { m.globalCompositeOperation = 'xor'; m.fillStyle = '#000'; m.fillRect(0, 0, w, h); m.globalCompositeOperation = 'source-over'; }
+  }
   // tracé SVG de la forme d'un calque (null = pas de découpe)
   function cheminForme(c, w, h) {
     if (!c || !c.forme) return null;
@@ -777,12 +815,26 @@
           const d = cheminForme(c, larg, haut);
           const chemin = d ? new Path2D() : null;
           if (chemin) chemin.addPath(new Path2D(d), new DOMMatrix().translate(-larg / 2, -haut / 2));
-          if (chemin) {
-            if (c.ombre_cadre) { ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 18; ctx.shadowOffsetY = 6; ctx.fillStyle = '#fff'; ctx.fill(chemin); ctx.restore(); }
-            ctx.save(); ctx.clip(chemin);
-            this._dessinerImage(el, -larg / 2, -haut / 2, larg, haut, true, c.recadrage);
-            ctx.restore();
-          } else this._dessinerImage(el, -larg / 2, -haut / 2, larg, haut, c.remplir === true, c.recadrage);
+          const peindre = g => {
+            const sv = this.ctx; this.ctx = g;
+            if (chemin) { g.save(); g.clip(chemin); this._dessinerImage(el, -larg / 2, -haut / 2, larg, haut, true, c.recadrage); g.restore(); }
+            else this._dessinerImage(el, -larg / 2, -haut / 2, larg, haut, c.remplir === true, c.recadrage);
+            this.ctx = sv;
+          };
+          if (chemin && c.ombre_cadre) { ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 18; ctx.shadowOffsetY = 6; ctx.fillStyle = '#fff'; ctx.fill(chemin); ctx.restore(); }
+          const mq = c.mq && c.mq.type && c.mq.type !== 'aucun' ? c.mq : null;
+          if (mq && larg >= 2 && haut >= 2) {
+            // masque (comme dans un montage vidéo) : seule la partie dans le masque reste, bords adoucis
+            const lw = Math.ceil(larg), lh = Math.ceil(haut);
+            const oc = this._mqC || (this._mqC = document.createElement('canvas'));
+            const mc = this._mqM || (this._mqM = document.createElement('canvas'));
+            if (oc.width !== lw || oc.height !== lh) { oc.width = mc.width = lw; oc.height = mc.height = lh; }
+            const g = oc.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; g.clearRect(0, 0, lw, lh);
+            g.translate(lw / 2, lh / 2); peindre(g); g.setTransform(1, 0, 0, 1, 0, 0);
+            dessinerMasque(mc.getContext('2d'), mq, lw, lh);
+            g.globalCompositeOperation = 'destination-in'; g.drawImage(mc, 0, 0); g.globalCompositeOperation = 'source-over';
+            ctx.drawImage(oc, -larg / 2, -haut / 2, larg, haut);
+          } else peindre(ctx);
           if (c.bordure) {
             ctx.strokeStyle = c.bordure; ctx.lineWidth = Number(c.bordure_epaisseur) || 3; ctx.lineJoin = 'round';
             if (chemin) ctx.stroke(chemin); else ctx.strokeRect(-larg / 2, -haut / 2, larg, haut);
@@ -1162,5 +1214,5 @@
   // Langues proposées pour les invitations
   const LANGUES = { mg: 'Malagasy', fr: 'Français', en: 'English', de: 'Deutsch', it: 'Italiano', es: 'Español', pt: 'Português', zh: '中文', ar: 'العربية', ru: 'Русский', ja: '日本語' };
   const FUSIONS = [['normal', 'Normale'], ['multiply', 'Produit (assombrit, garde les ombres)'], ['screen', 'Écran (éclaircit, garde les lumières)'], ['overlay', 'Superposition'], ['soft-light', 'Lumière douce'], ['hard-light', 'Lumière crue'], ['color-dodge', 'Densité couleur −'], ['color-burn', 'Densité couleur +'], ['darken', 'Obscurcir'], ['lighten', 'Éclaircir'], ['difference', 'Différence'], ['luminosity', 'Luminosité'], ['color', 'Couleur']];
-  global.MoteurInfo = { ICONE_MAPS, FORMES: FORMES.map(x => [x[0], x[1]]), cheminForme, CATALOGUE_POLICES, chargerPolices, chargerPolicePerso, typeFond, fondMedia, FUSIONS, plage, positionVideo, LANGUES, texteDe, W, H, POLICES, ANIMATIONS, SORTIES, NOMS_EFFETS, ACTIONS, TYPES_HTML, uid, variablesDe, dateLisible, remplacer, MOIS_MG, MOIS_FR };
+  global.MoteurInfo = { MASQUES, ICONE_MAPS, FORMES: FORMES.map(x => [x[0], x[1]]), cheminForme, CATALOGUE_POLICES, chargerPolices, chargerPolicePerso, typeFond, fondMedia, FUSIONS, plage, positionVideo, LANGUES, texteDe, W, H, POLICES, ANIMATIONS, SORTIES, NOMS_EFFETS, ACTIONS, TYPES_HTML, uid, variablesDe, dateLisible, remplacer, MOIS_MG, MOIS_FR };
 })(window);

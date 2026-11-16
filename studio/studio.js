@@ -304,7 +304,7 @@
     medias() {
       if (!this.actif()) return [];
       const miens = new Set(medias.map(m => m.equipe_id).filter(Boolean));
-      return (this.items || []).filter(x => !miens.has(x.id) && x.type !== 'film').map(x => ({ id: 'eq-' + x.id, equipe_id: x.id, equipe: true, src: this.url(x.chemin), nom: x.nom, type: x.type, vignette: x.vignette, usage: x.usage || 'programme', description: x.description || '', duree: x.duree, l: x.l, h: x.h, auteur: x.auteur, secondes_creation: x.secondes_creation, evenement: x.evenement, zone: { x: 50, y: 50, largeur: 66 }, zone_texte: 'centre' }));
+      return (this.items || []).filter(x => !miens.has(x.id) && x.type !== 'film').map(x => ({ id: 'eq-' + x.id, equipe_id: x.id, equipe: true, src: this.url(x.chemin), nom: x.nom, type: x.type, vignette: x.vignette, usage: x.usage || 'programme', description: x.description || '', duree: x.duree, l: x.l, h: x.h, auteur: x.auteur, secondes_creation: x.secondes_creation, evenement: x.evenement, cree: x.cree, zone: { x: 50, y: 50, largeur: 66 }, zone_texte: 'centre' }));
     },
     // partage un fichier local avec l'équipe (envoi + fiche)
     async partager(m, evtTitre) {
@@ -417,13 +417,16 @@
   };
   if (Equipe.actif()) setTimeout(() => Equipe.charger().catch(() => {}), 1500);
 
+  // le plus récemment importé en premier (fonds de base à la fin)
+  function recence(m) { if (m.base || Fabrique.FONDS.includes(m)) return -2; if (m.ajoute) return m.ajoute; const c = m.cree && Date.parse(m.cree); if (c) return c; const i = medias.indexOf(m); return i >= 0 ? i : -1; }
+  const recents = l => l.map((m, i) => [recence(m), i, m]).sort((a, b) => b[0] - a[0] || a[1] - b[1]).map(x => x[2]);
   function tousFonds() {
-    return Fabrique.FONDS.concat(medias.filter(m => m.type === 'fond'), Equipe.medias().filter(m => m.type === 'fond'));
+    return recents(medias.filter(m => m.type === 'fond').concat(Equipe.medias().filter(m => m.type === 'fond'))).concat(Fabrique.FONDS);
   }
   // Fonds visibles pour un événement : fonds de base + fonds communs + fonds de cet événement (+ celui déjà utilisé)
   const pourEvt = (m, id) => !m.evt || m.evt === id;
   function fondsDe(p, garder) {
-    return Fabrique.FONDS.concat(medias.filter(m => m.type === 'fond' && (pourEvt(m, p && p.id) || m.src === garder)), Equipe.medias().filter(m => m.type === 'fond'));
+    return recents(medias.filter(m => m.type === 'fond' && (pourEvt(m, p && p.id) || m.src === garder)).concat(Equipe.medias().filter(m => m.type === 'fond'))).concat(Fabrique.FONDS);
   }
   // Une seule fois : rattacher chaque fichier importé à l'événement qui l'utilise
   if (!Stock.lire('studio.medias.evt', false)) {
@@ -742,6 +745,10 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-16-1', date: '16 novembre 2026', titre: 'Masque, plein écran jusqu\'au remerciement, derniers fonds en premier', points: [
+      '<b>◐ Masque</b> (photo ou vidéo posée sur le plan, panneau « Masque ») : Linéaire, Miroir, Cercle / ovale, Rectangle, Cœur, Étoile. Réglez la position, la taille, la rotation et <b>Adoucir les bords</b> pour fondre la superposition dans le fond ; « Inverser » cache l\'intérieur. Le film et l\'invitation en ligne le montrent aussi.',
+      '<b>⛶ Plein écran</b> : le plan de confirmation (qui attend l\'invité) continue tout seul après 6 s, et le <b>remerciement</b> s\'affiche.',
+      '<b>Fonds</b> : le dernier fond importé apparaît <b>en premier</b> (Choisir un fond, Bibliothèque, nouvel événement) ; les fonds de base du studio sont à la fin.'] },
     { id: '2026-11-13-2', date: '13 novembre 2026', titre: 'Changer le fond : visible tout de suite', points: [
       'Choisir ou importer un fond s\'affiche aussitôt : le studio n\'attend plus que tous les fichiers de l\'invitation soient chargés, ni le téléchargement complet d\'une vidéo de l\'équipe (elle est lue en direct, la copie se fait derrière).',
       'Si une photo ou une vidéo posée sur tout le plan cache le fond, le studio le signale : ○ dans Calques pour la masquer, ✕ pour la retirer.'] },
@@ -1723,7 +1730,13 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       const maj = () => { if (!glisse) barre.value = tempsGlobal(); heure.textContent = fmt(tempsGlobal()) + ' / ' + fmt(total); barre.style.setProperty('--pc', (tempsGlobal() / total * 100) + '%'); };
       barre.addEventListener('input', () => { glisse = true; aller(Number(barre.value)); });
       barre.addEventListener('change', () => { glisse = false; });
-      const tic = setInterval(() => { if (ferme) clearInterval(tic); else maj(); }, 200);
+      const tic = setInterval(() => {
+        if (ferme) return clearInterval(tic);
+        // plan qui attend l'invité (confirmation, durée 0) : en plein écran on continue tout seul après 6 s, jusqu'au remerciement
+        const pc = v.planCourant();
+        if (v.lecture && pc && !(Number(pc.duree) > 0) && v.t >= (dur[v.pos] || 6) && v.pos < seq.length - 1) v.allerA(v.pos + 1);
+        maj();
+      }, 200);
       const lancer = () => { v.jouer(seq, 0); if (audio) { audio.currentTime = Number(p.musique.debut) || 0; audio.play().catch(() => {}); } const pb = $('[data-v="pause"]', ov); if (pb) pb.textContent = '⏸'; };
       lancer();
       $$('.vis-b', ov).forEach(b => b.onclick = () => {
@@ -2604,7 +2617,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     E.rendreReglages = rendreReglages;
     // Panneau façon Photoshop : une seule rubrique ouverte à la fois (la dernière utilisée), « Calques » toujours visible
     const titreBloc = d => { const sm = d.querySelector('summary'); if (!sm) return ''; if (sm.dataset.titre == null) sm.dataset.titre = (sm.childNodes[0] && sm.childNodes[0].textContent || sm.textContent).trim(); return sm.dataset.titre; };
-    const ICONES_PANNEAU = [[/^Fond/, '▦'], [/^Durée/, '⏱'], [/^Calques/, '☰'], [/^Texte/, 'T'], [/^Style|^Arrière|^Ombre|^Contour/, '🎨'], [/^⏱|^Compte/, '⏳'], [/^Traduction/, '🌐'], [/^Animation/, '✦'], [/^Position/, '✥'], [/^Ordre/, '⇅'], [/^Bouton/, '⏺'], [/^Compteur/, '±'], [/^▭/, '▭'], [/^◇/, '◇'], [/^Photo/, '🖼'], [/^Alignement|^Plusieurs|^Sélection/, '⊞']];
+    const ICONES_PANNEAU = [[/^Masque/, '◐'], [/^Fond/, '▦'], [/^Durée/, '⏱'], [/^Calques/, '☰'], [/^Texte/, 'T'], [/^Style|^Arrière|^Ombre|^Contour/, '🎨'], [/^⏱|^Compte/, '⏳'], [/^Traduction/, '🌐'], [/^Animation/, '✦'], [/^Position/, '✥'], [/^Ordre/, '⇅'], [/^Bouton/, '⏺'], [/^Compteur/, '±'], [/^▭/, '▭'], [/^◇/, '◇'], [/^Photo/, '🖼'], [/^Alignement|^Plusieurs|^Sélection/, '⊞']];
     const iconePanneau = t => (ICONES_PANNEAU.find(([r]) => r.test(t)) || [0, '•'])[1];
     // Panneaux façon Photoshop : liste d'icônes à droite, un seul panneau ouvert à la fois ; « Calques » toujours visible en bas
     // Panneau de droite en accordéon : chaque section se déplie / se replie (chevron, animation fluide) ; mémorisé par type
@@ -2668,8 +2681,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     function choisirFond(kind) {
       const pl = plan(), estVideo = kind !== 'image';
       const items = (estVideo
-        ? Fabrique.FONDS.map(f => Object.assign({ base: true }, f)).concat(medias.filter(m => m.type === 'fond'), Equipe.medias().filter(m => m.type === 'fond'))
-        : medias.filter(m => m.type === 'image').concat(Equipe.medias().filter(m => m.type === 'image')))
+        ? recents(medias.filter(m => m.type === 'fond').concat(Equipe.medias().filter(m => m.type === 'fond'))).concat(Fabrique.FONDS.map(f => Object.assign({ base: true }, f)))
+        : recents(medias.filter(m => m.type === 'image').concat(Equipe.medias().filter(m => m.type === 'image'))))
         .filter((m, i, l) => m.src && l.findIndex(x => x.src === m.src) === i);
       // où chaque fond est déjà utilisé : dans quels événements, sur quels plans
       const usages = {};
@@ -2775,6 +2788,34 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         };
         montrer();
       });
+    }
+    // ◐ Masque d'une photo / vidéo posée (superposition) : seule une partie reste visible, bords adoucis
+    const ICONES_MASQUE = { aucun: '⊘', lineaire: '◒', miroir: '▤', cercle: '◯', rectangle: '▭', coeur: '♡', etoile: '☆' };
+    function blocMasque(c) {
+      const mq = c.mq || {}, t = mq.type || 'aucun', v = (k, d) => mq[k] != null && mq[k] !== '' ? mq[k] : d;
+      const curseur = (k, nom, min, max, d, unite) => `<label class="champ">${nom} <span class="muet" data-mqv="${k}">${v(k, d)}${unite || ''}</span><input type="range" data-mq="${k}" min="${min}" max="${max}" step="1" value="${v(k, d)}"></label>`;
+      return `<details class="bloc" open><summary>Masque <span class="muet">${t === 'aucun' ? '' : esc((MoteurInfo.MASQUES.find(x => x[0] === t) || [0, ''])[1])}</span></summary><div class="pile">
+        <div class="masques-grille">${MoteurInfo.MASQUES.map(([id, nom]) => `<button class="masque-btn ${t === id ? 'on' : ''}" data-mq-type="${id}" title="${esc(nom)}"><span>${ICONES_MASQUE[id] || '?'}</span>${esc(nom.replace(/ \(.*\)$/, ''))}</button>`).join('')}</div>
+        ${t === 'aucun' ? '<p class="muet" style="font-size:12px;margin:0">Choisissez un masque : seule une partie de la photo ou de la vidéo reste visible, avec des bords fondus dans le fond (comme dans un montage vidéo).</p>' : `
+        <div class="deux">${curseur('x', 'Position ↔', -50, 150, 50, ' %')}${curseur('y', 'Position ↕', -50, 150, 50, ' %')}</div>
+        <div class="deux">${t !== 'lineaire' ? curseur('taille', 'Taille', 5, 200, 70, ' %') : ''}${curseur('adoucir', 'Adoucir les bords', 0, 100, 20, '')}</div>
+        <div class="deux">${curseur('angle', 'Rotation', -180, 180, 0, '°')}${t === 'rectangle' ? curseur('coins', 'Arrondi', 0, 100, 0, '') : ''}</div>
+        <div class="ligne" style="gap:6px;flex-wrap:wrap"><label class="cases" style="margin:0"><input type="checkbox" data-mq-inverse ${mq.inverse ? 'checked' : ''}> Inverser (cacher l'intérieur)</label><button class="btn petit" data-mq-reset>↺ Recentrer</button></div>`}
+      </div></details>`;
+    }
+    function brancherMasque(c) {
+      $$('#props [data-mq-type]').forEach(b => b.onclick = () => {
+        E.modif(true); const t = b.dataset.mqType;
+        if (t === 'aucun') delete c.mq; else c.mq = Object.assign({ x: 50, y: 50, taille: 70, adoucir: 25, angle: 0 }, c.mq || {}, { type: t });
+        E.rafraichir(); rendreReglages();
+      });
+      $$('#props [data-mq]').forEach(i => i.oninput = () => {
+        if (!c.mq) return; E.modif(); c.mq[i.dataset.mq] = Number(i.value);
+        const l = $(`#props [data-mqv="${i.dataset.mq}"]`); if (l) l.textContent = i.value + (i.dataset.mq === 'angle' ? '°' : /^(x|y|taille)$/.test(i.dataset.mq) ? ' %' : '');
+        E.rafraichir();
+      });
+      const inv = $('#props [data-mq-inverse]'); if (inv) inv.onchange = () => { if (!c.mq) return; E.modif(true); c.mq.inverse = inv.checked; if (!inv.checked) delete c.mq.inverse; E.rafraichir(); };
+      const rz = $('#props [data-mq-reset]'); if (rz) rz.onclick = () => { if (!c.mq) return; E.modif(true); Object.assign(c.mq, { x: 50, y: 50, angle: 0 }); E.rafraichir(); rendreReglages(); };
     }
     // Panneau quand plusieurs éléments sont choisis
     function formulaireMulti() {
@@ -3044,6 +3085,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         ${c.type === 'video' && c.media ? `<button class="btn petit" data-couper>✂ Couper la vidéo${MoteurInfo.plage(c) ? ' (' + MoteurInfo.plage(c).map(x => x.toFixed(1)).join(' → ') + ' s)' : ''}</button>` : ''}
         <div class="cases">${c.forme ? '' : `<label><input type="checkbox" data-k="remplir" ${c.remplir ? 'checked' : ''}> Remplir le cadre (recadrer)</label>`}</div>
         </div></details>
+        ${c.media && !c.illu ? blocMasque(c) : ''}
         <details class="bloc" open><summary>◇ Forme du cadre</summary><div class="pile">
         ${grilleFormes(c, ((Number(c.largeur) || 46) * 720) / ((Number(c.hauteur) || 22) * 1280))}
         ${c.forme === 'arrondi' ? `<label class="champ">Arrondi des coins<input type="range" data-k="arrondi" min="0" max="100" step="1" value="${c.arrondi != null && c.arrondi !== '' ? c.arrondi : 16}"></label>` : ''}
@@ -3077,6 +3119,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         else if (c.lien) window.open(c.lien, '_blank'); else toast('Mettez d\'abord l\'adresse du lien');
       };
       $$('#props [data-ordre]').forEach(b => b.onclick = () => ordreCalque(c, b.dataset.ordre));
+      if (c.type === 'image' || c.type === 'video') brancherMasque(c);
       const ef = $('#props [data-en-fond]'); if (ef) ef.onclick = () => {
         const pl = plan(); E.modif(true);
         pl.fond = Object.assign({}, pl.fond, { type: c.type === 'video' ? 'video' : 'image', media: c.media, boucle: true });
@@ -4911,8 +4954,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     if (evt && evt !== '*' && !projets[evt]) evt = liste[0] ? liste[0].id : '';
     const titre = id => id ? ((projets[id] && projets[id].fiche && projets[id].fiche.titre) || 'Événement supprimé') : 'Commun à tous les événements';
     const garde = m => evt === '*' || (m.evt || '') === evt;
-    const fondsEvt = medias.filter(m => m.type === 'fond' && garde(m));
-    const autres = medias.filter(m => m.type !== 'fond' && garde(m));
+    const fondsEvt = recents(medias.filter(m => m.type === 'fond' && garde(m)));
+    const autres = recents(medias.filter(m => m.type !== 'fond' && garde(m)));
     const choixEvt = m => `<label class="champ">Événement<select data-k="evt">${[['', 'Commun à tous']].concat(liste.map(x => [x.id, (x.fiche && x.fiche.titre) || x.id])).map(([v, t]) => `<option value="${esc(v)}" ${(m.evt || '') === v ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`;
     const carteFond = f => `
         <div class="carte pile" data-id="${f.id}" style="padding:12px">
@@ -5068,7 +5111,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     await IDB.mettre(src, f);
     const url = URL.createObjectURL(f);
     const info = video ? await vignetteVideo(url) : await vignetteImage(url);
-    const m = { id, evt: evt || '', nom: f.name.replace(/\.\w+$/, ''), src, type: type || (video ? 'video' : 'image'), vignette: info.vignette, duree: info.duree ? Math.round(info.duree * 10) / 10 : 0, l: info.l, h: info.h };
+    const m = { id, ajoute: Date.now(), evt: evt || '', nom: f.name.replace(/\.\w+$/, ''), src, type: type || (video ? 'video' : 'image'), vignette: info.vignette, duree: info.duree ? Math.round(info.duree * 10) / 10 : 0, l: info.l, h: info.h };
     if (m.type === 'fond') {
       Object.assign(m, { usage: 'programme', description: '', zone: { x: 50, y: 50, largeur: 66 }, zone_texte: 'centre' });
       if (info.l && info.h && Math.abs(info.l / info.h - 9 / 16) > 0.03) toast(`${f.name} n'est pas au format vertical 9:16 : il sera recadré`);
