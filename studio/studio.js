@@ -756,6 +756,9 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-17-5', date: '17 novembre 2026', titre: 'Plein écran des films : image seule en pause', points: [
+      'Les films (🎬 Vidéos, films de l\'événement, vitrine du site) ont maintenant leur propre plein écran <b>⛶</b> (coin en haut à droite de la vidéo au survol, ou double-clic), au même design que le studio. Un clic met en pause ; en pause, un clic cache la barre et tous les boutons (image seule), un 2e clic les fait revenir sans relancer. Espace : lecture / pause · ← → : 5 s · Échap : fermer.',
+      '⛶ Plein écran de l\'invitation dans le studio : un clic pendant la lecture met aussi en pause.'] },
     { id: '2026-11-17-4', date: '17 novembre 2026', titre: 'Invitation en pause : image seule', points: [
       'Dans l\'invitation des invités aussi (comme dans ⛶ Plein écran du studio) : en pause, un toucher sur l\'écran cache tous les boutons (♪, ▶, ❚❚, 🌐) pour ne voir que l\'image ; un 2e toucher les fait revenir, sans relancer. Pour reprendre : ▶ au centre ou ❚❚ en bas.'] },
     { id: '2026-11-17-3', date: '17 novembre 2026', titre: 'Voir l\'invitation dans une autre langue : traduite tout de suite', points: [
@@ -1767,6 +1770,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         if (e.target.closest('.vis-barre, .vis-btns, button, a, input, select, textarea, [role="button"]')) return;
         if (ov.classList.contains('sans-controles')) { ov.classList.remove('sans-controles'); return; }
         if (v && !v.lecture) ov.classList.add('sans-controles');
+        else if (v) $('[data-v="pause"]', ov).click();   // en lecture : un clic met en pause
       });
       $$('.vis-b', ov).forEach(b => b.onclick = () => {
         const a = b.dataset.v;
