@@ -877,7 +877,8 @@
           ctx.fillStyle = c.fond_couleur;
           const mg = taille * (c.fond_marge != null && c.fond_marge !== '' ? Number(c.fond_marge) : 0.4);
           const ar = c.fond_arrondi != null && c.fond_arrondi !== '' ? Number(c.fond_arrondi) : 0.4;
-          const fh = hTot + mg * 1.5;
+          const kh = c.fond_haut != null && c.fond_haut !== '' ? Math.max(0, Number(c.fond_haut)) : 1;   // hauteur du cartouche (poignées haut / bas)
+          const fh = hTot + mg * 1.5 * kh;
           arrondi(ctx, -larg / 2 - mg, -fh / 2, larg + mg * 2, fh, Math.min(fh / 2, taille * ar));
           ctx.fill(); ctx.restore();
         }
@@ -898,7 +899,12 @@
           ctx.fillStyle = c.couleur || '#7a1f2b';
           ecrire(morceau, l, ax, y, i, false);
         });
-        if (mesurer) this.bbox[c.id] = { x: (cx - larg / 2) / W * 100, y: (cy - hTot / 2) / H * 100, w: larg / W * 100, h: hTot / H * 100 };
+        if (mesurer) {
+          // avec un cartouche (fond du texte), le cadre de sélection suit le cartouche
+          let bw = larg, bh = hTot;
+          if (c.fond_couleur) { const mg = taille * (c.fond_marge != null && c.fond_marge !== '' ? Number(c.fond_marge) : 0.4), kh = c.fond_haut != null && c.fond_haut !== '' ? Math.max(0, Number(c.fond_haut)) : 1; bw = larg + mg * 2; bh = hTot + mg * 1.5 * kh; }
+          this.bbox[c.id] = { x: (cx - bw / 2) / W * 100, y: (cy - bh / 2) / H * 100, w: bw / W * 100, h: bh / H * 100 };
+        }
       } else if (c.type === 'image' || c.type === 'video') {
         const el = this.medias[c.media];
         const haut = c.hauteur ? Number(c.hauteur) / 100 * H : larg * 1.0;

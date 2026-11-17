@@ -756,6 +756,8 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-17-6', date: '17 novembre 2026', titre: 'Texte sur cartouche (ex. « Manasa olona … ») : réduire le cadre, pas le texte', points: [
+      'Un texte avec un fond (cartouche, comme « Manasa olona {places} » de la confirmation) a 8 poignées : <b>côtés</b> = largeur, <b>haut / bas</b> = hauteur du cartouche, <b>coins</b> = les deux. Le texte garde sa taille. Maj + coin : tout ensemble, texte compris.'] },
     { id: '2026-11-17-5', date: '17 novembre 2026', titre: 'Plein écran des films : image seule en pause', points: [
       'Les films (🎬 Vidéos, films de l\'événement, vitrine du site) ont maintenant leur propre plein écran <b>⛶</b> (coin en haut à droite de la vidéo au survol, ou double-clic), au même design que le studio. Un clic met en pause ; en pause, un clic cache la barre et tous les boutons (image seule), un 2e clic les fait revenir sans relancer. Espace : lecture / pause · ← → : 5 s · Échap : fermer.',
       '⛶ Plein écran de l\'invitation dans le studio : un clic pendant la lecture met aussi en pause.'] },
@@ -1896,7 +1898,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       const pl = plan(), seule = E.multi.size <= 1;
       const html = (pl.calques || []).filter(c => eng.bbox[c.id] && !c.masque && !c._edition).map(c => {
         const b = eng.bbox[c.id], actif = E.sel === c.id, groupe = E.multi.has(c.id) && !seule;
-        const hs = actif && seule ? (POIGNEES[c.type] || []).map(h => `<i class="h h-${h}" data-h="${h}"></i>`).join('') + '<i class="h h-rot" data-h="rot" title="Tourner (Maj : librement, sinon par 15°)">⟳</i>' : '';
+        const hs = actif && seule ? ((c.type === 'texte' && c.fond_couleur ? POIGNEES.bouton : POIGNEES[c.type]) || []).map(h => `<i class="h h-${h}" data-h="${h}"></i>`).join('') + '<i class="h h-rot" data-h="rot" title="Tourner (Maj : librement, sinon par 15°)">⟳</i>' : '';
         const rot = Number(c.rotation) || 0;
         return `<div class="poignee ${actif && seule ? 'actif' : ''} ${groupe ? 'groupe' : ''}" data-id="${c.id}" style="left:${b.x}%;top:${b.y}%;width:${b.w}%;height:${b.h}%${rot ? `;transform:rotate(${rot}deg)` : ''}"><span class="nom">${esc(nomType(c))}${drag && drag.mode === 'rotation' && drag.c === c ? ' · ' + rot + '°' : ''}</span>${hs}</div>`;
       }).join('') + (regles ? p.guides.v.map((x, k) => `<div class="guide guide-v" data-gv="${k}" style="left:${x}%" title="Glisser pour déplacer · double-clic ou glisser hors du cadre pour effacer"></div>`).join('') + p.guides.h.map((y, k) => `<div class="guide guide-h" data-gh="${k}" style="top:${y}%" title="Glisser pour déplacer · double-clic ou glisser hors du cadre pour effacer"></div>`).join('') : '')
@@ -1981,7 +1983,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       }
       if (h && calqueSel() && E.multi.size <= 1) {
         const c = calqueSel(), b = eng.bbox[c.id];
-        drag = { mode: 'taille', h: h.dataset.h, c, x0: e.clientX, y0: e.clientY, w: r.width, hz: r.height, b: Object.assign({}, b), v: { largeur: Number(c.largeur) || 60, taille: Number(c.taille) || 4, hauteur: Number(c.hauteur) || 22, b_hauteur: Number(c.b_hauteur) || 1, x: Number(c.x), y: Number(c.y) }, bouge: false };
+        drag = { mode: 'taille', h: h.dataset.h, c, x0: e.clientX, y0: e.clientY, w: r.width, hz: r.height, b: Object.assign({}, b), v: { largeur: Number(c.largeur) || 60, taille: Number(c.taille) || 4, hauteur: Number(c.hauteur) || 22, b_hauteur: Number(c.b_hauteur) || 1, fond_haut: c.fond_haut != null && c.fond_haut !== '' ? Number(c.fond_haut) : 1, x: Number(c.x), y: Number(c.y) }, bouge: false };
         zone.setPointerCapture(e.pointerId); e.preventDefault(); return;
       }
       const c = calqueA(e);
@@ -2062,6 +2064,10 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         if ((c.type === 'bouton' || c.type === 'compteur' || c.type === 'champ') && !(coin && e.shiftKey)) {
           if (sx) c.largeur = Math.round(Math.max(5, Math.min(100, v.largeur + 2 * sx * dx)) * 10) / 10;
           if (sy && b.h > 0) c.b_hauteur = Math.round(Math.max(0.4, Math.min(5, v.b_hauteur * (b.h + 2 * sy * dy) / b.h)) * 100) / 100;
+        } else if (c.type === 'texte' && c.fond_couleur && !(coin && e.shiftKey)) {
+          // texte sur cartouche (ex. « Manasa olona … ») : le cartouche change, le texte garde sa taille
+          if (sx) c.largeur = Math.round(Math.max(5, Math.min(100, v.largeur + 2 * sx * dx)) * 10) / 10;
+          if (sy) { const mg = (Number(c.taille) || 4) * (c.fond_marge != null && c.fond_marge !== '' ? Number(c.fond_marge) : 0.4) * 1.5; c.fond_haut = Math.round(Math.max(0, Math.min(10, v.fond_haut + 2 * sy * dy / Math.max(0.1, mg))) * 100) / 100; }
         } else if (coin) {
           // agrandir proportionnellement depuis le centre
           const f = Math.max(0.2, Math.min(5, (b.w + 2 * sx * dx) / b.w));
