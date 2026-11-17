@@ -3,6 +3,6 @@
 V=$(date +%Y%m%d%H%M)
 for f in index.html studio/index.html i/index.html hote/index.html; do
   [ -f "$f" ] || continue
-  sed -i -E "s#((src|href)=\"(\.\./)?(config\.js|moteur/[a-z]+\.js|vitrine/index\.js|studio\.css|studio\.js))(\?v=[0-9]+)?\"#\1?v=$V\"#g" "$f"
+  sed -i -E "s#((src|href)=\"(\.\./)?(config\.js|moteur/[a-z-]+\.js|vitrine/[a-z-]+\.js|langue-en\.js|studio\.css|studio\.js))(\?v=[0-9]+)?\"#\1?v=$V\"#g" "$f"
 done
 echo "version $V"

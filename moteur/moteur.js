@@ -652,13 +652,17 @@
         const ti = fs * 1.25, tw = Math.min(ctx.measureText(libelle).width, larg - fs - ti), x0 = x + larg / 2 - (ti + fs * 0.35 + tw) / 2;
         ctx.drawImage(imgMaps, x0, y + haut / 2 - ti / 2, ti, ti);
         ctx.textAlign = 'left'; ctx.fillText(libelle, x0 + ti + fs * 0.35, y + haut / 2, larg - fs - ti);
-      } else ctx.fillText((c.b_icone ? c.b_icone + ' ' : '') + libelle, x + larg / 2, y + haut / 2, larg - fs);
+      } else {
+        // le texte garde sa taille : s'il est trop long pour la largeur, il passe à la ligne (jamais écrasé)
+        const ls = lignes(ctx, (c.b_icone ? c.b_icone + ' ' : '') + libelle, Math.max(fs, larg - fs)), lh = fs * 1.15;
+        ls.forEach((l, k) => ctx.fillText(l, x + larg / 2, y + haut / 2 + (k - (ls.length - 1) / 2) * lh));
+      }
       ctx.restore();
     }
 
     _dessinerChamp(c, t, vars, alphaPlan) {
       const deb = Number(c.debut) || 0; if (t < deb) return;
-      const ctx = this.ctx, fs = (Number(c.taille) || 2.3) / 100 * H, larg = (Number(c.largeur) || 66) / 100 * W, haut = fs * 2.3;
+      const ctx = this.ctx, fs = (Number(c.taille) || 2.3) / 100 * H, larg = (Number(c.largeur) || 66) / 100 * W, haut = fs * 2.3 * (Number(c.b_hauteur) || 1);
       const x = (Number(c.x) || 50) / 100 * W - larg / 2, y = (Number(c.y) || 50) / 100 * H - haut / 2, coul = c.couleur || '#7a1f2b';
       ctx.save(); ctx.globalAlpha = alphaPlan * clamp((t - deb) / 0.6, 0, 1); tourner(ctx, c);
       arrondi(ctx, x, y, larg, haut, fs * 0.7); ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = coul; ctx.globalAlpha *= 0.8; ctx.stroke();
@@ -669,13 +673,16 @@
 
     _dessinerCompteur(c, t, vars, alphaPlan) {
       const deb = Number(c.debut) || 0; if (t < deb) return;
-      const ctx = this.ctx, fs = (Number(c.taille) || 2.3) / 100 * H, larg = (Number(c.largeur) || 66) / 100 * W, haut = fs * 2.4;
+      const ctx = this.ctx, fs = (Number(c.taille) || 2.3) / 100 * H, larg = (Number(c.largeur) || 66) / 100 * W, haut = fs * 2.4 * (Number(c.b_hauteur) || 1);
       const x = (Number(c.x) || 50) / 100 * W - larg / 2, y = (Number(c.y) || 50) / 100 * H - haut / 2, coul = c.couleur || '#7a1f2b';
       ctx.save(); ctx.globalAlpha = alphaPlan * clamp((t - deb) / 0.6, 0, 1); tourner(ctx, c);
       arrondi(ctx, x, y, larg, haut, fs * 0.9); ctx.fillStyle = 'rgba(255,255,255,.82)'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = coul; ctx.globalAlpha *= 0.9; ctx.stroke();
       ctx.fillStyle = coul; ctx.textBaseline = 'middle'; ctx.font = `600 ${fs.toFixed(1)}px "Cormorant Garamond", Georgia, serif`;
-      ctx.textAlign = 'left'; ctx.fillText(remplacer(texteDe(c, this.langue), vars), x + fs * 0.7, y + haut / 2, larg * 0.55);
       const r = fs * 0.75, cxP = x + larg - fs * 1.2, cxM = cxP - fs * 3.2, cy = y + haut / 2;
+      // libellé à sa taille : à la ligne s'il manque de place (jamais écrasé)
+      ctx.textAlign = 'left';
+      { const ls = lignes(ctx, remplacer(texteDe(c, this.langue), vars), Math.max(fs, cxM - r - fs * 0.4 - (x + fs * 0.7))), lh = fs * 1.1;
+        ls.forEach((l, k) => ctx.fillText(l, x + fs * 0.7, cy + (k - (ls.length - 1) / 2) * lh)); }
       [[cxM, '−'], [cxP, '+']].forEach(([cx, sgn]) => { ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill(); ctx.stroke(); ctx.fillStyle = coul; ctx.textAlign = 'center'; ctx.fillText(sgn, cx, cy); });
       ctx.textAlign = 'center'; ctx.fillText(String(c.defaut != null ? c.defaut : (c.champ === 'enfants' ? 0 : 1)), (cxM + cxP) / 2, cy);
       ctx.restore();
@@ -919,6 +926,7 @@
           if (this.form[champ] == null) this.form[champ] = Number(c.defaut) || 0;
           el.innerHTML = `<span class="mt-lib"></span><span class="mt-ctrl"><button type="button" class="mt-moins" aria-label="moins">−</button><b class="mt-val"></b><button type="button" class="mt-plus" aria-label="plus">+</button></span>`;
           el.querySelector('.mt-lib').textContent = remplacer(texteDe(c, this.langue), vars);
+          if (Number(c.b_hauteur) && Number(c.b_hauteur) !== 1) el.style.padding = (0.35 * Number(c.b_hauteur)).toFixed(2) + 'em .6em';
           const val = el.querySelector('.mt-val');
           const maj = () => { val.textContent = this.form[champ]; };
           maj();
@@ -949,6 +957,7 @@
           const inp = el.querySelector('input');
           inp.placeholder = remplacer(texteDe(c, this.langue), vars) || (lang === 'mg' ? 'Soraty eto' : lang === 'fr' ? 'Écrire ici' : 'Write here');
           inp.value = this.form[champ] || '';
+          if (Number(c.b_hauteur) && Number(c.b_hauteur) !== 1) inp.style.padding = (0.45 * Number(c.b_hauteur)).toFixed(2) + 'em .7em';
           inp.addEventListener('input', () => { this.form[champ] = inp.value; });
           inp.addEventListener('click', ev => ev.stopPropagation());
         }
@@ -1202,7 +1211,7 @@
 .mt-style-contour button{background:rgba(255,255,255,.82);color:var(--mt-couleur)}
 .mt-style-lien button{background:none;border:none;color:var(--mt-couleur);text-decoration:underline}
 .mt-compteur{justify-content:space-between;gap:.5em;background:rgba(255,255,255,.82);border:1.5px solid color-mix(in srgb,var(--mt-couleur) 40%,transparent);border-radius:1em;padding:.35em .6em;color:var(--mt-couleur);font-weight:600;box-sizing:border-box}
-.mt-ctrl{display:flex;align-items:center;gap:.5em}
+.mt-ctrl{display:flex;align-items:center;gap:.5em;flex:none}.mt-lib{min-width:0;line-height:1.15}
 .mt-ctrl button{font:inherit;width:1.7em;height:1.7em;border-radius:50%;border:1.5px solid var(--mt-couleur);background:#fff;color:var(--mt-couleur);cursor:pointer;line-height:1;padding:0}
 .mt-val{min-width:1.4em;text-align:center}
 .mt-champ input{font:inherit;width:100%;box-sizing:border-box;padding:.45em .7em;border-radius:.7em;border:1.5px solid color-mix(in srgb,var(--mt-couleur) 40%,transparent);background:rgba(255,255,255,.9);color:#3a2a2a}

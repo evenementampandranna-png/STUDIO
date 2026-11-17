@@ -21,6 +21,8 @@
   #menu { display: flex; align-items: center; gap: 22px; }
   #menu a { color: var(--encre); text-decoration: none; font-size: 15px; font-weight: 500; }
   #menu a:hover { color: var(--vin); }
+  #menu a.lang-bascule { border: 1px solid rgba(0,0,0,.15); border-radius: 999px; padding: 5px 11px; font-size: 13px; white-space: nowrap; }
+  #menu a.lang-bascule b { color: var(--vin); }
   #menu a.nav-wa { background: #1f9d55; color: #fff; padding: 7px 14px; border-radius: 999px; font-weight: 600; }
   .burger { display: none; border: 0; background: none; font-size: 26px; cursor: pointer; color: var(--encre); }
   @media (max-width: 860px) {
@@ -247,10 +249,12 @@
   <a class="pied-mail" id="pied-mail" hidden>✉ <span id="pied-mail-t"></span></a>
 </div></footer>
 <div id="boite"><button id="fermer" aria-label="Fermer">×</button><div class="lecteur" id="lecteur"><div class="fin-film" id="fin"><button id="revoir">↺ Revoir le film</button><a id="essayer" target="_blank">Essayer l'invitation interactive</a></div></div><div class="barre-lecture"><div id="progression"></div></div></div>
-<script src="config.js?v=202611161706"></script>
-<script src="moteur/moteur.js?v=202611161706"></script>
-<script src="moteur/fabrique.js?v=202611161706"></script>
-<script src="vitrine/index.js?v=202611161706"></script>
+<script src="config.js?v=202611170805"></script>
+<script src="moteur/langue.js?v=202611170805"></script>
+<script src="moteur/vitrine-en.js?v=202611170805"></script>
+<script src="moteur/moteur.js?v=202611170805"></script>
+<script src="moteur/fabrique.js?v=202611170805"></script>
+<script src="vitrine/index.js?v=202611170805"></script>
 <script>
 (async function () {
   const $ = s => document.querySelector(s);
@@ -444,7 +448,7 @@
   function ouvrir(m) {
     boite.classList.add('ouvert'); document.body.style.overflow = 'hidden'; boite.scrollTop = 0;
     const titre = m ? (m.titre || m.slug) : 'Sans modèle (sur mesure)';
-    zone.innerHTML = `<h2>Commander : ${esc(titre)}</h2>
+    zone.innerHTML = `<h2>Commander : <span data-no-trad>${esc(titre)}</span></h2>
       <div class="cmd-etapes"><span class="on">1. Conditions</span><span>2. Vos informations</span><span>3. Envoi</span></div>
       <div class="cmd-cond">
         ${(cond.formules || []).length ? `<h3>Formules</h3><div class="cmd-formules">${cond.formules.map(f => `<div><b>${esc(f.nom)}</b><span>${esc(f.prix || 'Prix sur devis')}</span><small>${esc(String(f.contenu || '').split('\n').join(' · '))}</small></div>`).join('')}</div>` : ''}
@@ -461,7 +465,7 @@
     const formules = (cond.formules || []).map(f => f.nom);
     zone.innerHTML = `<h2>Vos informations</h2>
       <div class="cmd-etapes"><span>1. Conditions ✓</span><span class="on">2. Vos informations</span><span>3. Envoi</span></div>
-      <p class="cmd-aide">Modèle choisi : <b>${esc(m ? (m.titre || m.slug) : 'sur mesure')}</b>. Plus vous donnez de détails, plus la démo sera juste du premier coup. Les champs * sont obligatoires.</p>
+      <p class="cmd-aide">Modèle choisi : <b data-no-trad>${esc(m ? (m.titre || m.slug) : 'sur mesure')}</b>. Plus vous donnez de détails, plus la démo sera juste du premier coup. Les champs * sont obligatoires.</p>
       <form id="cmd-form" class="cmd-form">
         <fieldset><legend>Vous</legend>
           <label>Nom *<input name="nom" required value="${v('nom')}"></label>
@@ -613,6 +617,15 @@
     $('#cmd-fin').onclick = fermer;
   }
   window.ouvrirCommande = ouvrir;
+})();
+</script>
+<script>
+(function () {
+  if (!window.Langue) return;
+  const L = Langue.creer({ cle: 'site.langue', dico: window.DICO_VITRINE_EN || {}, cache: 'site.trad.en', automatique: true,
+    exclure: '.modele .vignette, .cmd-num, .pied-mail, #contact-tel, #contact-mail-t' });
+  if (L.lang === 'en') document.querySelectorAll('.logo, .pied-nom').forEach(el => { if (/^Invitations\s*vid[ée]o$/.test(el.textContent.trim()) && el.querySelector('em')) el.innerHTML = 'Video <em>invitations</em>'; });
+  const nav = document.getElementById('menu'); if (nav) nav.insertBefore(L.bouton('lang-bascule'), nav.querySelector('.studio'));
 })();
 </script>
 </body>

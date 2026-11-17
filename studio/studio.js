@@ -52,6 +52,17 @@
   };
   let projets = Stock.lire('studio.projets', {});
   let medias = Stock.lire('studio.medias', []);
+  // ---- langue de l'interface (FR / EN) : les contenus des clients ne sont jamais traduits
+  let contenuCache = null, contenuT = 0;
+  function contenuUtilisateur() {
+    if (contenuCache && Date.now() - contenuT < 5000) return contenuCache;
+    const set = new Set(), vu = (x, d) => { if (d > 7 || x == null) return; if (typeof x === 'string') { const n = x.replace(/\s+/g, ' ').trim(); if (n && n.length < 400) set.add(n); } else if (typeof x === 'object') for (const k in x) vu(x[k], d + 1); };
+    try { vu(projets, 0); medias.forEach(m => set.add(String(m.nom || '').trim())); (Equipe.items || []).forEach(m => set.add(String(m.nom || '').trim())); } catch (e) {}
+    contenuCache = set; contenuT = Date.now(); return set;
+  }
+  const Langue_ = window.Langue ? Langue.creer({ cle: 'studio.langue', dico: window.DICO_STUDIO_EN || {}, cache: 'studio.trad.en', automatique: true, contenu: contenuUtilisateur,
+    exclure: '#scene, .scene, .mt-el, .vis-scene, .plan-carte .resume, [contenteditable], textarea, .calque-ligne .t, .police-choix, .police-btn, .pop-liste.polices, .cf-nom, .bib-nom, .carte-evt h3' }) : { lang: 'fr', t: s => s, bouton: () => document.createElement('span') };
+  { const nav = document.querySelector('.barre nav'); if (nav) nav.appendChild(Langue_.bouton('lang-bascule')); }
   let reglages = Stock.lire('studio.reglages', { github: { owner: '', repo: '', branche: 'main', token: '' }, firebase: null });
   let tSauve = 0;
   const sauverProjets = () => { const ok = Stock.ecrire('studio.projets', projets); Sauve.copie(); return ok; };
@@ -745,6 +756,9 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-17-1', date: '17 novembre 2026', titre: 'Français / English, et compteurs redimensionnables', points: [
+      '<b>🌐 FR · EN</b> en haut à droite du studio et dans le menu du site : toute l\'interface passe en anglais (ou revient en français). Le choix est gardé. Les textes de vos invitations, les noms des clients et des événements ne sont jamais traduits.',
+      '<b>Compteur (Adultes / Enfants) et champ</b> : 8 poignées comme les boutons — côtés = largeur, haut / bas = hauteur, coins = les deux ; le texte garde sa taille (il passe à la ligne au lieu d\'être écrasé). Maj + coin : tout ensemble.'] },
     { id: '2026-11-16-2', date: '16 novembre 2026', titre: 'Plein écran : image seule en pause', points: [
       'En ⛶ Plein écran, vidéo en pause : un clic sur l\'écran cache la barre de lecture et tous les boutons, pour ne voir que l\'image. Un deuxième clic les fait revenir, sans relancer la lecture.'] },
     { id: '2026-11-16-1', date: '16 novembre 2026', titre: 'Masque, plein écran jusqu\'au remerciement, derniers fonds en premier', points: [
@@ -1840,7 +1854,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     const zone = $('#poignees');
     const cadre = $('#cadre');
     let drag = null, editeur = null;
-    const POIGNEES = { texte: ['nw', 'ne', 'sw', 'se', 'e', 'w'], bouton: ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'], compteur: ['e', 'w'], champ: ['e', 'w'], image: ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'], video: ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'], forme: ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] };
+    const POIGNEES = { texte: ['nw', 'ne', 'sw', 'se', 'e', 'w'], bouton: ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'], compteur: ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'], champ: ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'], image: ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'], video: ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'], forme: ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] };
     function calqueSel() { return (plan().calques || []).find(x => x.id === E.sel); }
     // ---- Sélection multiple : E.multi contient tous les éléments choisis (E.sel = le dernier cliqué)
     E.multi = new Set();
@@ -2018,7 +2032,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         const sx = H.includes('e') ? 1 : H.includes('w') ? -1 : 0, sy = H.includes('s') ? 1 : H.includes('n') ? -1 : 0;
         const coin = sx && sy;
         // bouton : chaque poignée ne change que sa partie — côtés = largeur, haut/bas = hauteur, coins = les deux ; le texte garde sa taille (Maj + coin : tout ensemble)
-        if (c.type === 'bouton' && !(coin && e.shiftKey)) {
+        if ((c.type === 'bouton' || c.type === 'compteur' || c.type === 'champ') && !(coin && e.shiftKey)) {
           if (sx) c.largeur = Math.round(Math.max(5, Math.min(100, v.largeur + 2 * sx * dx)) * 10) / 10;
           if (sy && b.h > 0) c.b_hauteur = Math.round(Math.max(0.4, Math.min(5, v.b_hauteur * (b.h + 2 * sy * dy) / b.h)) * 100) / 100;
         } else if (coin) {
