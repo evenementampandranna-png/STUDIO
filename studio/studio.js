@@ -756,6 +756,8 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-17-4', date: '17 novembre 2026', titre: 'Invitation en pause : image seule', points: [
+      'Dans l\'invitation des invités aussi (comme dans ⛶ Plein écran du studio) : en pause, un toucher sur l\'écran cache tous les boutons (♪, ▶, ❚❚, 🌐) pour ne voir que l\'image ; un 2e toucher les fait revenir, sans relancer. Pour reprendre : ▶ au centre ou ❚❚ en bas.'] },
     { id: '2026-11-17-3', date: '17 novembre 2026', titre: 'Voir l\'invitation dans une autre langue : traduite tout de suite', points: [
       'Sous l\'aperçu, le menu <b>« Voir en : … »</b> est toujours visible et propose toutes les langues (« Traduire en… »). En choisissant une langue, les textes pas encore traduits le sont aussitôt (IA, sinon Google), la langue est ajoutée à l\'invitation (bouton 🌐 des invités), et l\'aperçu passe dans cette langue. Republiez pour que les invités l\'aient.'] },
     { id: '2026-11-17-2', date: '17 novembre 2026', titre: 'Mise en forme d\'une partie du texte, traduction soignée', points: [

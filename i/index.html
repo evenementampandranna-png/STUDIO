@@ -24,6 +24,7 @@
   #bandeau-demo { position: fixed; z-index: 14; left: 50%; top: 10px; transform: translateX(-50%); background: rgba(122,31,43,.92); color: #fff; font: 600 13px Inter, system-ui, sans-serif; padding: 6px 14px; border-radius: 999px; pointer-events: none; white-space: nowrap; max-width: 92vw; overflow: hidden; text-overflow: ellipsis; }
   #indic-pause { position: fixed; z-index: 16; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 86px; height: 86px; border-radius: 50%; background: rgba(0,0,0,.45); color: #fff; font-size: 38px; display: none; align-items: center; justify-content: center; padding-left: 6px; cursor: pointer; backdrop-filter: blur(3px); }
   #indic-pause.vu { display: flex; }
+  body.sans-controles #indic-pause, body.sans-controles #pause, body.sans-controles #son, body.sans-controles #btn-langue, body.sans-controles #menu-langue, body.sans-controles #bandeau-demo { opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; transition: opacity .25s, visibility 0s .25s; }
   #pause { position: fixed; z-index: 15; left: 64px; bottom: 12px; width: 44px; height: 44px; border-radius: 50%; border: 0; background: rgba(255,255,255,.85); color: var(--vin); font-size: 17px; display: none; cursor: pointer; }
   #son { position: fixed; z-index: 15; left: 12px; bottom: 12px; width: 44px; height: 44px; border-radius: 50%; border: 0; background: rgba(255,255,255,.85); color: var(--vin); font-size: 20px; display: none; }
   #bandeau { position: fixed; z-index: 25; left: 50%; bottom: 18px; transform: translateX(-50%); width: min(92vw, 440px); background: #fffaf3; color: #3a2323; border-radius: 16px; padding: 16px 18px; box-shadow: 0 10px 40px rgba(0,0,0,.4); font-size: 18px; display: none; }
@@ -51,10 +52,10 @@
 <button id="son" aria-label="Son">♪</button><button id="pause" aria-label="Pause">❚❚</button>
 <div id="bandeau" role="dialog"></div>
 <div id="erreur"></div>
-<script src="../config.js?v=202611170828"></script>
-<script src="../moteur/moteur.js?v=202611170828"></script>
-<script src="../moteur/fabrique.js?v=202611170828"></script>
-<script src="../moteur/base.js?v=202611170828"></script>
+<script src="../config.js?v=202611170839"></script>
+<script src="../moteur/moteur.js?v=202611170839"></script>
+<script src="../moteur/fabrique.js?v=202611170839"></script>
+<script src="../moteur/base.js?v=202611170839"></script>
 <script>
 (async function () {
   const q = new URLSearchParams(location.search);
@@ -203,13 +204,19 @@
     enPause = !enPause;
     if (enPause) { moteur.pause(); if (musique) musique.pause(); $('#pause').textContent = '▶'; $('#pause').setAttribute('aria-label', 'Reprendre'); }
     else { moteur.reprendre(); if (musique && $('#son').textContent !== '×') musique.play().catch(() => {}); $('#pause').textContent = '❚❚'; $('#pause').setAttribute('aria-label', 'Pause'); }
-    indic.classList.toggle('vu', enPause);
+    indic.classList.toggle('vu', enPause); if (!enPause) document.body.classList.remove('sans-controles');
     return true;
   };
   $('#pause').onclick = e => { e.stopPropagation(); basculerPause(); };
   indic.onclick = () => basculerPause();
-  // toucher l'image (pas un bouton, un compteur ou un champ) met en pause / relance
-  $('#scene').addEventListener('click', e => { if (e.target.closest('.mt-el, button, input, a')) return; if ($('#ecran-ouvrir').style.display !== 'none') return; basculerPause(); });
+  // toucher l'image (pas un bouton, un compteur ou un champ) : en lecture → pause ;
+  // en pause → cache tous les boutons (image seule), un 2e toucher les fait revenir, sans relancer (▶ pour reprendre)
+  document.addEventListener('click', e => {
+    if (e.target.closest('.mt-el, button, input, select, textarea, a, #bandeau, #menu-langue, #ecran-ouvrir, #indic-pause')) return;
+    if ($('#ecran-ouvrir').style.display !== 'none') return;
+    if (enPause) { document.body.classList.toggle('sans-controles'); return; }
+    if (e.target.closest('#scene')) basculerPause();
+  });
   document.addEventListener('keydown', e => { if (e.code === 'Space' && !/INPUT|TEXTAREA/.test((document.activeElement || {}).tagName || '')) { e.preventDefault(); basculerPause(); } });
 
   /* ---- Actions des boutons ---- */
