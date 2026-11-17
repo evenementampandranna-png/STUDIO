@@ -756,6 +756,8 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-17-7', date: '17 novembre 2026', titre: 'Détacher le fond d\'un texte', points: [
+      'Texte avec un fond (ex. « Manasa olona 4 ») : bouton <b>⧉ Détacher le fond</b> dans le panneau du texte. Le fond devient une forme indépendante juste derrière le texte (même couleur, arrondi, animation et visibilité) : cliquez le texte ou le fond pour les sélectionner, déplacer et redimensionner séparément, chacun avec ses poignées, comme dans Canva. Ctrl+Z pour revenir.'] },
     { id: '2026-11-17-6', date: '17 novembre 2026', titre: 'Texte sur cartouche (ex. « Manasa olona … ») : réduire le cadre, pas le texte', points: [
       'Un texte avec un fond (cartouche, comme « Manasa olona {places} » de la confirmation) a 8 poignées : <b>côtés</b> = largeur, <b>haut / bas</b> = hauteur du cartouche, <b>coins</b> = les deux. Le texte garde sa taille. Maj + coin : tout ensemble, texte compris.'] },
     { id: '2026-11-17-5', date: '17 novembre 2026', titre: 'Plein écran des films : image seule en pause', points: [
@@ -2378,6 +2380,23 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       new ResizeObserver(placer).observe(div);
       E.rafraichir();
     }
+    // Le fond (cartouche) d'un texte devient une forme indépendante, posée juste derrière le texte
+    E.detacherFond = function detacherFond(c) {
+      const pl = plan(); if (!c || c.type !== 'texte' || !c.fond_couleur || !pl) return;
+      const b = eng.bbox[c.id]; if (!b) return toast('Affichez d\'abord le plan où se trouve ce texte');
+      snapshot();
+      const W = 720, H = 1280, wpx = b.w / 100 * W, hpx = b.h / 100 * H;
+      const taillePx = (Number(c.taille) || 4) / 100 * H, ar = c.fond_arrondi != null && c.fond_arrondi !== '' ? Number(c.fond_arrondi) : 0.4;
+      const rayon = Math.min(hpx / 2, taillePx * ar), coins = Math.round(Math.min(100, rayon / (Math.min(wpx, hpx) * 0.45) * 100));
+      const f = { id: uid(), type: 'forme', forme: 'rect', nom: 'Fond de « ' + String(c.texte || '').slice(0, 24) + ' »',
+        x: Math.round((b.x + b.w / 2) * 10) / 10, y: Math.round((b.y + b.h / 2) * 10) / 10, largeur: Math.round(b.w * 10) / 10, hauteur: Math.round(b.h * 10) / 10,
+        couleur: c.fond_couleur, opacite: c.fond_opacite != null && c.fond_opacite !== '' ? Number(c.fond_opacite) : 0.6, coins };
+      ['rotation', 'debut', 'fin', 'animation', 'sortie', 'condition', 'anim_continu', 'langues'].forEach(k => { if (c[k] != null && c[k] !== '') f[k] = c[k]; });
+      ['fond_couleur', 'fond_opacite', 'fond_marge', 'fond_arrondi', 'fond_haut'].forEach(k => delete c[k]);
+      const i = pl.calques.indexOf(c); pl.calques.splice(Math.max(0, i), 0, f);   // juste derrière le texte
+      E.modif(true); E.sel = c.id; if (E.multi) E.multi.clear(); E.rafraichir(); rendreReglages(); rendrePlans();
+      toast('Fond détaché : cliquez le texte ou le fond pour les modifier séparément (chacun ses poignées)', 6000);
+    };
     function editer(c) {
       if (editeur) terminerEdition();
       choisir(c.id);
@@ -2742,7 +2761,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <div class="muet" style="font-size:11.5px;margin:-2px 0 6px">En haut de la liste = devant · glisser ▲▼ pour changer l'ordre</div>
           <div id="liste-calques">${(pl.calques || []).slice().reverse().map(x => `
             <div class="calque-ligne ${x.id === E.sel || (E.multi.size > 1 && E.multi.has(x.id)) ? 'actif' : ''}" data-id="${x.id}" title="Maj+clic : choisir plusieurs">
-              <span class="type">${NOMS_TYPE[x.type] || x.type}</span><span class="t">${esc(x.texte || (x.illu && window.Illustrations ? '✿ ' + Illustrations.nom(x.illu.id) : '') || nomMedia(x.media) || '(vide)')}</span>
+              <span class="type">${NOMS_TYPE[x.type] || x.type}</span><span class="t">${esc(x.texte || x.nom || (x.illu && window.Illustrations ? '✿ ' + Illustrations.nom(x.illu.id) : '') || nomMedia(x.media) || '(vide)')}</span>
               <button data-a="vis" title="Afficher / masquer">${x.masque ? '○' : '●'}</button><button data-a="avance" title="Avancer (devant)">▲</button><button data-a="recule" title="Reculer (derrière)">▼</button><button data-a="suppr" title="Supprimer">✕</button>
             </div>`).join('') || '<p class="muet">Aucun calque.</p>'}</div>
         </details>
@@ -3145,6 +3164,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       return `<details class="bloc" open><summary>Fond, ombre, contour</summary><div class="pile style-texte">
         <div class="st-ligne"><label class="st-case"><input type="checkbox" data-st="fond" ${c.fond_couleur ? 'checked' : ''}> <b>Arrière-plan</b></label>
           ${c.fond_couleur ? `<input type="color" data-k="fond_couleur" value="${esc(c.fond_couleur)}" title="Couleur du fond">` : ''}</div>
+        ${c.fond_couleur ? `<button class="btn petit plein" data-detacher-fond title="Le texte et son fond deviennent deux éléments indépendants (chacun ses poignées, comme dans Canva)">⧉ Détacher le fond : texte et fond séparés</button>` : ''}
         ${c.fond_couleur ? `<div class="trois"><label class="champ">Opacité<input type="range" data-k="fond_opacite" min="0.05" max="1" step="0.05" value="${v('fond_opacite', 0.6)}"></label><label class="champ">Marge<input type="range" data-k="fond_marge" min="0" max="1.5" step="0.05" value="${v('fond_marge', 0.4)}"></label><label class="champ">Arrondi<input type="range" data-k="fond_arrondi" min="0" max="3" step="0.1" value="${v('fond_arrondi', 0.4)}"></label></div>` : ''}
         <div class="st-ligne"><label class="champ" style="flex:1"><b>Ombre</b><select data-st="ombre">${opts([['aucune', 'Aucune'], ['halo', 'Halo (lueur autour)'], ['portee', 'Ombre portée (décalée)']], typeOmbre)}</select></label>
           ${c.ombre ? `<input type="color" data-st="ombre_couleur" value="${esc(coulOmbre)}" title="Couleur de l'ombre">` : ''}</div>
@@ -3241,7 +3261,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       let s = `<div class="section-titre">${nomType(c)} choisi${c.illu ? 'e' : ''}</div>`;
       if (c.type === 'texte') s += `<details class="bloc" open><summary>Texte</summary><div class="pile">
         <label class="champ">Texte <span class="muet">— variables : {famille} {places} {date} {heure} {date_limite} {compte_a_rebours}</span><textarea data-k="texte" rows="3">${esc(c.texte)}</textarea></label>
-        <div class="ligne" style="gap:6px;flex-wrap:wrap;font-size:12px"><button class="btn petit" data-riche-ouvrir title="Double-clic sur le texte : sélectionnez une partie puis changez sa police, taille, couleur…">✎ Mettre en forme une partie</button>${Array.isArray(c.styles) && c.styles.length ? `<span class="muet">${c.styles.length} partie(s) mise(s) en forme</span><button class="btn petit" data-riche-effacer>✕ Tout remettre pareil</button>` : ''}</div>
+        <div class="ligne" style="gap:6px;flex-wrap:wrap;font-size:12px"><button class="btn petit" data-riche-ouvrir title="Double-clic sur le texte : sélectionnez une partie puis changez sa police, taille, couleur…">✎ Mettre en forme une partie</button>${c.fond_couleur ? `<button class="btn petit" data-detacher-fond title="Le texte et son fond deviennent deux éléments indépendants (chacun ses poignées, comme dans Canva)">⧉ Détacher le fond</button>` : ''}${Array.isArray(c.styles) && c.styles.length ? `<span class="muet">${c.styles.length} partie(s) mise(s) en forme</span><button class="btn petit" data-riche-effacer>✕ Tout remettre pareil</button>` : ''}</div>
         <div class="ligne" style="gap:6px"><button class="btn petit" data-emoji-texte>😊 Ajouter un emoji</button>${String(c.texte || '').includes('{compte_a_rebours}') ? '' : '<button class="btn petit" data-ajout-compte>⏱ Ajouter le compte à rebours</button>'}</div>
         <div class="deux"><label class="champ">Police<button class="btn police-btn" data-police style="font-family:'${esc(c.police || 'Cormorant Garamond')}',serif">${esc(c.police || 'Cormorant Garamond')} ▾</button></label><label class="champ">Taille<input type="range" data-k="taille" min="1.5" max="12" step="0.1" value="${c.taille || 4}"></label></div>
         <div class="trois"><label class="champ">Couleur<input type="color" data-k="couleur" value="${c.couleur || '#7a1f2b'}"></label><label class="champ">Alignement<select data-k="align">${opts([['center', 'Centré'], ['left', 'Gauche'], ['right', 'Droite'], ['justify', 'Justifié']], c.align || 'center')}</select></label><label class="champ">Interligne<input type="number" data-k="interligne" step="0.05" min="0.8" max="2" value="${c.interligne || 1.25}"></label></div>
@@ -3320,6 +3340,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       };
       $$('#props [data-ordre]').forEach(b => b.onclick = () => ordreCalque(c, b.dataset.ordre));
       if (c.type === 'image' || c.type === 'video') brancherMasque(c);
+      $$('#props [data-detacher-fond]').forEach(df => df.onclick = () => E.detacherFond(c));
       { const ro = $('#props [data-riche-ouvrir]'); if (ro) ro.onclick = () => E.editer(c);
         const rx = $('#props [data-riche-effacer]'); if (rx) rx.onclick = () => { E.modif(true); delete c.styles; E.rafraichir(); rendreReglages(); toast('Mise en forme partielle retirée'); }; }
       const ef = $('#props [data-en-fond]'); if (ef) ef.onclick = () => {
