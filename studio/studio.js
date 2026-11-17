@@ -756,6 +756,9 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-17-2', date: '17 novembre 2026', titre: 'Mise en forme d\'une partie du texte, traduction soignée', points: [
+      '<b>Une partie d\'un texte dans un autre style</b> : double-cliquez le texte (ou « ✎ Mettre en forme une partie » dans le panneau), sélectionnez avec la souris une partie (ex. « INVIT » dans « INVITATION »), puis dans la petite barre au-dessus : <b>police, taille, couleur, gras, italique, MAJ / min, espacement des lettres</b>. « ✕ style » remet la sélection comme le reste. Tout reste dans une seule zone de texte : déplacer, agrandir et animer comme avant ; les styles suivent quand vous modifiez le texte, et sont gardés à l\'enregistrement, dans l\'invitation en ligne et dans le film.',
+      '<b>🌐 Traduire</b> : « ⚡ Traduire automatiquement » traduit maintenant <b>toute l\'invitation d\'un coup avec une IA</b>, comme un vrai faire-part dans chaque langue (pas mot à mot ; versets bibliques dans leur version officielle ; noms et variables gardés). Pour la meilleure qualité, collez une clé Claude dans Réglages → « Traduction soignée » ; sans clé, une IA gratuite est utilisée, et Google Traduction en dernier recours.'] },
     { id: '2026-11-17-1', date: '17 novembre 2026', titre: 'Français / English, et compteurs redimensionnables', points: [
       '<b>🌐 FR · EN</b> en haut à droite du studio et dans le menu du site : toute l\'interface passe en anglais (ou revient en français). Le choix est gardé. Les textes de vos invitations, les noms des clients et des événements ne sont jamais traduits.',
       '<b>Compteur (Adultes / Enfants) et champ</b> : 8 poignées comme les boutons — côtés = largeur, haut / bas = hauteur, coins = les deux ; le texte garde sa taille (il passe à la ligne au lieu d\'être écrasé). Maj + coin : tout ensemble.'] },
@@ -2202,9 +2205,153 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       if (c && (c.type === 'texte' || c.type === 'bouton' || c.type === 'compteur')) { e.preventDefault(); editer(c); }
       else if (c && (c.type === 'image' || c.type === 'video')) { const inp = $('#props [data-remplacer]'); if (inp) inp.click(); }
     });
+    // ---- Écriture d'un texte, avec mise en forme partielle : on sélectionne une partie, la barre au-dessus la met en forme
+    function editerRiche(c) {
+      const b = eng.bbox[c.id]; if (!b) return;
+      const hz = cadre.clientHeight, pxDe = t => (Number(t) || 4) / 100 * hz;
+      const div = document.createElement('div');
+      div.className = 'edition-directe riche'; div.contentEditable = 'true'; div.spellcheck = false;
+      Object.assign(div.style, {
+        left: b.x + '%', top: b.y + '%', width: b.w + '%', minHeight: Math.max(b.h, 4) + '%',
+        fontFamily: `"${c.police || 'Cormorant Garamond'}", serif`, fontSize: pxDe(c.taille) + 'px', lineHeight: String(Number(c.interligne) || 1.25),
+        color: c.couleur || '#7a1f2b', textAlign: c.align || 'center', fontWeight: String(Number(c.graisse) || (c.gras ? 700 : 400)), fontStyle: c.italique ? 'italic' : 'normal',
+        textTransform: c.majuscules ? 'uppercase' : 'none'
+      });
+      const barre = document.createElement('div');
+      barre.className = 'barre-style-texte';
+      barre.innerHTML = `<span class="bst-aide">Sélectionnez une partie du texte :</span>
+        <button type="button" data-st="police" class="bst-police" title="Police de la sélection">Police ▾</button>
+        <label title="Taille de la sélection"><input type="number" data-st="taille" step="0.1" min="0.5" max="40" placeholder="${Number(c.taille) || 4}"></label>
+        <input type="color" data-st="couleur" title="Couleur de la sélection" value="${c.couleur || '#7a1f2b'}">
+        <button type="button" data-st="gras" title="Gras (Ctrl+B)"><b>G</b></button>
+        <button type="button" data-st="italique" title="Italique (Ctrl+I)"><i>I</i></button>
+        <select data-st="casse" title="Majuscules / minuscules de la sélection"><option value="">Aa</option><option value="maj">MAJ</option><option value="min">min</option><option value="normal">Comme écrit</option></select>
+        <label title="Espacement des lettres de la sélection (em)">↔<input type="number" data-st="espace" step="0.02" min="-0.2" max="1.5" placeholder="0"></label>
+        <button type="button" data-st="effacer" title="Retirer la mise en forme de la sélection">✕ style</button>`;
+      cadre.appendChild(div); cadre.appendChild(barre);
+      [div, barre].forEach(el => { el.addEventListener('pointerdown', ev => ev.stopPropagation()); el.addEventListener('dblclick', ev => ev.stopPropagation()); });
+      c._edition = true;
+      const ed = editeur = { c, ta: div, barre, riche: true, sel: [0, 0], garde: false };
+      // --- vue : le texte en morceaux stylés
+      const esc2 = t => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const rendre = () => {
+        const t = String(c.texte || ''), tab = tableauStyles(c, t.length);
+        let html = '', i = 0;
+        while (i < t.length) {
+          let j = i + 1; const k = JSON.stringify(tab[i]); while (j < t.length && JSON.stringify(tab[j]) === k) j++;
+          const st = tab[i], morceau = esc2(t.slice(i, j));
+          if (!st) html += morceau;
+          else {
+            const css = [];
+            if (st.police) { css.push(`font-family:"${st.police}",serif`); MoteurInfo.chargerPolices([st.police]); }
+            if (st.taille != null) css.push(`font-size:${pxDe(st.taille).toFixed(1)}px`);
+            if (st.couleur) css.push(`color:${st.couleur}`);
+            if (st.gras != null) css.push(`font-weight:${st.gras ? 700 : 400}`);
+            if (st.italique != null) css.push(`font-style:${st.italique ? 'italic' : 'normal'}`);
+            if (st.casse) css.push(`text-transform:${st.casse === 'maj' ? 'uppercase' : st.casse === 'min' ? 'lowercase' : 'none'}`);
+            if (st.espace) css.push(`letter-spacing:${Number(st.espace)}em`);
+            html += `<span style='${css.join(';')}'>${morceau}</span>`;
+          }
+          i = j;
+        }
+        div.innerHTML = html + (t.endsWith('\n') || !t ? '<br data-fin>' : '');
+      };
+      const lire = () => {
+        let out = '';
+        const marcher = n => n.childNodes.forEach(x => {
+          if (x.nodeType === 3) out += x.nodeValue;
+          else if (x.nodeName === 'BR') { if (!x.hasAttribute('data-fin')) out += '\n'; }
+          else { if ((x.nodeName === 'DIV' || x.nodeName === 'P') && out && !out.endsWith('\n')) out += '\n'; marcher(x); }
+        });
+        marcher(div); return out.replace(/ /g, ' ');
+      };
+      // position (en caractères) d'un point de la sélection
+      const posDe = (noeud, off) => {
+        let n = 0, fini = false;
+        const marcher = el => { for (const x of el.childNodes) {
+          if (fini) return;
+          if (x === noeud && x.nodeType === 3) { n += off; fini = true; return; }
+          if (x === noeud) { for (let k = 0; k < off && k < x.childNodes.length; k++) n += longueur(x.childNodes[k]); fini = true; return; }
+          if (x.nodeType === 3) n += x.nodeValue.length; else if (x.nodeName === 'BR') { if (!x.hasAttribute('data-fin')) n++; } else marcher(x);
+        } };
+        const longueur = x => x.nodeType === 3 ? x.nodeValue.length : x.nodeName === 'BR' ? (x.hasAttribute('data-fin') ? 0 : 1) : [...x.childNodes].reduce((a, y) => a + longueur(y), 0);
+        if (noeud === div) { for (let k = 0; k < off && k < div.childNodes.length; k++) n += longueur(div.childNodes[k]); return n; }
+        marcher(div); return n;
+      };
+      const lireSel = () => {
+        const sl = getSelection(); if (!sl.rangeCount) return ed.sel;
+        const r = sl.getRangeAt(0); if (!div.contains(r.startContainer) && r.startContainer !== div) return ed.sel;
+        const a = posDe(r.startContainer, r.startOffset), z = posDe(r.endContainer, r.endOffset);
+        return (ed.sel = [Math.min(a, z), Math.max(a, z)]);
+      };
+      const poser = (a, z) => {
+        const trouver = pos => { let n = 0; const w = document.createTreeWalker(div, NodeFilter.SHOW_ALL); let x;
+          while ((x = w.nextNode())) { if (x.nodeType === 3) { if (n + x.nodeValue.length >= pos) return [x, pos - n]; n += x.nodeValue.length; } else if (x.nodeName === 'BR' && !x.hasAttribute('data-fin')) { if (n + 1 > pos) return [x.parentNode, [...x.parentNode.childNodes].indexOf(x)]; n++; } }
+          return [div, div.childNodes.length]; };
+        try { const r = document.createRange(), [n1, o1] = trouver(a), [n2, o2] = trouver(z); r.setStart(n1, o1); r.setEnd(n2, o2); const sl = getSelection(); sl.removeAllRanges(); sl.addRange(r); } catch (e) {}
+        ed.sel = [a, z];
+      };
+      const apres = () => { const l = $(`.calque-ligne[data-id="${c.id}"] .t`); if (l) l.textContent = c.texte; const t2 = $('#props [data-k="texte"]'); if (t2) t2.value = c.texte; enregistrer(p); };
+      const remplacerTexte = (a, z, ins) => {
+        const ancien = String(c.texte || ''), nouveau = ancien.slice(0, a) + ins + ancien.slice(z);
+        ajusterStyles(c, ancien, nouveau); c.texte = nouveau; rendre(); poser(a + ins.length, a + ins.length); apres();
+      };
+      div.addEventListener('input', () => { const ancien = String(c.texte || ''), nouveau = lire(); if (nouveau !== ancien) { ajusterStyles(c, ancien, nouveau); c.texte = nouveau; apres(); } lireSel(); });
+      div.addEventListener('paste', ev => { ev.preventDefault(); const t = (ev.clipboardData && ev.clipboardData.getData('text/plain')) || ''; const [a, z] = lireSel(); remplacerTexte(a, z, t.replace(/\r\n?/g, '\n')); });
+      div.addEventListener('keydown', ev => {
+        ev.stopPropagation();
+        if (ev.key === 'Escape' || (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey))) { ev.preventDefault(); terminerEdition(); return; }
+        if (ev.key === 'Enter') { ev.preventDefault(); const [a, z] = lireSel(); remplacerTexte(a, z, '\n'); return; }
+        if ((ev.ctrlKey || ev.metaKey) && /^[bi]$/i.test(ev.key)) { ev.preventDefault(); basculer(ev.key.toLowerCase() === 'b' ? 'gras' : 'italique'); }
+      });
+      document.addEventListener('selectionchange', ed.surSel = () => { if (document.activeElement === div) { lireSel(); majBarre(); } });
+      const dansBarre = el => el && (barre.contains(el) || (el.closest && el.closest('.pop, .pop-liste, .pop-cherche')));
+      div.addEventListener('blur', ev => setTimeout(() => { if (editeur !== ed || ed.garde) return; if (dansBarre(ev.relatedTarget) || dansBarre(document.activeElement)) return; terminerEdition(); }, 80));
+      barre.addEventListener('focusout', ev => setTimeout(() => { if (editeur !== ed || ed.garde) return; const a = document.activeElement; if (a === div || dansBarre(a)) return; terminerEdition(); }, 120));
+      barre.addEventListener('mousedown', ev => { if (ev.target.closest('button')) ev.preventDefault(); });   // garder la sélection
+      barre.addEventListener('keydown', ev => { ev.stopPropagation(); if (ev.key === 'Escape') terminerEdition(); });
+      // --- appliquer à la sélection
+      const styleSel = () => { const [a, z] = ed.sel; const tab = tableauStyles(c, String(c.texte || '').length); return a < z ? tab.slice(a, z) : [tab[Math.max(0, a - 1)]]; };
+      const appliquer = props => {
+        const [a, z] = ed.sel;
+        if (a >= z) { toast('Sélectionnez d\'abord une partie du texte (glisser avec la souris, ou Maj + flèches)'); div.focus(); return; }
+        snapshot(); appliquerStylePartiel(c, a, z, props); rendre(); div.focus(); poser(a, z); apres(); majBarre();
+      };
+      const basculer = k => { const sts = styleSel(); const actuel = sts.every(o => (o && o[k] != null) ? o[k] : (k === 'gras' ? !!c.gras || Number(c.graisse) >= 600 : !!c.italique)); appliquer({ [k]: !actuel }); };
+      const majBarre = () => {
+        const [a, z] = ed.sel, o = (styleSel()[0]) || {};
+        barre.classList.toggle('vide', a >= z);
+        const pol = $('[data-st="police"]', barre); pol.textContent = (o.police || c.police || 'Cormorant Garamond').slice(0, 18) + ' ▾'; pol.style.fontFamily = `"${o.police || c.police || 'Cormorant Garamond'}", serif`;
+        const ta = $('[data-st="taille"]', barre); if (document.activeElement !== ta) ta.value = o.taille != null ? o.taille : '';
+        const co = $('[data-st="couleur"]', barre); if (document.activeElement !== co) co.value = o.couleur || c.couleur || '#7a1f2b';
+        $('[data-st="gras"]', barre).classList.toggle('on', o.gras != null ? !!o.gras : !!c.gras);
+        $('[data-st="italique"]', barre).classList.toggle('on', o.italique != null ? !!o.italique : !!c.italique);
+        const ca = $('[data-st="casse"]', barre); if (document.activeElement !== ca) ca.value = o.casse || '';
+        const es = $('[data-st="espace"]', barre); if (document.activeElement !== es) es.value = o.espace != null ? o.espace : '';
+      };
+      $('[data-st="police"]', barre).onclick = ev => {
+        if (ed.sel[0] >= ed.sel[1]) return appliquer({});
+        const garde = ed.sel.slice(); ed.garde = true;
+        ouvrirPolices(ev.currentTarget, (styleSel()[0] || {}).police || c.police, nom => { ed.garde = false; ed.sel = garde; MoteurInfo.chargerPolices([nom]); appliquer({ police: nom }); });
+        setTimeout(() => { ed.garde = false; }, 30000);
+      };
+      $('[data-st="gras"]', barre).onclick = () => basculer('gras');
+      $('[data-st="italique"]', barre).onclick = () => basculer('italique');
+      $('[data-st="effacer"]', barre).onclick = () => appliquer(Object.fromEntries(CLES_STYLE.map(k => [k, null])));
+      $('[data-st="taille"]', barre).onchange = e2 => appliquer({ taille: e2.target.value === '' ? null : Math.round(Number(e2.target.value) * 100) / 100 });
+      $('[data-st="couleur"]', barre).onchange = e2 => appliquer({ couleur: e2.target.value });
+      $('[data-st="casse"]', barre).onchange = e2 => appliquer({ casse: e2.target.value || null });
+      $('[data-st="espace"]', barre).onchange = e2 => appliquer({ espace: e2.target.value === '' || Number(e2.target.value) === 0 ? null : Number(e2.target.value) });
+      // --- place de la barre : au-dessus de la zone (ou en dessous si pas de place)
+      const placer = () => { const hb = barre.offsetHeight || 40; const top = div.offsetTop - hb - 8; barre.style.top = (top < 4 ? div.offsetTop + div.offsetHeight + 8 : top) + 'px'; barre.style.left = Math.max(4, Math.min(cadre.clientWidth - barre.offsetWidth - 4, div.offsetLeft + div.offsetWidth / 2 - barre.offsetWidth / 2)) + 'px'; };
+      rendre(); div.focus(); poser(String(c.texte || '').length, String(c.texte || '').length); majBarre(); placer();
+      new ResizeObserver(placer).observe(div);
+      E.rafraichir();
+    }
     function editer(c) {
       if (editeur) terminerEdition();
       choisir(c.id);
+      if (c.type === 'texte') { snapshot(); return editerRiche(c); }
       const b = eng.bbox[c.id]; if (!b) return;
       snapshot();
       const hz = cadre.clientHeight;
@@ -2231,8 +2378,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     }
     function terminerEdition() {
       if (!editeur) return;
-      const { c, ta } = editeur; editeur = null;
-      delete c._edition; ta.remove();
+      const { c, ta, barre, surSel } = editeur; editeur = null;
+      delete c._edition; ta.remove(); if (barre) barre.remove(); if (surSel) document.removeEventListener('selectionchange', surSel);
       enregistrer(p); E.rafraichir(); rendrePlans(); zone._html = '';
     }
     E.editer = editer;
@@ -3064,6 +3211,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       let s = `<div class="section-titre">${nomType(c)} choisi${c.illu ? 'e' : ''}</div>`;
       if (c.type === 'texte') s += `<details class="bloc" open><summary>Texte</summary><div class="pile">
         <label class="champ">Texte <span class="muet">— variables : {famille} {places} {date} {heure} {date_limite} {compte_a_rebours}</span><textarea data-k="texte" rows="3">${esc(c.texte)}</textarea></label>
+        <div class="ligne" style="gap:6px;flex-wrap:wrap;font-size:12px"><button class="btn petit" data-riche-ouvrir title="Double-clic sur le texte : sélectionnez une partie puis changez sa police, taille, couleur…">✎ Mettre en forme une partie</button>${Array.isArray(c.styles) && c.styles.length ? `<span class="muet">${c.styles.length} partie(s) mise(s) en forme</span><button class="btn petit" data-riche-effacer>✕ Tout remettre pareil</button>` : ''}</div>
         <div class="ligne" style="gap:6px"><button class="btn petit" data-emoji-texte>😊 Ajouter un emoji</button>${String(c.texte || '').includes('{compte_a_rebours}') ? '' : '<button class="btn petit" data-ajout-compte>⏱ Ajouter le compte à rebours</button>'}</div>
         <div class="deux"><label class="champ">Police<button class="btn police-btn" data-police style="font-family:'${esc(c.police || 'Cormorant Garamond')}',serif">${esc(c.police || 'Cormorant Garamond')} ▾</button></label><label class="champ">Taille<input type="range" data-k="taille" min="1.5" max="12" step="0.1" value="${c.taille || 4}"></label></div>
         <div class="trois"><label class="champ">Couleur<input type="color" data-k="couleur" value="${c.couleur || '#7a1f2b'}"></label><label class="champ">Alignement<select data-k="align">${opts([['center', 'Centré'], ['left', 'Gauche'], ['right', 'Droite'], ['justify', 'Justifié']], c.align || 'center')}</select></label><label class="champ">Interligne<input type="number" data-k="interligne" step="0.05" min="0.8" max="2" value="${c.interligne || 1.25}"></label></div>
@@ -3142,6 +3290,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       };
       $$('#props [data-ordre]').forEach(b => b.onclick = () => ordreCalque(c, b.dataset.ordre));
       if (c.type === 'image' || c.type === 'video') brancherMasque(c);
+      { const ro = $('#props [data-riche-ouvrir]'); if (ro) ro.onclick = () => E.editer(c);
+        const rx = $('#props [data-riche-effacer]'); if (rx) rx.onclick = () => { E.modif(true); delete c.styles; E.rafraichir(); rendreReglages(); toast('Mise en forme partielle retirée'); }; }
       const ef = $('#props [data-en-fond]'); if (ef) ef.onclick = () => {
         const pl = plan(); E.modif(true);
         pl.fond = Object.assign({}, pl.fond, { type: c.type === 'video' ? 'video' : 'image', media: c.media, boucle: true });
@@ -3210,6 +3360,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           E.modif(inp.tagName === 'SELECT' || inp.type === 'checkbox');
           let v = inp.type === 'checkbox' ? inp.checked : inp.value;
           if (inp.type === 'number' || inp.type === 'range') v = inp.value === '' ? '' : Number(inp.value);
+          if (k === 'texte') ajusterStyles(c, c.texte, v);
           c[k] = v;
           if (k === 'type' || k === 'media') { if (k === 'media') { const m = medias.find(x => x.src === v); if (m) c.type = m.type === 'video' || m.type === 'fond' ? 'video' : 'image'; } eng.precharger().then(E.rafraichir); }
           if (I.TYPES_HTML.includes(c.type) || k === 'condition') E.rafraichir();
@@ -3375,6 +3526,72 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
   }
 
   /* ---------- Traduction automatique d'un texte (Google Traduction, sans clé ; variables {…} gardées) ---------- */
+  /* ---------- Mise en forme partielle d'un texte (c.styles) ----------
+     Chaque caractère peut avoir sa police, taille, couleur, gras, italique, casse, espacement ; on garde des plages [d, f). */
+  const CLES_STYLE = ['police', 'taille', 'couleur', 'gras', 'italique', 'casse', 'espace'];
+  function tableauStyles(c, n) {
+    const t = new Array(n).fill(null);
+    (Array.isArray(c.styles) ? c.styles : []).forEach(st => { for (let i = Math.max(0, Number(st.d) || 0); i < Math.min(n, Number(st.f) || 0); i++) { const o = Object.assign({}, t[i] || {}); CLES_STYLE.forEach(k => { if (st[k] != null && st[k] !== '') o[k] = st[k]; }); t[i] = o; } });
+    return t;
+  }
+  function stylesDepuisTableau(c, t) {
+    const out = []; let cur = null, cle = '';
+    t.forEach((o, i) => {
+      const k = o && Object.keys(o).length ? JSON.stringify(CLES_STYLE.filter(x => o[x] != null).map(x => [x, o[x]])) : '';
+      if (k && k === cle && cur) { cur.f = i + 1; return; }
+      cle = k; cur = null;
+      if (k) { cur = Object.assign({ d: i, f: i + 1 }, o); out.push(cur); }
+    });
+    if (out.length) c.styles = out; else delete c.styles;
+  }
+  // le texte change (frappe, collage, panneau) : les styles suivent les caractères
+  function ajusterStyles(c, ancien, nouveau) {
+    if (!Array.isArray(c.styles) || !c.styles.length || ancien === nouveau) return;
+    ancien = String(ancien || ''); nouveau = String(nouveau || '');
+    const t = tableauStyles(c, ancien.length);
+    let a = 0; while (a < ancien.length && a < nouveau.length && ancien[a] === nouveau[a]) a++;
+    let b = 0; while (b < ancien.length - a && b < nouveau.length - a && ancien[ancien.length - 1 - b] === nouveau[nouveau.length - 1 - b]) b++;
+    const ins = nouveau.length - a - b, modele = a > 0 ? t[a - 1] : t[a] || null;
+    const nt = t.slice(0, a).concat(new Array(Math.max(0, ins)).fill(modele ? Object.assign({}, modele) : null), t.slice(ancien.length - b));
+    stylesDepuisTableau(c, nt);
+  }
+  function appliquerStylePartiel(c, d, f, props) {
+    const n = String(c.texte || '').length, t = tableauStyles(c, n);
+    for (let i = Math.max(0, d); i < Math.min(n, f); i++) { const o = Object.assign({}, t[i] || {}); Object.entries(props).forEach(([k, v]) => { if (v == null || v === '') delete o[k]; else o[k] = v; }); t[i] = Object.keys(o).length ? o : null; }
+    stylesDepuisTableau(c, t);
+  }
+  // IA texte : Claude (clé dans Réglages) sinon IA gratuite (Pollinations) ; renvoie { texte, moteur }
+  async function demanderIA(prompt, maxTokens) {
+    const ia = reglages.ia || {}, erreurs = [];
+    if (ia.cle) {
+      try {
+        const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'x-api-key': ia.cle, 'anthropic-version': '2023-06-01', 'content-type': 'application/json', 'anthropic-dangerous-direct-browser-access': 'true' },
+          body: JSON.stringify({ model: ia.modele || 'claude-sonnet-5-5', max_tokens: maxTokens || 8000, messages: [{ role: 'user', content: prompt }] }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error((j.error && j.error.message) || 'Claude ' + r.status);
+        return { texte: (j.content || []).map(x => x.text || '').join(''), moteur: 'Claude' };
+      } catch (e) { erreurs.push(e.message); }
+    }
+    try {
+      const r = await fetch('https://text.pollinations.ai/openai', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ model: 'openai', messages: [{ role: 'user', content: prompt }], seed: 7, private: true }) });
+      if (!r.ok) throw new Error('IA gratuite ' + r.status);
+      const j = await r.json(); const t = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+      if (!t) throw new Error('IA gratuite : réponse vide');
+      return { texte: t, moteur: 'IA gratuite' };
+    } catch (e) { erreurs.push(e.message); }
+    throw new Error(erreurs.join(' · ') || 'IA indisponible');
+  }
+  // Traduction de toute l'invitation par l'IA, langue par langue (ton de faire-part, pas mot à mot)
+  async function traduireInvitationIA(p, cs, langue, N) {
+    const proj = { fiche: p.fiche, plans: [{ calques: cs.map(c => ({ id: c.id, texte: c.texte })) }] };
+    const prompt = Fabrique.promptTraduction(proj, [langue], N) + `
+
+Important : écris comme un traducteur natif qui rédige un vrai faire-part dans cette langue — phrases naturelles et fluides, jamais mot à mot. Si un texte est un verset biblique, utilise la traduction officielle reconnue dans cette langue. Les textes qui se suivent forment une seule invitation : garde la cohérence (tutoiement / vouvoiement, termes).`;
+    const r = await demanderIA(prompt, 12000);
+    const j = Fabrique.lireJSON(r.texte);
+    const res = (j && (j[langue] || j)) || {};
+    return { res, moteur: r.moteur };
+  }
   async function traduireTexte(texte, de, vers) {
     const vars = []; const prot = texte.replace(/\{[^{}]+\}/g, m => { vars.push(m); return '__' + (vars.length - 1) + '__'; });
     const remettre = t => t.replace(/_{2}\s*(\d+)\s*_{2}/g, (m, i) => vars[Number(i)] || m);
@@ -3397,7 +3614,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       <p class="muet">Langue principale : <b>${esc(N[p.fiche.langue] || p.fiche.langue)}</b>. Cochez les langues à proposer aux invités : dans l'invitation, un bouton 🌐 leur permet de changer de langue d'un clic.</p>
       <div class="cases" style="flex-wrap:wrap" id="tr-langues">${Object.entries(N).filter(([k]) => k !== p.fiche.langue).map(([k, n]) => `<label><input type="checkbox" value="${k}" ${(p.langues || []).includes(k) ? 'checked' : ''}> ${n}${(p.langues || []).includes(k) ? ` <span class="muet">(${manque(k) ? manque(k) + ' texte(s) à traduire' : '✓ traduite'})</span>` : ''}</label>`).join('')}</div>
       <div class="carte pile" style="margin-top:12px;background:#f3f8f2"><b>⚡ Traduction automatique (en un clic)</b>
-        <p class="muet" style="margin:0">Traduit tous les textes vers les langues cochées (Google Traduction). Les variables {famille}, {date}… sont gardées. Relisez ensuite : chaque traduction reste modifiable (Plans → texte → Traductions).</p>
+        <p class="muet" style="margin:0">Traduit toute l'invitation d'un coup vers les langues cochées, comme un vrai faire-part (pas mot à mot) : avec l'IA (Claude si une clé est dans Réglages, sinon une IA gratuite), et Google Traduction en dernier recours. Les variables {famille}, {date}… et les noms sont gardés. Relisez ensuite : chaque traduction reste modifiable (Plans → texte → Traductions).</p>
         <div class="ligne"><button class="btn plein" id="tr-auto">⚡ Traduire automatiquement</button><span class="muet" id="tr-auto-etat"></span></div></div>
       <details style="margin-top:8px"><summary class="muet" style="cursor:pointer">Ou avec Claude / ChatGPT (traduction plus soignée)</summary>
       <div class="ia-grille" style="margin-top:12px">
@@ -3424,13 +3641,25 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         const total = ls.reduce((s, l) => s + cs.filter(c => tout || !(c.trad && c.trad[l])).length, 0);
         if (!total) { etat.textContent = 'Tout est déjà traduit (cochez « Retraduire » pour recommencer).'; return; }
         b.disabled = true;
+        const faits = new Set(); let moteurs = new Set();
+        for (const l of ls) {
+          const aFaire = cs.filter(c => tout || !(c.trad && c.trad[l]));
+          if (!aFaire.length) continue;
+          etat.textContent = `${N[l] || l} : traduction soignée de toute l'invitation…`;
+          try {
+            const { res, moteur } = await traduireInvitationIA(p, aFaire, l, N);
+            aFaire.forEach(c => { const t = res[c.id]; if (typeof t === 'string' && t.trim()) { c.trad = c.trad || {}; c.trad[l] = t; faits.add(l + ':' + c.id); n++; k++; moteurs.add(moteur); } });
+          } catch (e) { console.warn('traduction IA', e.message); etat.textContent = 'IA indisponible (' + e.message.slice(0, 80) + ') : Google Traduction…'; }
+        }
         for (const l of ls) for (const c of cs) {
+          if (faits.has(l + ':' + c.id)) continue;
           if (!tout && c.trad && c.trad[l]) continue;
+          moteurs.add('Google');
           etat.textContent = `${N[l] || l} : ${++k} / ${total}…`;
           try { const t = await traduireTexte(String(c.texte), p.fiche.langue || 'fr', l); if (t && t.trim()) { c.trad = c.trad || {}; c.trad[l] = t; n++; } } catch (e) { err++; console.warn('traduction', e.message); if (err > 5) break; }
         }
         enregistrer(p); b.disabled = false;
-        etat.textContent = n + ' texte(s) traduit(s)' + (err ? ' · ' + err + ' échec(s) : réessayez ou utilisez Claude' : '');
+        etat.textContent = n + ' texte(s) traduit(s)' + (moteurs.size ? ' — ' + [...moteurs].join(' + ') : '') + (err ? ' · ' + err + ' échec(s) : réessayez ou utilisez Claude' : '');
         if (n) { toast(n + ' traductions faites : relisez-les dans l\'aperçu (bouton 🌐)'); if (apres) apres(); }
       };
       $('#tr-ok', box).onclick = () => {
@@ -5629,6 +5858,12 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
           <label class="champ">Configuration web Firebase (JSON)<textarea id="fb" rows="7" placeholder='{"apiKey":"...","authDomain":"...","projectId":"..."}'>${reglages.firebase ? esc(JSON.stringify(reglages.firebase, null, 1)) : ''}</textarea></label>
           <button class="btn plein" id="fb-ok">Enregistrer</button>
         </div>
+        <div class="carte pile"><h3>🌐 Traduction soignée des invitations (IA)</h3>
+          <p class="muet">« ⚡ Traduire » traduit toute l'invitation d'un coup, comme un vrai faire-part dans chaque langue (pas mot à mot) : d'abord avec Claude si une clé est enregistrée ici, sinon avec une IA gratuite, et en dernier recours Google Traduction. La clé reste uniquement dans ce navigateur.</p>
+          <label class="champ">Clé API Claude (facultatif, console.anthropic.com → API Keys)<input type="password" id="ia-cle" autocomplete="off" placeholder="sk-ant-…" value="${esc((reglages.ia || {}).cle || '')}"></label>
+          <label class="champ">Modèle<input id="ia-modele" value="${esc((reglages.ia || {}).modele || 'claude-sonnet-5-5')}"></label>
+          <div class="ligne"><button class="btn plein" id="ia-ok">Enregistrer</button><button class="btn" id="ia-test">Tester</button><span class="muet" id="ia-etat"></span></div>
+        </div>
         <div class="carte pile"><h3>Wan 2.2 sur RunPod (ComfyUI)</h3>
           <p class="muet">Pour que le bouton « Générer avec Wan 2.2 » du fond sur mesure envoie la demande à votre pod et récupère la vidéo tout seul.</p>
           <div class="ligne"><button class="btn plein" id="cf-assistant">▶ Démarrer le pod (étapes guidées)</button><span class="muet">Les liens à cliquer, pas à pas.</span></div>
@@ -5720,6 +5955,9 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       catch (err) { e.textContent = /function|schema cache|Could not find/i.test(err.message) ? 'Connecté, mais le script SQL n\'est pas encore installé (étape 2).' : 'Échec : ' + err.message; }
     };
     $('#sb-sql').onclick = async () => { try { copier(await (await fetch('../outils/supabase.sql?v=' + Date.now())).text()); toast('Script copié : collez-le dans Supabase → SQL Editor'); } catch (e) { toast('Script introuvable'); } };
+    $('#ia-ok').onclick = () => { reglages.ia = { cle: $('#ia-cle').value.trim(), modele: $('#ia-modele').value.trim() || 'claude-sonnet-5-5' }; if (!reglages.ia.cle) delete reglages.ia.cle; sauverReglages(); toast('Enregistré'); };
+    $('#ia-test').onclick = async () => { const e = $('#ia-etat'); e.textContent = 'Test…'; reglages.ia = { cle: $('#ia-cle').value.trim(), modele: $('#ia-modele').value.trim() || 'claude-sonnet-5-5' }; sauverReglages();
+      try { const r = await demanderIA('Réponds seulement : OK', 50); e.textContent = '✓ ' + r.moteur + ' répond'; } catch (x) { e.textContent = '✗ ' + x.message; } };
     $('#fb-ok').onclick = () => { const v = $('#fb').value.trim(); if (!v) { reglages.firebase = null; sauverReglages(); return toast('Firebase désactivé'); } try { const t = v.replace(/^[^{]*/, '').replace(/[^}]*$/, ''); reglages.firebase = JSON.parse(t.replace(/(\w+)\s*:/g, '"$1":').replace(/""/g, '"').replace(/'/g, '"')); sauverReglages(); toast('Firebase enregistré'); } catch (e) { toast('Configuration illisible'); } };
     $('#exp-tout').onclick = () => telecharger('studio-sauvegarde.json', JSON.stringify({ projets, medias: medias.map(m => Object.assign({}, m)) }, null, 1));
     $('#imp-tout').onchange = async e => { try { const j = JSON.parse(await e.target.files[0].text()); Object.assign(projets, j.projets || {}); sauverProjets(); toast('Sauvegarde importée'); } catch (err) { toast('Fichier invalide'); } };

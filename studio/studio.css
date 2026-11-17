@@ -619,3 +619,16 @@ body.atelier-plein.haut-replie main { padding-top: 14px !important; }
 /* bouton de langue FR / EN */
 .lang-bascule { margin-left: 6px; padding: 5px 10px !important; border: 1px solid rgba(122,31,43,.25); border-radius: 999px; font-size: 12.5px; white-space: nowrap; }
 .lang-bascule b { color: var(--bordeaux, #7a1f2b); }
+/* écriture d'un texte avec mise en forme partielle */
+div.edition-directe.riche { position: absolute; z-index: 8; overflow: visible; padding: 2px 4px; margin: 0; box-sizing: border-box; border: 1.5px dashed #c33a4c; border-radius: 4px; background: rgba(255,255,255,.55); outline: none; white-space: pre-wrap; overflow-wrap: break-word; cursor: text; }
+div.edition-directe.riche::selection, div.edition-directe.riche *::selection { background: rgba(51,144,255,.35); }
+.barre-style-texte { position: absolute; z-index: 9; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; max-width: 96%; padding: 5px 7px; background: #fff; border: 1px solid #e3d6cf; border-radius: 12px; box-shadow: 0 8px 24px rgba(40,20,20,.18); font: 500 12px Inter, sans-serif; color: #4a3a35; }
+.barre-style-texte .bst-aide { color: #9a8a84; font-size: 11px; padding: 0 3px; }
+.barre-style-texte:not(.vide) .bst-aide { display: none; }
+.barre-style-texte.vide > :not(.bst-aide) { opacity: .45; }
+.barre-style-texte button, .barre-style-texte select, .barre-style-texte input[type=number] { height: 28px; border: 1px solid #e3d6cf; background: #fffaf7; border-radius: 8px; padding: 0 8px; font: inherit; color: inherit; cursor: pointer; }
+.barre-style-texte input[type=number] { width: 58px; padding: 0 5px; cursor: text; }
+.barre-style-texte label { display: inline-flex; align-items: center; gap: 3px; margin: 0; }
+.barre-style-texte input[type=color] { width: 30px; height: 28px; padding: 1px; border: 1px solid #e3d6cf; border-radius: 8px; background: #fff; cursor: pointer; }
+.barre-style-texte button.on { background: #7a1f2b; color: #fff; border-color: transparent; }
+.barre-style-texte .bst-police { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }

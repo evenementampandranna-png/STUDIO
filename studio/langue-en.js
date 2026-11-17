@@ -265,6 +265,11 @@ window.DICO_STUDIO_EN = {
   "Forme : Coins arrondis": "Shape: Rounded corners", "Composer tous les plans avec l'IA": "Compose all scenes with AI", "Plan": "Scene", "Finaliser ce plan avec l'IA": "Finish this scene with AI",
   "Fond": "Background", "Importer un fond": "Import a background", "Éviter les chevauchements de textes": "Avoid overlapping texts", "+ Plan intermédiaire": "+ Middle scene",
   "Maj+clic ou cadre de sélection : choisir plusieurs éléments · Double-clic : écrire dans le texte · Coins : agrandir · Côtés : élargir · Ctrl+C / Ctrl+V : copier / coller": "Shift+click or selection box: choose several items · Double-click: type in the text · Corners: enlarge · Sides: widen · Ctrl+C / Ctrl+V: copy / paste",
+  "Sélectionnez une partie du texte :": "Select part of the text:", "Police de la sélection": "Font of the selection", "Taille de la sélection": "Size of the selection", "Couleur de la sélection": "Colour of the selection",
+  "Gras (Ctrl+B)": "Bold (Ctrl+B)", "Italique (Ctrl+I)": "Italic (Ctrl+I)", "Majuscules / minuscules de la sélection": "Upper / lower case of the selection", "Comme écrit": "As typed",
+  "Espacement des lettres de la sélection (em)": "Letter spacing of the selection (em)", "✕ style": "✕ style", "Retirer la mise en forme de la sélection": "Remove the formatting of the selection",
+  "Mettre en forme une partie": "Format part of the text", "Tout remettre pareil": "Reset all to the same", "Police ▾": "Font ▾",
+  "Traduction soignée des invitations (IA)": "Careful invitation translation (AI)", "Traduire automatiquement": "Translate automatically",
   // ---- messages fréquents
   "Enregistré": "Saved", "Copié": "Copied", "Copié !": "Copied!", "Supprimé": "Deleted", "Annulé": "Undone", "Rétabli": "Redone", "Chargement…": "Loading…", "Patientez…": "Please wait…",
   "Oui": "Yes", "Non": "No", "OK": "OK", "Valider": "Approve", "Publier": "Publish", "Nouveau": "New", "Ouvrir": "Open", "Rechercher": "Search", "Ajouter": "Add", "Fermer la fenêtre": "Close the window"

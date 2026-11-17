@@ -257,6 +257,86 @@
     return out;
   }
 
+  /* ---------- Texte à styles partiels (une seule zone de texte, plusieurs mises en forme) ----------
+     c.styles = [{ d, f, police, taille, couleur, gras, italique, casse ('maj' | 'min' | 'normal'), espace (em) }]
+     d / f : positions dans c.texte (texte d'origine, avant les variables) */
+  function aStyles(c, brut) { return c.type === 'texte' && Array.isArray(c.styles) && c.styles.length > 0 && brut === (c.texte || ''); }
+  function morceauxRiches(c, brut, vars) {
+    const n = brut.length, sts = c.styles.filter(st => st && Number(st.f) > Number(st.d) && Number(st.d) < n);
+    const coupes = new Set([0, n]); sts.forEach(st => { coupes.add(Math.max(0, Number(st.d))); coupes.add(Math.min(n, Number(st.f))); });
+    const pts = [...coupes].sort((a, b) => a - b), out = [];
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i], b = pts[i + 1]; if (b <= a) continue;
+      const st = {}; sts.forEach(x => { if (Number(x.d) <= a && Number(x.f) >= b) Object.keys(x).forEach(k => { if (k !== 'd' && k !== 'f' && x[k] != null && x[k] !== '') st[k] = x[k]; }); });
+      let t = remplacer(brut.slice(a, b), vars);
+      const casse = st.casse || (c.majuscules ? 'maj' : '');
+      if (casse === 'maj') t = t.toUpperCase(); else if (casse === 'min') t = t.toLowerCase();
+      out.push({ t, st });
+    }
+    return out;
+  }
+  function policeRiche(c, st, px) {
+    const ita = st.italique != null ? st.italique : c.italique, g = st.gras != null ? (st.gras ? 700 : 400) : graisse(c);
+    return `${ita ? 'italic ' : ''}${g} ${px.toFixed(2)}px "${st.police || c.police || 'Cormorant Garamond'}", serif, ${POLICE_EMOJI}`;
+  }
+  function miseEnPageRiche(ctx, c, morceaux, larg) {
+    const base = (Number(c.taille) || 4) / 100 * H, inter = Number(c.interligne) || 1.25;
+    const bout = (t, st) => {
+      const px = (st.taille != null && st.taille !== '' ? Number(st.taille) : Number(c.taille) || 4) / 100 * H, font = policeRiche(c, st, px), esp = (Number(st.espace) || 0) * px;
+      ctx.font = font; return { t, st, px, font, esp, w: ctx.measureText(t).width + esp * [...t].length };
+    };
+    // jetons : mots (suite de morceaux sans espace), espaces, retours à la ligne
+    const jetons = []; let colle = false;
+    morceaux.forEach(m => m.t.split(/(\n|[ \t]+)/).forEach(part => {
+      if (!part) return;
+      if (part === '\n') { jetons.push({ nl: true }); colle = false; }
+      else if (/^[ \t]+$/.test(part)) { jetons.push({ esp: bout(' ', m.st), n: part.length }); colle = false; }
+      else { const b = bout(part, m.st); if (colle && jetons.length && jetons[jetons.length - 1].bouts) { const j = jetons[jetons.length - 1]; j.bouts.push(b); j.w += b.w; } else jetons.push({ bouts: [b], w: b.w }); colle = true; }
+    }));
+    const lignesR = [{ items: [], w: 0, fin: false }]; let attente = null;
+    jetons.forEach(j => {
+      let l = lignesR[lignesR.length - 1];
+      if (j.nl) { l.fin = true; lignesR.push({ items: [], w: 0, fin: false }); attente = null; return; }
+      if (j.esp) { if (l.items.length) attente = j; return; }
+      const we = attente ? attente.esp.w : 0;
+      if (l.items.length && l.w + we + j.w > larg) { lignesR.push({ items: [], w: 0, fin: false }); l = lignesR[lignesR.length - 1]; attente = null; }
+      if (attente && l.items.length) { l.items.push({ esp: attente.esp, n: attente.n }); l.w += attente.esp.w; }
+      attente = null; l.items.push(j); l.w += j.w;
+    });
+    lignesR[lignesR.length - 1].fin = true;
+    let h = 0, n = 0;
+    lignesR.forEach(l => {
+      let mx = 0; l.items.forEach(it => { if (it.bouts) it.bouts.forEach(b => { mx = Math.max(mx, b.px); n += [...b.t].length; }); else { mx = Math.max(mx, it.esp.px * 0.6); n += it.n; } });
+      l.px = mx || base; l.lh = l.px * inter; h += l.lh; n += 1;
+    });
+    return { lignes: lignesR, h, n, txt: morceaux.map(m => m.t).join('') };
+  }
+  function dessinerRiche(ctx, c, R, larg, align, montrer) {
+    const justifie = align === 'justify';
+    let y = -R.h / 2, reste = montrer == null ? Infinity : montrer;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    R.lignes.forEach(l => {
+      const base = y + l.lh / 2 + l.px * 0.33; y += l.lh;
+      const nEsp = l.items.filter(it => it.esp).length;
+      const extra = justifie && !l.fin && nEsp ? (larg - l.w) / nEsp : 0;
+      let x = align === 'right' ? larg / 2 - l.w : align === 'left' || justifie ? -larg / 2 : -l.w / 2;
+      l.items.forEach(it => {
+        if (it.esp) { x += it.esp.w + extra; reste -= it.n; return; }
+        it.bouts.forEach(b => {
+          if (reste <= 0) { x += b.w; return; }
+          const chars = [...b.t], vis = chars.slice(0, Math.max(0, Math.min(chars.length, reste))); reste -= chars.length;
+          ctx.font = b.font; ctx.fillStyle = b.st.couleur || c.couleur || '#7a1f2b';
+          const ecrire = (t, px) => { if (c.contour) ctx.strokeText(t, px, base); ctx.fillText(t, px, base); };
+          if (c.contour) { ctx.lineWidth = Number(c.contour_epaisseur) || b.px * 0.06; ctx.lineJoin = 'round'; ctx.miterLimit = 2; ctx.strokeStyle = c.contour; }
+          if (b.esp) { let px = x; vis.forEach(ch => { ecrire(ch, px); px += ctx.measureText(ch).width + b.esp; }); }
+          else ecrire(vis.join(''), x);
+          x += b.w;
+        });
+      });
+      reste -= 1;
+    });
+  }
+
   /* ---------- Moteur ---------- */
   class Moteur {
     constructor(racine, opts) {
@@ -354,6 +434,7 @@
         if (p.fond && p.fond.media && p.fond.type !== 'couleur' && p.fond.type !== 'aucun') promesses.push(this.media(p.fond.media, p.fond.type === 'image' ? 'image' : 'video'));
         (p.calques || []).forEach(c => {
           if (c.police) polices.add(c.police);
+          if (Array.isArray(c.styles)) c.styles.forEach(st => { if (st && st.police) polices.add(st.police); });
           if ((c.type === 'image' || c.type === 'video') && c.media) promesses.push(this.media(c.media, c.type));
         });
       });
@@ -772,9 +853,12 @@
           else if (animCompte === 'lueur') { ctx.shadowColor = c.couleur || '#7a1f2b'; ctx.shadowBlur = taille * (0.15 + 0.5 * k * (0.5 - 0.5 * Math.cos(ph * 2 * Math.PI))); }
           else if (animCompte === 'vague') vagueCompte = ph;
         }
-        const ls = lignes(ctx, txt, larg);
+        // styles partiels (une partie du texte dans une autre police, taille, couleur…)
+        const R = aStyles(c, brut) ? miseEnPageRiche(ctx, c, morceauxRiches(c, brut, vars), larg) : null;
+        if (R) { txt = R.txt; ctx.font = `${c.italique ? 'italic ' : ''}${graisse(c)} ${taille}px "${police}", serif, ${POLICE_EMOJI}`; }
+        const ls = R ? Object.assign([], { fin: [] }) : lignes(ctx, txt, larg);
         const inter = taille * (Number(c.interligne) || 1.25);
-        const hTot = inter * ls.length;
+        const hTot = R ? R.h : inter * ls.length;
         let total = txt.length, montrer = total;
         const motsTxt = txt.split(/(\s+)/);
         if (e.entree === 'ecriture') montrer = Math.floor(e.brutE * total);
@@ -805,6 +889,7 @@
           if (dec) { ctx.shadowOffsetX = dec * taille * 0.06 * Math.max(0.01, sc); ctx.shadowOffsetY = dec * taille * 0.06 * Math.max(0.01, sc); }
         }
         let compte = 0;
+        if (R) dessinerRiche(ctx, c, R, larg, align, e.entree === 'ecriture' || e.entree === 'mot-par-mot' ? montrer : null);
         ls.forEach((l, i) => {
           const y = -hTot / 2 + inter * (i + 0.5) + (vagueCompte ? Math.sin((vagueCompte + i * 0.25) * 2 * Math.PI) * taille * 0.12 * (Number(c.compte_anim_force) || 1) : 0);
           let morceau = l;
@@ -987,7 +1072,9 @@
       const taille = (Number(c.taille) || 4) / 100 * H;
       ctx.save();
       ctx.font = `${c.italique ? 'italic ' : ''}${graisse(c)} ${taille}px "${c.police || 'Cormorant Garamond'}", serif`;
-      let txt = remplacer(texteDe(c, this.langue), variablesDe(this.projet, this.famille || { nom: 'Fianakaviana Rakotomalala', places: 4 }, this.form, this.langue));
+      const brutH = texteDe(c, this.langue), varsH = variablesDe(this.projet, this.famille || { nom: 'Fianakaviana Rakotomalala', places: 4 }, this.form, this.langue);
+      if (aStyles(c, brutH)) { const R = miseEnPageRiche(ctx, c, morceauxRiches(c, brutH, varsH), (Number(c.largeur) || 80) / 100 * W); ctx.restore(); return R.h / H * 100; }
+      let txt = remplacer(brutH, varsH);
       if (c.majuscules) txt = txt.toUpperCase();
       const n = lignes(ctx, txt, (Number(c.largeur) || 80) / 100 * W).length;
       ctx.restore();
@@ -1223,5 +1310,5 @@
   // Langues proposées pour les invitations
   const LANGUES = { mg: 'Malagasy', fr: 'Français', en: 'English', de: 'Deutsch', it: 'Italiano', es: 'Español', pt: 'Português', zh: '中文', ar: 'العربية', ru: 'Русский', ja: '日本語' };
   const FUSIONS = [['normal', 'Normale'], ['multiply', 'Produit (assombrit, garde les ombres)'], ['screen', 'Écran (éclaircit, garde les lumières)'], ['overlay', 'Superposition'], ['soft-light', 'Lumière douce'], ['hard-light', 'Lumière crue'], ['color-dodge', 'Densité couleur −'], ['color-burn', 'Densité couleur +'], ['darken', 'Obscurcir'], ['lighten', 'Éclaircir'], ['difference', 'Différence'], ['luminosity', 'Luminosité'], ['color', 'Couleur']];
-  global.MoteurInfo = { MASQUES, ICONE_MAPS, FORMES: FORMES.map(x => [x[0], x[1]]), cheminForme, CATALOGUE_POLICES, chargerPolices, chargerPolicePerso, typeFond, fondMedia, FUSIONS, plage, positionVideo, LANGUES, texteDe, W, H, POLICES, ANIMATIONS, SORTIES, NOMS_EFFETS, ACTIONS, TYPES_HTML, uid, variablesDe, dateLisible, remplacer, MOIS_MG, MOIS_FR };
+  global.MoteurInfo = { morceauxRiches, MASQUES, ICONE_MAPS, FORMES: FORMES.map(x => [x[0], x[1]]), cheminForme, CATALOGUE_POLICES, chargerPolices, chargerPolicePerso, typeFond, fondMedia, FUSIONS, plage, positionVideo, LANGUES, texteDe, W, H, POLICES, ANIMATIONS, SORTIES, NOMS_EFFETS, ACTIONS, TYPES_HTML, uid, variablesDe, dateLisible, remplacer, MOIS_MG, MOIS_FR };
 })(window);
