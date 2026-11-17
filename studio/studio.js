@@ -756,10 +756,12 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-17-8', date: '17 novembre 2026', titre: 'Texte sur cartouche : les coins agrandissent le texte', points: [
+      'Texte avec fond (ex. « Manasa olona 4 ») : les <b>coins</b> agrandissent / réduisent le <b>texte</b> (le fond suit) ; côtés = largeur ; haut / bas = hauteur du fond. Pour régler le fond tout seul : ⧉ Détacher le fond.'] },
     { id: '2026-11-17-7', date: '17 novembre 2026', titre: 'Détacher le fond d\'un texte', points: [
       'Texte avec un fond (ex. « Manasa olona 4 ») : bouton <b>⧉ Détacher le fond</b> dans le panneau du texte. Le fond devient une forme indépendante juste derrière le texte (même couleur, arrondi, animation et visibilité) : cliquez le texte ou le fond pour les sélectionner, déplacer et redimensionner séparément, chacun avec ses poignées, comme dans Canva. Ctrl+Z pour revenir.'] },
     { id: '2026-11-17-6', date: '17 novembre 2026', titre: 'Texte sur cartouche (ex. « Manasa olona … ») : réduire le cadre, pas le texte', points: [
-      'Un texte avec un fond (cartouche, comme « Manasa olona {places} » de la confirmation) a 8 poignées : <b>côtés</b> = largeur, <b>haut / bas</b> = hauteur du cartouche, <b>coins</b> = les deux. Le texte garde sa taille. Maj + coin : tout ensemble, texte compris.'] },
+      'Un texte avec un fond (cartouche, comme « Manasa olona {places} » de la confirmation) a 8 poignées : <b>côtés</b> = largeur, <b>haut / bas</b> = hauteur du cartouche, <b>coins</b> = agrandir / réduire le texte (le cartouche suit).'] },
     { id: '2026-11-17-5', date: '17 novembre 2026', titre: 'Plein écran des films : image seule en pause', points: [
       'Les films (🎬 Vidéos, films de l\'événement, vitrine du site) ont maintenant leur propre plein écran <b>⛶</b> (coin en haut à droite de la vidéo au survol, ou double-clic), au même design que le studio. Un clic met en pause ; en pause, un clic cache la barre et tous les boutons (image seule), un 2e clic les fait revenir sans relancer. Espace : lecture / pause · ← → : 5 s · Échap : fermer.',
       '⛶ Plein écran de l\'invitation dans le studio : un clic pendant la lecture met aussi en pause.'] },
@@ -2066,8 +2068,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         if ((c.type === 'bouton' || c.type === 'compteur' || c.type === 'champ') && !(coin && e.shiftKey)) {
           if (sx) c.largeur = Math.round(Math.max(5, Math.min(100, v.largeur + 2 * sx * dx)) * 10) / 10;
           if (sy && b.h > 0) c.b_hauteur = Math.round(Math.max(0.4, Math.min(5, v.b_hauteur * (b.h + 2 * sy * dy) / b.h)) * 100) / 100;
-        } else if (c.type === 'texte' && c.fond_couleur && !(coin && e.shiftKey)) {
-          // texte sur cartouche (ex. « Manasa olona … ») : le cartouche change, le texte garde sa taille
+        } else if (c.type === 'texte' && c.fond_couleur && !coin) {
+          // texte sur cartouche : côtés = largeur, haut / bas = hauteur du cartouche ; les coins agrandissent / réduisent le texte (le cartouche suit)
           if (sx) c.largeur = Math.round(Math.max(5, Math.min(100, v.largeur + 2 * sx * dx)) * 10) / 10;
           if (sy) { const mg = (Number(c.taille) || 4) * (c.fond_marge != null && c.fond_marge !== '' ? Number(c.fond_marge) : 0.4) * 1.5; c.fond_haut = Math.round(Math.max(0, Math.min(10, v.fond_haut + 2 * sy * dy / Math.max(0.1, mg))) * 100) / 100; }
         } else if (coin) {
