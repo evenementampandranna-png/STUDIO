@@ -756,6 +756,8 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-17-3', date: '17 novembre 2026', titre: 'Voir l\'invitation dans une autre langue : traduite tout de suite', points: [
+      'Sous l\'aperçu, le menu <b>« Voir en : … »</b> est toujours visible et propose toutes les langues (« Traduire en… »). En choisissant une langue, les textes pas encore traduits le sont aussitôt (IA, sinon Google), la langue est ajoutée à l\'invitation (bouton 🌐 des invités), et l\'aperçu passe dans cette langue. Republiez pour que les invités l\'aient.'] },
     { id: '2026-11-17-2', date: '17 novembre 2026', titre: 'Mise en forme d\'une partie du texte, traduction soignée', points: [
       '<b>Une partie d\'un texte dans un autre style</b> : double-cliquez le texte (ou « ✎ Mettre en forme une partie » dans le panneau), sélectionnez avec la souris une partie (ex. « INVIT » dans « INVITATION »), puis dans la petite barre au-dessus : <b>police, taille, couleur, gras, italique, MAJ / min, espacement des lettres</b>. « ✕ style » remet la sélection comme le reste. Tout reste dans une seule zone de texte : déplacer, agrandir et animer comme avant ; les styles suivent quand vous modifiez le texte, et sont gardés à l\'enregistrement, dans l\'invitation en ligne et dans le film.',
       '<b>🌐 Traduire</b> : « ⚡ Traduire automatiquement » traduit maintenant <b>toute l\'invitation d\'un coup avec une IA</b>, comme un vrai faire-part dans chaque langue (pas mot à mot ; versets bibliques dans leur version officielle ; noms et variables gardés). Pour la meilleure qualité, collez une clé Claude dans Réglages → « Traduction soignée » ; sans clé, une IA gratuite est utilisée, et Google Traduction en dernier recours.'] },
@@ -1823,9 +1825,25 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     $('#pause').onclick = basculerPause;
     ['#jouer-plan', '#jouer-tout'].forEach(id => $(id).addEventListener('click', () => { E.enPause = false; setTimeout(majPause, 30); }));
     E.basculerPause = basculerPause;
-    const majVoirLangue = () => { const sel = $('#voir-langue'); const ls = [p.fiche.langue].concat((p.langues || []).filter(l => l !== p.fiche.langue)); sel.style.display = ls.length > 1 ? '' : 'none'; sel.innerHTML = ls.map(l => `<option value="${l}" ${(eng.langue || p.fiche.langue) === l ? 'selected' : ''}>Voir en : ${esc(MoteurInfo.LANGUES[l] || l)}</option>`).join(''); };
+    const majVoirLangue = () => {
+      const sel = $('#voir-langue'), N = MoteurInfo.LANGUES, pr = p.fiche.langue || 'mg';
+      const ls = [pr].concat((p.langues || []).filter(l => l !== pr)), autres = Object.keys(N).filter(l => !ls.includes(l));
+      sel.style.display = '';
+      sel.innerHTML = ls.map(l => `<option value="${l}" ${(eng.langue || pr) === l ? 'selected' : ''}>Voir en : ${esc(N[l] || l)}</option>`).join('')
+        + (autres.length ? `<optgroup label="Traduire en…">${autres.map(l => `<option value="${l}">🌐 ${esc(N[l] || l)}</option>`).join('')}</optgroup>` : '');
+    };
     majVoirLangue();
-    $('#voir-langue').onchange = e => { eng.changerLangue(e.target.value); E.rafraichir(); };
+    // « Voir en » : si des textes ne sont pas encore traduits dans cette langue, on les traduit tout de suite
+    $('#voir-langue').onchange = async e => {
+      const l = e.target.value, pr = p.fiche.langue || 'mg', sel = e.target;
+      const manque = l !== pr && p.plans.some(x => (x.calques || []).some(c => c.texte && String(c.texte).trim() && !(c.trad && c.trad[l])));
+      if (manque) {
+        sel.disabled = true; toast('Traduction de l\'invitation en ' + (MoteurInfo.LANGUES[l] || l) + '…', 60000);
+        const r = await traduireManquants(p, [l], false, t => toast(t, 60000));
+        sel.disabled = false; toast(r.message + (r.n ? ' — relisez et corrigez au besoin (texte → Traductions)' : ''), 6000);
+      }
+      eng.changerLangue(l); majVoirLangue(); E.rafraichir();
+    };
     $('#traduire').onclick = () => modaleTraduction(p, () => { majVoirLangue(); E.afficher(); });
     $('#musique-btn').onclick = () => modaleMusique(p, () => { $('#musique-btn').textContent = '♪ ' + (p.musique ? (p.musique.nom || 'Chanson').replace(/\.\w+$/, '').slice(0, 18) : 'Ajouter une chanson'); });
     eng.onTemps = (t) => {
@@ -3606,6 +3624,33 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     }
   }
   /* ---------- Traduction de toute l'invitation ---------- */
+  // Traduit les textes de l'invitation qui n'ont pas encore de traduction (IA d'abord, Google ensuite)
+  async function traduireManquants(p, ls, tout, etat) {
+    const N = MoteurInfo.LANGUES, cs = p.plans.flatMap(x => (x.calques || []).filter(c => c.texte && String(c.texte).trim()));
+    etat = etat || (() => {});
+    let n = 0, err = 0, k = 0; const faits = new Set(), moteurs = new Set();
+    const total = ls.reduce((s2, l) => s2 + cs.filter(c => tout || !(c.trad && c.trad[l])).length, 0);
+    if (!total) return { n: 0, message: 'Tout est déjà traduit (cochez « Retraduire » pour recommencer).' };
+    ls.forEach(l => { if (l !== p.fiche.langue && !(p.langues || []).includes(l)) p.langues = (p.langues || []).concat(l); });
+    for (const l of ls) {
+      const aFaire = cs.filter(c => tout || !(c.trad && c.trad[l]));
+      if (!aFaire.length) continue;
+      etat(`${N[l] || l} : traduction soignée de toute l'invitation…`);
+      try {
+        const { res, moteur } = await traduireInvitationIA(p, aFaire, l, N);
+        aFaire.forEach(c => { const t = res[c.id]; if (typeof t === 'string' && t.trim()) { c.trad = c.trad || {}; c.trad[l] = t; faits.add(l + ':' + c.id); n++; k++; moteurs.add(moteur); } });
+      } catch (e) { console.warn('traduction IA', e.message); etat('IA indisponible : Google Traduction…'); }
+    }
+    for (const l of ls) for (const c of cs) {
+      if (faits.has(l + ':' + c.id)) continue;
+      if (!tout && c.trad && c.trad[l]) continue;
+      moteurs.add('Google');
+      etat(`${N[l] || l} : ${++k} / ${total}…`);
+      try { const t = await traduireTexte(String(c.texte), p.fiche.langue || 'fr', l); if (t && t.trim()) { c.trad = c.trad || {}; c.trad[l] = t; n++; } } catch (e) { err++; console.warn('traduction', e.message); if (err > 5) break; }
+    }
+    enregistrer(p);
+    return { n, err, message: n + ' texte(s) traduit(s)' + (moteurs.size ? ' — ' + [...moteurs].join(' + ') : '') + (err ? ' · ' + err + ' échec(s) : réessayez ou utilisez Claude' : '') };
+  }
   function modaleTraduction(p, apres) {
     const N = MoteurInfo.LANGUES;
     const calques = () => p.plans.flatMap(x => (x.calques || []).filter(c => c.texte && String(c.texte).trim()));
@@ -3636,31 +3681,11 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
       };
       $('#tr-auto', box).onclick = async () => {
         const ls = choisies(); if (!ls.length) return toast('Cochez d\'abord au moins une langue');
-        const b = $('#tr-auto', box), etat = $('#tr-auto-etat', box), tout = $('#tr-tout', box).checked;
-        const cs = calques(); let n = 0, err = 0, k = 0;
-        const total = ls.reduce((s, l) => s + cs.filter(c => tout || !(c.trad && c.trad[l])).length, 0);
-        if (!total) { etat.textContent = 'Tout est déjà traduit (cochez « Retraduire » pour recommencer).'; return; }
+        const b = $('#tr-auto', box), etat = $('#tr-auto-etat', box);
         b.disabled = true;
-        const faits = new Set(); let moteurs = new Set();
-        for (const l of ls) {
-          const aFaire = cs.filter(c => tout || !(c.trad && c.trad[l]));
-          if (!aFaire.length) continue;
-          etat.textContent = `${N[l] || l} : traduction soignée de toute l'invitation…`;
-          try {
-            const { res, moteur } = await traduireInvitationIA(p, aFaire, l, N);
-            aFaire.forEach(c => { const t = res[c.id]; if (typeof t === 'string' && t.trim()) { c.trad = c.trad || {}; c.trad[l] = t; faits.add(l + ':' + c.id); n++; k++; moteurs.add(moteur); } });
-          } catch (e) { console.warn('traduction IA', e.message); etat.textContent = 'IA indisponible (' + e.message.slice(0, 80) + ') : Google Traduction…'; }
-        }
-        for (const l of ls) for (const c of cs) {
-          if (faits.has(l + ':' + c.id)) continue;
-          if (!tout && c.trad && c.trad[l]) continue;
-          moteurs.add('Google');
-          etat.textContent = `${N[l] || l} : ${++k} / ${total}…`;
-          try { const t = await traduireTexte(String(c.texte), p.fiche.langue || 'fr', l); if (t && t.trim()) { c.trad = c.trad || {}; c.trad[l] = t; n++; } } catch (e) { err++; console.warn('traduction', e.message); if (err > 5) break; }
-        }
-        enregistrer(p); b.disabled = false;
-        etat.textContent = n + ' texte(s) traduit(s)' + (moteurs.size ? ' — ' + [...moteurs].join(' + ') : '') + (err ? ' · ' + err + ' échec(s) : réessayez ou utilisez Claude' : '');
-        if (n) { toast(n + ' traductions faites : relisez-les dans l\'aperçu (bouton 🌐)'); if (apres) apres(); }
+        const r = await traduireManquants(p, ls, $('#tr-tout', box).checked, t => { etat.textContent = t; });
+        b.disabled = false; etat.textContent = r.message;
+        if (r.n) { toast(r.n + ' traductions faites : relisez-les dans l\'aperçu (« Voir en »)'); if (apres) apres(); }
       };
       $('#tr-ok', box).onclick = () => {
         let j; try { j = Fabrique.lireJSON($('#tr-rep', box).value); } catch (e) { $('#tr-etat', box).textContent = 'Réponse illisible : collez tout le bloc de code JSON.'; return; }
