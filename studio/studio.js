@@ -756,6 +756,8 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-18-4', date: '18 novembre 2026', titre: 'Le film est comme l\'aperçu du studio', points: [
+      'Film et publication → « Film pour » : par défaut, <b>« Tout le monde — comme l\'aperçu du studio »</b> : le film montre exactement ce que vous voyez dans l\'éditeur (ex. « Manasa olona 4 », 2 adultes / 2 enfants). L\'ancienne version (phrase générale sans nom ni nombre) reste au choix, ainsi qu\'un film par famille.'] },
     { id: '2026-11-18-3', date: '18 novembre 2026', titre: 'Fonds vidéo longs', points: [
       'Importer un fond vidéo long ou lourd (15 s et plus) : si l\'allègement automatique se bloque, le studio garde la vidéo d\'origine et l\'applique quand même au plan, au lieu d\'attendre sans fin.'] },
     { id: '2026-11-18-2', date: '18 novembre 2026', titre: 'Fond qui « ne change pas »', points: [
@@ -4634,8 +4636,8 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
           <p class="muet">Fabrique le film MP4 (ouverture, plans intermédiaires, remerciement) avec la chanson, image par image : le fichier est complet, avec les transitions et les boutons, et se lit partout (téléphone, WhatsApp, Facebook, QuickTime). Comptez environ 1 à 2 minutes ; vous pouvez changer d'onglet pendant ce temps. Tous les plans y sont, confirmation comprise (7 s).</p>
           <div class="apercu-cadre" style="height:340px;margin:0 auto" id="cadre-film"><div id="scene-film"></div></div>
           <div class="progres"><div id="barre"></div></div>
-          <label class="champ">Film pour<select id="film-pour"><option value="">Tout le monde (comme le lien général)</option>${(p.familles || []).filter(f => f.nom).map(f => `<option value="${esc(f.code)}">${esc(f.nom)} (film personnalisé)</option>`).join('')}</select></label>
-          ${p.plans.some(pl => (pl.calques || []).some(c => c.condition === 'famille' && c.type === 'texte' && !c.masque)) ? `<div class="pile" id="film-tous" style="gap:6px"><span class="muet">Textes du lien personnel (« Pour {famille} », « {places} personnes »…) : dans le film pour tout le monde, ils s'affichent avec :</span>
+          <label class="champ">Film pour<select id="film-pour"><option value="__apercu" ${((p.film || {}).pour || '__apercu') === '__apercu' ? 'selected' : ''}>Tout le monde — comme l'aperçu du studio (« ${esc(FAMILLE_TEST.nom)} », ${FAMILLE_TEST.places} pers.)</option><option value="" ${(p.film || {}).pour === '' ? 'selected' : ''}>Tout le monde — sans nom ni nombre (phrase générale)</option>${(p.familles || []).filter(f => f.nom).map(f => `<option value="${esc(f.code)}">${esc(f.nom)} (film personnalisé)</option>`).join('')}</select></label>
+          ${p.plans.some(pl => (pl.calques || []).some(c => c.condition === 'famille' && c.type === 'texte' && !c.masque)) ? `<div class="pile" id="film-tous" style="gap:6px;${((p.film || {}).pour || '__apercu') === '__apercu' ? 'display:none' : ''}"><span class="muet">Textes du lien personnel (« Pour {famille} », « {places} personnes »…) : dans le film pour tout le monde, ils s'affichent avec :</span>
             <div class="deux"><label class="champ">{famille} devient<input type="text" id="film-nom" value="${esc((p.film || {}).nom != null ? p.film.nom : nomFilmDefaut(p))}"></label><label class="champ">{places} devient<input type="text" id="film-places" placeholder="vide = phrase sans nombre" value="${esc((p.film || {}).places || '')}"></label></div></div>` : ''}
           <div id="film-rangement"></div>
           <div class="ligne"><button class="btn plein" id="film">Enregistrer le film</button><button class="btn" id="film-transparent" title="Vidéo WebM avec transparence : les plans « Sans fond » restent transparents, pour la poser sur une autre vidéo">▦ Vidéo sans fond (WebM)</button><span class="muet" id="film-etat"></span></div></div>
@@ -4710,9 +4712,20 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     const fn = $('#film-nom'), fpl = $('#film-places');
     [fn, fpl].forEach(x => x && x.addEventListener('change', () => { p.film = { nom: fn.value, places: fpl.value }; enregistrer(p); if (!eng.famille) eng.setProjet(projetFilm()).then(() => eng.afficherPlan(Math.max(0, p.plans.findIndex(x => x.role === 'confirmation')), 1.5)); }));
     if ($('#lv-etat')) lierLivraison(p, eng);
-    eng.setProjet(projetFilm()).then(() => eng.afficherPlan(0, 0.5));
     const fp = $('#film-pour');
-    if (fp) fp.onchange = () => { const f = (p.familles || []).find(x => x.code === fp.value) || null; eng.famille = f ? Object.assign({}, f) : null; eng.form = Object.assign(eng.form, { adultes: f ? Number(f.adultes) || Number(f.places) || 1 : null, enfants: f ? Number(f.enfants) || 0 : null }); eng.setProjet(f ? p : projetFilm()).then(() => eng.afficherPlan(Math.max(0, p.plans.findIndex(x => x.role !== 'ouverture')), 0.8)); };
+    // « comme l'aperçu du studio » (par défaut) : même famille d'essai, mêmes textes et mêmes nombres que dans l'éditeur
+    const modeApercu = () => {
+      eng.famille = Object.assign({}, FAMILLE_TEST); eng.form = Object.assign(eng.form, { adultes: FAMILLE_TEST.adultes, enfants: FAMILLE_TEST.enfants });
+      const ft2 = $('#film-tous'); if (ft2) ft2.style.display = 'none';
+      return eng.setProjet(Fabrique.confirmationPourTous(p));
+    };
+    if (fp && fp.value === '__apercu') modeApercu().then(() => eng.afficherPlan(0, 0.5));
+    else eng.setProjet(projetFilm()).then(() => eng.afficherPlan(0, 0.5));
+    if (fp) fp.onchange = () => {
+      p.film = Object.assign({}, p.film || {}, { pour: fp.value === '__apercu' || fp.value === '' ? fp.value : (p.film || {}).pour }); enregistrer(p);
+      const ft2 = $('#film-tous'); if (ft2) ft2.style.display = fp.value === '' ? '' : 'none';
+      if (fp.value === '__apercu') return modeApercu().then(() => eng.afficherPlan(Math.max(0, p.plans.findIndex(x => x.role === 'confirmation')), 1.5));
+      const f = (p.familles || []).find(x => x.code === fp.value) || null; eng.famille = f ? Object.assign({}, f) : null; eng.form = Object.assign(eng.form, { adultes: f ? Number(f.adultes) || Number(f.places) || 1 : null, enfants: f ? Number(f.enfants) || 0 : null }); eng.setProjet(f ? p : projetFilm()).then(() => eng.afficherPlan(Math.max(0, p.plans.findIndex(x => x.role !== 'ouverture')), 0.8)); };
     const ft = $('#film-transparent');
     if (ft) ft.onclick = async () => {
       if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) return toast('Ce navigateur ne sait pas enregistrer : utilisez Chrome sur ordinateur');
