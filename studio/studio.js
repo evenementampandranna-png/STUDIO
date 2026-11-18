@@ -756,6 +756,8 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-18-3', date: '18 novembre 2026', titre: 'Fonds vidéo longs', points: [
+      'Importer un fond vidéo long ou lourd (15 s et plus) : si l\'allègement automatique se bloque, le studio garde la vidéo d\'origine et l\'applique quand même au plan, au lieu d\'attendre sans fin.'] },
     { id: '2026-11-18-2', date: '18 novembre 2026', titre: 'Fond qui « ne change pas »', points: [
       'Si une photo ou une vidéo couvre tout le plan (souvent l\'ouverture), le panneau Fond l\'affiche en permanence avec ⚠ et propose <b>○ Masquer</b> ou <b>✕ Retirer</b> : c\'était elle qu\'on voyait à la place du nouveau fond.',
       'Changer de fond oublie la coupe (✂) de l\'ancienne vidéo : le nouveau fond est lu en entier (vous pouvez le recouper).'] },
@@ -5421,6 +5423,13 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
           if (!v.ended) v.requestVideoFrameCallback(image);
         };
         v.onended = () => ok(); v.requestVideoFrameCallback(image); v.play().catch(ko);
+        // garde-fou : si la lecture se bloque (onglet en arrière-plan, vidéo longue ou lourde), on garde la vidéo d'origine
+        let vu = -1, immobile = 0; const t0 = Date.now();
+        const garde = setInterval(() => {
+          if (v.ended) return clearInterval(garde);
+          immobile = v.currentTime > vu + 0.05 ? 0 : immobile + 1; vu = v.currentTime;
+          if (immobile >= 8 || Date.now() - t0 > (duree * 2.5 + 30) * 1000) { clearInterval(garde); try { v.pause(); } catch (e) {} ko(new Error('allègement trop long')); }
+        }, 1000);
       });
       await enc.flush(); muxer.finalize();
       const b = new Blob([muxer.target.buffer], { type: 'video/mp4' });
