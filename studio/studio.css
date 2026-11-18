@@ -632,3 +632,4 @@ div.edition-directe.riche::selection, div.edition-directe.riche *::selection { b
 .barre-style-texte input[type=color] { width: 30px; height: 28px; padding: 1px; border: 1px solid #e3d6cf; border-radius: 8px; background: #fff; cursor: pointer; }
 .barre-style-texte button.on { background: #7a1f2b; color: #fff; border-color: transparent; }
 .barre-style-texte .bst-police { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.avis-cache-fond { background: #fff4e5; border: 1px solid #f0c27a; color: #6b4a12; border-radius: 10px; padding: 8px 10px; font-size: 12.5px; line-height: 1.35; margin: 0 0 8px; }

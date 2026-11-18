@@ -756,6 +756,9 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-18-2', date: '18 novembre 2026', titre: 'Fond qui « ne change pas »', points: [
+      'Si une photo ou une vidéo couvre tout le plan (souvent l\'ouverture), le panneau Fond l\'affiche en permanence avec ⚠ et propose <b>○ Masquer</b> ou <b>✕ Retirer</b> : c\'était elle qu\'on voyait à la place du nouveau fond.',
+      'Changer de fond oublie la coupe (✂) de l\'ancienne vidéo : le nouveau fond est lu en entier (vous pouvez le recouper).'] },
     { id: '2026-11-18-1', date: '18 novembre 2026', titre: 'Film pour tout le monde : les textes remplacés restent à leur place', points: [
       'Dans le film « pour tout le monde », un texte du lien personnel remplacé (ex. « Manasa olona 4 » → « Manasa anao am-pitiavana ») garde le même nombre de lignes que dans l\'éditeur (taille réduite si besoin) et reste dans son fond blanc, même détaché. Pour garder exactement « Manasa olona 4 », écrivez 4 dans « {places} devient » (Film et publication), ou choisissez une famille dans « Film pour ».'] },
     { id: '2026-11-17-8', date: '17 novembre 2026', titre: 'Texte sur cartouche : les coins agrandissent le texte', points: [
@@ -2726,6 +2729,9 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       col.innerHTML = `
         <div class="section-titre" style="margin-top:0">Plan ${E.i + 1} · ${ROLES[pl.role]}</div>
         <details class="bloc" open><summary>Fond</summary>
+          ${(() => { const cv = (pl.calques || []).filter(c => (c.type === 'image' || c.type === 'video') && !c.masque && !c.illu && (Number(c.largeur) || 0) >= 90 && (Number(c.hauteur) || 0) >= 85);
+            return cv.length ? `<div class="avis-cache-fond">⚠ ${cv.length > 1 ? cv.length + ' photos / vidéos couvrent' : (cv[0].type === 'video' ? 'Une vidéo couvre' : 'Une photo couvre')} tout le plan${cv[0].debut ? ' (à partir de ' + cv[0].debut + ' s)' : ''} : le fond est caché derrière, c'est pour ça qu'il semble ne pas changer.
+              <div class="ligne" style="gap:6px;margin-top:6px"><button class="btn petit" data-cache-fond="choisir">Voir ${cv.length > 1 ? 'la 1re' : 'l\'élément'}</button><button class="btn petit" data-cache-fond="masquer">○ Masquer</button><button class="btn petit" data-cache-fond="retirer">✕ Retirer</button></div></div>` : ''; })()}
           <div class="seg fond-types">${[['video', '🎬 Vidéo'], ['image', '🖼 Photo'], ['couleur', '🎨 Couleur'], ['aucun', '▦ Sans fond']].map(([k, n]) => `<button data-ftype="${k}" class="${typeF === k || (k === 'video' && typeF === 'defaut') ? 'on' : ''}">${n}</button>`).join('')}</div>
           ${typeF === 'video' || typeF === 'defaut' ? `
           <div class="fond-actuel"><img src="${esc(vignetteDe(pl.fond.media))}" alt=""><div style="min-width:0"><b>${esc(fondActuel ? fondActuel.nom : '—')}</b>
@@ -2793,13 +2799,22 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       surFond('p-angle', 'oninput', e => { E.modif(); pl.fond.angle = Number(e.target.value); });
       surFond('p-fond-choisir', 'onclick', e => choisirFond(e.currentTarget.dataset.kind));
       surFond('fond-tous', 'onclick', () => { if (!confirm('Mettre ce fond (et ses réglages) sur tous les plans de l\'invitation ?')) return; E.modif(true); const modele = JSON.stringify(pl.fond); p.plans.forEach(x => { x.fond = JSON.parse(modele); }); majFond(true); toast('Fond appliqué à tous les plans (↶ pour annuler)'); });
-      surFond('p-fond', 'onchange', e => { E.modif(true); pl.fond.media = e.target.value; prechargerPlan().then(() => { eng._entrerPlan(); afficher(); }); });
+      surFond('p-fond', 'onchange', e => { E.modif(true); if (pl.fond.media !== e.target.value) delete pl.fond.coupe; pl.fond.media = e.target.value; prechargerPlan().then(() => { eng._entrerPlan(); afficher(); }); });
       if ($('#imp-fond-plan', col)) $('#imp-fond-plan').onchange = async e => {
         const f = e.target.files[0]; if (!f) return;
         const m = await importerFichier(f, 'fond', p.id); sauverMedias(); Equipe.apresAjout(m, p);
-        E.modif(true); pl.fond.media = m.src; prechargerPlan().then(() => { eng._entrerPlan(); afficher(); }); toast('Fond importé et appliqué à ce plan');
+        E.modif(true); delete pl.fond.coupe; pl.fond.media = m.src; prechargerPlan().then(() => { eng._entrerPlan(); afficher(); }); toast('Fond importé et appliqué à ce plan');
       };
       surFond('fond-ia', 'onclick', () => allerCreateur(p, E.i, {}));
+      $$('[data-cache-fond]', col).forEach(b => b.onclick = () => {
+        const cv = (pl.calques || []).filter(c => (c.type === 'image' || c.type === 'video') && !c.masque && !c.illu && (Number(c.largeur) || 0) >= 90 && (Number(c.hauteur) || 0) >= 85);
+        const a = b.dataset.cacheFond; if (!cv.length) return;
+        if (a === 'choisir') { E.sel = cv[0].id; E.rafraichir(); rendreReglages(); return; }
+        E.modif(true);
+        if (a === 'masquer') cv.forEach(c => { c.masque = true; });
+        if (a === 'retirer') pl.calques = pl.calques.filter(c => !cv.includes(c));
+        E.rafraichir(); rendreReglages(); rendrePlans(); toast(a === 'masquer' ? 'Masqué : le fond est visible (○ dans Calques pour le remontrer)' : 'Retiré : le fond est visible (Ctrl+Z pour annuler)');
+      });
       if ($('#fond-couper', col)) $('#fond-couper').onclick = () => modaleCouper(pl.fond, pl.fond.media, () => { E.modif(true); prechargerPlan().then(() => { eng._entrerPlan(); afficher(); }); });
       $('#empiler').onclick = () => { E.modif(true); if (eng.empilerTextes(pl)) { E.rafraichir(); rendreReglages(); toast('Textes réorganisés (↶ pour annuler)'); } else toast('Rien à réorganiser'); };
       $('#p-duree').oninput = e => { E.modif(); pl.duree = Math.max(0, Number(e.target.value) || 0); $('#t-curseur').max = Number(pl.duree) || 6; rendrePlans(); };
@@ -2948,7 +2963,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
         const appliquer = src => {
           E.modif(true);
           const cibles = portee === 'tous' ? p.plans : portee === 'role' ? p.plans.filter(x => x.role === pl.role) : [pl];
-          cibles.forEach(x => { x.fond = x.fond || {}; if (estVideo) { if (x.fond.type === 'image' || x.fond.type === 'couleur' || x.fond.type === 'aucun') delete x.fond.type; x.fond.media = src; } else { x.fond.type = 'image'; x.fond.media = src; delete x.fond.recadrage; } });
+          cibles.forEach(x => { x.fond = x.fond || {}; if (estVideo) { if (x.fond.type === 'image' || x.fond.type === 'couleur' || x.fond.type === 'aucun') delete x.fond.type; if (x.fond.media !== src) delete x.fond.coupe; x.fond.media = src; } else { x.fond.type = 'image'; x.fond.media = src; delete x.fond.recadrage; } });
           fermer(); toast(cibles.length > 1 ? 'Fond mis sur ' + cibles.length + ' plans' : 'Fond changé');
           prechargerPlan().then(() => { eng._entrerPlan(); afficher(); });
         };
@@ -4115,8 +4130,8 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
         if (!surPlan) return finir('Nouveau fond rangé dans la bibliothèque de l\'événement');
         E.modif(true);
         const ancien = pl.fond.media;
-        if ($('#fi-autres', box) && $('#fi-autres', box).checked) p.plans.forEach(x => { if (x.fond && x.fond.media === ancien) x.fond.media = m.src; });
-        pl.fond.media = m.src;
+        if ($('#fi-autres', box) && $('#fi-autres', box).checked) p.plans.forEach(x => { if (x.fond && x.fond.media === ancien) { x.fond.media = m.src; delete x.fond.coupe; } });
+        pl.fond.media = m.src; delete pl.fond.coupe;
         pl.fond_ia = Object.assign(pl.fond_ia || {}, { fichier: m.src });
         enregistrer(p);
         E.eng.precharger().then(() => { E.eng._entrerPlan(); E.afficher(); });
