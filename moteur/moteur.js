@@ -830,7 +830,7 @@
       if (c.miroir_h || c.miroir_v) ctx.scale(c.miroir_h ? -1 : 1, c.miroir_v ? -1 : 1);   // miroir (outil ⇋)
 
       if (c.type === 'texte') {
-        const taille = (Number(c.taille) || 4) / 100 * H;
+        let taille = (Number(c.taille) || 4) / 100 * H;
         const police = c.police || 'Cormorant Garamond';
         ctx.font = `${c.italique ? 'italic ' : ''}${graisse(c)} ${taille}px "${police}", serif, ${POLICE_EMOJI}`;
         ctx.textBaseline = 'middle';
@@ -840,6 +840,8 @@
         if (brut && brut.indexOf('{compte_a_rebours}') >= 0) vars = Object.assign({}, vars, { compte_a_rebours: compteDe(c, this.projet, this.langue || (this.projet.fiche || {}).langue || 'fr') });
         let txt = remplacer(brut, vars);
         if (c.majuscules) txt = txt.toUpperCase();
+        // texte remplacé (film pour tout le monde) : il garde le nombre de lignes d'origine, quitte à être un peu plus petit
+        if (c.lignes_max && !aStyles(c, brut)) { let k = 0; while (k++ < 25 && lignes(ctx, txt, larg).length > Number(c.lignes_max)) { taille *= 0.94; ctx.font = `${c.italique ? 'italic ' : ''}${graisse(c)} ${taille}px "${police}", serif, ${POLICE_EMOJI}`; } }
         // animation du compte à rebours : rythmée par les secondes de l'horloge
         let vagueCompte = 0;
         const animCompte = c.compte_anim || 'pulsation';   // animé par défaut ; « aucune » pour un compteur fixe

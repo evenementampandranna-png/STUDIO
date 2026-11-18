@@ -756,6 +756,8 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-18-1', date: '18 novembre 2026', titre: 'Film pour tout le monde : les textes remplacés restent à leur place', points: [
+      'Dans le film « pour tout le monde », un texte du lien personnel remplacé (ex. « Manasa olona 4 » → « Manasa anao am-pitiavana ») garde le même nombre de lignes que dans l\'éditeur (taille réduite si besoin) et reste dans son fond blanc, même détaché. Pour garder exactement « Manasa olona 4 », écrivez 4 dans « {places} devient » (Film et publication), ou choisissez une famille dans « Film pour ».'] },
     { id: '2026-11-17-8', date: '17 novembre 2026', titre: 'Texte sur cartouche : les coins agrandissent le texte', points: [
       'Texte avec fond (ex. « Manasa olona 4 ») : les <b>coins</b> agrandissent / réduisent le <b>texte</b> (le fond suit) ; côtés = largeur ; haut / bas = hauteur du fond. Pour régler le fond tout seul : ⧉ Détacher le fond.'] },
     { id: '2026-11-17-7', date: '17 novembre 2026', titre: 'Détacher le fond d\'un texte', points: [
@@ -5124,8 +5126,12 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
       return t;
     };
     (d.plans || []).forEach(pl => (pl.calques || []).forEach(c => {
-      if (c.condition !== 'famille' || c.type !== 'texte' || c.masque) return;
+      if (c.condition !== 'famille' || c.masque) return;
+      if (c.type === 'forme') { c.condition = ''; return; }   // le fond détaché d'un texte personnel reste avec son texte
+      if (c.type !== 'texte') return;
+      const avant = c.texte;
       c.condition = ''; c.texte = adapter(c.texte);
+      if (c.texte !== avant) c.lignes_max = Math.max(1, String(avant || '').split('\n').length);   // même nombre de lignes que dans l'éditeur
       if (c.trad) Object.keys(c.trad).forEach(k => { c.trad[k] = adapter(c.trad[k]); });
     }));
     return d;
