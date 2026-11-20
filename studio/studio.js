@@ -733,7 +733,8 @@
   function telecharger(nom, contenu, type) {
     const blob = contenu instanceof Blob ? contenu : new Blob([contenu], { type: type || 'application/json' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nom; document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    // assez longtemps pour que « Enregistrer sous… » du navigateur ait le temps (un film lourd échouait si on libérait trop tôt)
+    setTimeout(() => URL.revokeObjectURL(a.href), 15 * 60 * 1000);
   }
   function dataURLversBlob(d) { const [t, b] = d.split(','); const bin = atob(b); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new Blob([u], { type: t.match(/:(.*?);/)[1] }); }
   const codeFamille = () => { const a = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 8; i++) s += a[Math.floor(Math.random() * a.length)]; return s; };
@@ -756,6 +757,9 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-20-1', date: '20 novembre 2026', titre: 'Films fabriqués : jamais perdus', points: [
+      'Après « Enregistrer le film », une boîte reste affichée : <b>⬇ Télécharger le film</b> (si le téléchargement automatique a échoué), puis 📁 Brouillon ou ✅ Validé. Si l\'ordinateur n\'a plus de place pour le garder, le studio le dit clairement et propose ☁ Envoyer à l\'équipe ; il prévient aussi avant de fermer la page.',
+      'Le téléchargement d\'un film lourd ne s\'interrompt plus quand le navigateur demande « Enregistrer sous… ».'] },
     { id: '2026-11-18-4', date: '18 novembre 2026', titre: 'Le film est comme l\'aperçu du studio', points: [
       'Film et publication → « Film pour » : par défaut, <b>« Tout le monde — comme l\'aperçu du studio »</b> : le film montre exactement ce que vous voyez dans l\'éditeur (ex. « Manasa olona 4 », 2 adultes / 2 enfants). L\'ancienne version (phrase générale sans nom ni nombre) reste au choix, ainsi qu\'un film par famille.'] },
     { id: '2026-11-18-3', date: '18 novembre 2026', titre: 'Fonds vidéo longs', points: [
@@ -4416,6 +4420,8 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
   // Ne renvoie une liste vide que si le fichier n'existe pas encore (sinon on effacerait la vitrine)
   // Met un film de l'équipe sur la vitrine du site
   /* ---------- Mes films : chaque film fabriqué est gardé sur cet ordinateur, rangé dans « Vidéos » ou dans le brouillon de l'événement ---------- */
+  let filmEnAttente = null;   // film fabriqué pas encore rangé / envoyé
+  addEventListener('beforeunload', e => { if (filmEnAttente) { e.preventDefault(); e.returnValue = 'Le film fabriqué n\'est pas encore enregistré.'; } });
   const Films = {
     liste() { return Stock.lire('studio.films', []); },
     ecrire(l) { Stock.ecrire('studio.films', l); },
@@ -4745,15 +4751,30 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
       try {
         const mus = p.musique ? await resoudre(p.musique.src) : null;
         const r = await eng.exporterFilm({ musique: mus, debut: p.musique ? Number(p.musique.debut) || 0 : 0, volume: p.musique ? p.musique.volume : 0.8, etape: t => { $('#film-etat').textContent = t; }, progres: v => { $('#barre').style.width = Math.round(v * 100) + '%'; $('#film-etat').textContent = 'Fabrication du film… ' + Math.round(v * 100) + ' %'; } });
-        telecharger(`${p.slug}-film.${r.extension}`, r.blob);
+        const nomFichier = `${p.slug}-film.${r.extension}`;
+        telecharger(nomFichier, r.blob);
         const sec = (Date.now() - t0) / 1000;
-        // gardé sur cet ordinateur : on demande où le ranger
-        Films.garder(r.blob, p, { duree: r.duree, dossier: 'brouillon' }).then(fl => {
-          const z = $('#film-rangement'); if (!z) return;
-          z.innerHTML = `<div class="carte ligne" style="padding:10px 12px;margin-top:8px;gap:8px;flex-wrap:wrap;background:#fbf7f1"><b>Enregistrer ce film :</b><button class="btn petit" data-ranger="brouillon">📁 En brouillon</button><button class="btn petit plein" data-ranger="videos">✅ Validé (dans 🎬 Vidéos${Equipe.actif() ? ', visible par l\'équipe' : ''})</button><span class="muet">(par défaut : brouillon de l'événement)</span></div>`;
-          $$('[data-ranger]', z).forEach(b => b.onclick = async () => { z.innerHTML = ''; if (b.dataset.ranger === 'videos') { await validerFilm(fl.id); } else { Films.maj(fl.id, { dossier: 'brouillon' }); toast('📁 Film enregistré en brouillon'); } ongletPublier(p); });
-          rendreFilmsEvt();
-        }).catch(e => toast('Film non gardé sur cet ordinateur : ' + e.message));
+        // le film reste en mémoire tant que la page est ouverte, avec une boîte qui ne disparaît pas :
+        // re-télécharger, ranger (brouillon / validé), ou l'envoyer à l'équipe si l'ordinateur n'a plus de place
+        filmEnAttente = r.blob;
+        const z = $('#film-rangement');
+        const boite = (fl, err) => {
+          if (!z) return;
+          z.innerHTML = `<div class="carte pile" style="padding:10px 12px;margin-top:8px;gap:8px;background:#fbf7f1">
+            <div class="ligne" style="gap:8px;flex-wrap:wrap"><b>Film prêt (${(r.blob.size / 1e6).toFixed(1)} Mo)</b><button class="btn petit" data-film-dl>⬇ Télécharger le film</button><span class="muet" style="font-size:12px">si le téléchargement automatique n'est pas dans votre dossier Téléchargements</span></div>
+            ${fl ? `<div class="ligne" style="gap:8px;flex-wrap:wrap"><b>Enregistrer ce film :</b><button class="btn petit" data-ranger="brouillon">📁 En brouillon</button><button class="btn petit plein" data-ranger="videos">✅ Validé (dans 🎬 Vidéos${Equipe.actif() ? ', visible par l\'équipe' : ''})</button></div>`
+              : `<div class="erreur-boite">⚠ Ce film n'a pas pu être gardé dans le studio sur cet ordinateur : ${esc(err || 'erreur')}. Téléchargez-le${Equipe.actif() ? ' ou envoyez-le à l\'équipe' : ''} avant de fermer la page, sinon il sera perdu. (Réglages → Espace : libérez de la place.)</div>
+                 ${Equipe.actif() ? '<div class="ligne"><button class="btn petit plein" data-film-equipe>☁ Envoyer à l\'équipe (🎬 Vidéos)</button></div>' : ''}`}
+          </div>`;
+          const dl = $('[data-film-dl]', z); if (dl) dl.onclick = () => telecharger(nomFichier, r.blob);
+          const eq = $('[data-film-equipe]', z); if (eq) eq.onclick = async () => { eq.disabled = true; eq.textContent = 'Envoi…'; try { await Equipe.ajouterFilm(r.blob, { titre: p.fiche.titre || '' }); filmEnAttente = null; toast('Film envoyé : visible dans 🎬 Vidéos pour toute l\'équipe'); eq.textContent = '✓ Envoyé'; } catch (e) { eq.disabled = false; eq.textContent = '☁ Réessayer l\'envoi'; toast('Envoi impossible : ' + e.message, 6000); } };
+          $$('[data-ranger]', z).forEach(b => b.onclick = async () => { filmEnAttente = null; z.innerHTML = ''; if (b.dataset.ranger === 'videos') { await validerFilm(fl.id); } else { Films.maj(fl.id, { dossier: 'brouillon' }); toast('📁 Film enregistré en brouillon (Films de cet événement, et 🎬 Vidéos → « Voir aussi les brouillons »)', 6000); } ongletPublier(p); });
+        };
+        boite(null, 'enregistrement en cours…');
+        (async () => {
+          try { const est = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate() : null; if (est && est.quota && est.quota - est.usage < r.blob.size * 1.2) throw new Error('plus assez de place dans le navigateur'); } catch (e) { if (/place/.test(e.message)) throw e; }
+          return Films.garder(r.blob, p, { duree: r.duree, dossier: 'brouillon' });
+        })().then(fl => { boite(fl); rendreFilmsEvt(); }).catch(e => { boite(null, e.message); toast('Film non gardé sur cet ordinateur : ' + e.message, 8000); });
         $('#film-etat').textContent = `Film prêt en ${dureeTexte(sec)} (film de ${Math.round(r.duree)} s, ${(r.blob.size / 1e6).toFixed(1)} Mo, ${r.extension.toUpperCase()})`;
         Equipe.noter('film', 'Film — ' + (p.fiche.titre || ''), sec, p);
       } catch (e) { console.error(e); $('#film-etat').textContent = 'Erreur : ' + e.message; }
