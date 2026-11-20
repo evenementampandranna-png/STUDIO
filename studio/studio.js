@@ -757,6 +757,8 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-20-2', date: '20 novembre 2026', titre: 'Film enregistré = rangé dans Vidéos', points: [
+      '« Enregistrer le film » range maintenant le film tout de suite dans <b>🎞 Films de cet événement</b> et dans <b>🎬 Vidéos → Mes films</b>. « 📁 Mettre en brouillon » le garde seulement dans l\'événement ; « ✅ Valider » le partage avec l\'équipe (et le site).'] },
     { id: '2026-11-20-1', date: '20 novembre 2026', titre: 'Films fabriqués : jamais perdus', points: [
       'Après « Enregistrer le film », une boîte reste affichée : <b>⬇ Télécharger le film</b> (si le téléchargement automatique a échoué), puis 📁 Brouillon ou ✅ Validé. Si l\'ordinateur n\'a plus de place pour le garder, le studio le dit clairement et propose ☁ Envoyer à l\'équipe ; il prévient aussi avant de fermer la page.',
       'Le téléchargement d\'un film lourd ne s\'interrompt plus quand le navigateur demande « Enregistrer sous… ».'] },
@@ -4470,7 +4472,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
   // « ✅ Validé » = publié : sur le site directement (studio relié à GitHub), sinon envoyé à l'équipe et publié automatiquement par le studio de l'admin
   async function validerFilm(id) {
     let f = Films.liste().find(x => x.id === id); if (!f) return;
-    Films.maj(id, { dossier: 'videos' });
+    Films.maj(id, { dossier: 'videos', a_valider: false });
     if (peutPublierGitHub()) {
       toast('✅ Validé · publication sur le site…', 6000);
       try {
@@ -4525,7 +4527,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
   async function rattraperFilms() {
     if (filmsRattrapes || !navigator.onLine || !(peutPublierGitHub() || Equipe.actif())) return;
     filmsRattrapes = true;
-    for (const f of Films.liste().filter(x => x.dossier === 'videos' && !x.site && !x.equipe_id)) { try { await validerFilm(f.id); } catch (e) { console.warn('film', f.titre, e.message); } }
+    for (const f of Films.liste().filter(x => x.dossier === 'videos' && !x.a_valider && !x.site && !x.equipe_id)) { try { await validerFilm(f.id); } catch (e) { console.warn('film', f.titre, e.message); } }
   }
   setTimeout(rattraperFilms, 40000);
   // carte d'un film de cet ordinateur (Vidéos et Film et publication)
@@ -4533,10 +4535,10 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     const pr = projets[f.projet];
     return `<div class="carte pile film-local" data-fl="${esc(f.id)}" style="padding:10px">
       <div class="fl-video" style="position:relative;aspect-ratio:9/16;background:#000 center/cover no-repeat url('${esc(f.vignette || '')}');border-radius:8px;cursor:pointer" title="Regarder"><span style="position:absolute;inset:auto 0 0 0;padding:6px;color:#fff;font-size:22px;text-align:center;background:linear-gradient(transparent,rgba(0,0,0,.5))">▶</span></div>
-      <div class="ligne" style="justify-content:space-between;gap:4px;flex-wrap:wrap">${f.dossier === 'videos' ? '<span class="badge ok">✅ Validé</span>' : '<span class="badge">📁 Brouillon</span>'}${f.site ? '<span class="badge ok">✓ sur le site</span>' : ''}${f.equipe_id ? '<span class="badge">équipe ✓</span>' : ''}</div>
+      <div class="ligne" style="justify-content:space-between;gap:4px;flex-wrap:wrap">${f.dossier === 'videos' ? (f.a_valider ? '<span class="badge">🎬 Enregistré</span>' : '<span class="badge ok">✅ Validé</span>') : '<span class="badge">📁 Brouillon</span>'}${f.site ? '<span class="badge ok">✓ sur le site</span>' : ''}${f.equipe_id ? '<span class="badge">équipe ✓</span>' : ''}</div>
       <b style="font-size:13px">${esc(f.titre)}</b><div class="muet" style="font-size:12px">${pr ? '' : 'événement supprimé · '}${new Date(f.date).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}${f.duree ? ' · ' + f.duree + ' s' : ''} · ${(f.taille / 1e6).toFixed(1)} Mo</div>
       <div class="ligne" style="gap:4px;flex-wrap:wrap">
-        ${f.dossier === 'videos' ? `<button class="btn petit plein" data-fl-pub>${f.site ? 'Republier' : 'Publier sur le site'}</button><button class="btn petit" data-fl-dos="brouillon">→ Brouillon</button>` : '<button class="btn petit plein" data-fl-dos="videos" title="Le film passe dans 🎬 Vidéos et peut être publié">✅ Valider</button>'}
+        ${f.dossier === 'videos' ? `${f.a_valider ? '<button class="btn petit plein" data-fl-dos="videos" title="Partager avec l\'équipe (et publier sur le site)">✅ Valider</button>' : ''}<button class="btn petit ${f.a_valider ? '' : 'plein'}" data-fl-pub>${f.site ? 'Republier' : 'Publier sur le site'}</button><button class="btn petit" data-fl-dos="brouillon">→ Brouillon</button>` : '<button class="btn petit plein" data-fl-dos="videos" title="Le film passe dans 🎬 Vidéos et peut être publié">✅ Valider</button>'}
         <button class="btn petit" data-fl-dl>Télécharger</button><button class="btn petit danger" data-fl-suppr title="Supprimer de cet ordinateur">🗑</button></div></div>`;
   }
   function lierFilmsLocaux(zone, relancer) {
@@ -4762,19 +4764,20 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
           if (!z) return;
           z.innerHTML = `<div class="carte pile" style="padding:10px 12px;margin-top:8px;gap:8px;background:#fbf7f1">
             <div class="ligne" style="gap:8px;flex-wrap:wrap"><b>Film prêt (${(r.blob.size / 1e6).toFixed(1)} Mo)</b><button class="btn petit" data-film-dl>⬇ Télécharger le film</button><span class="muet" style="font-size:12px">si le téléchargement automatique n'est pas dans votre dossier Téléchargements</span></div>
-            ${fl ? `<div class="ligne" style="gap:8px;flex-wrap:wrap"><b>Enregistrer ce film :</b><button class="btn petit" data-ranger="brouillon">📁 En brouillon</button><button class="btn petit plein" data-ranger="videos">✅ Validé (dans 🎬 Vidéos${Equipe.actif() ? ', visible par l\'équipe' : ''})</button></div>`
+            ${fl ? `<div class="ok-boite" style="margin:0">✓ Enregistré : dans <b>🎞 Films de cet événement</b> (ci-dessous) et dans <b>🎬 Vidéos → Mes films</b>.</div>
+              <div class="ligne" style="gap:8px;flex-wrap:wrap"><button class="btn petit plein" data-ranger="videos">✅ Valider${peutPublierGitHub() || Equipe.actif() ? ' et partager (équipe' + (peutPublierGitHub() ? ' + site' : '') + ')' : ''}</button><button class="btn petit" data-ranger="brouillon">📁 Mettre en brouillon (seulement dans l'événement)</button></div>`
               : `<div class="erreur-boite">⚠ Ce film n'a pas pu être gardé dans le studio sur cet ordinateur : ${esc(err || 'erreur')}. Téléchargez-le${Equipe.actif() ? ' ou envoyez-le à l\'équipe' : ''} avant de fermer la page, sinon il sera perdu. (Réglages → Espace : libérez de la place.)</div>
                  ${Equipe.actif() ? '<div class="ligne"><button class="btn petit plein" data-film-equipe>☁ Envoyer à l\'équipe (🎬 Vidéos)</button></div>' : ''}`}
           </div>`;
           const dl = $('[data-film-dl]', z); if (dl) dl.onclick = () => telecharger(nomFichier, r.blob);
           const eq = $('[data-film-equipe]', z); if (eq) eq.onclick = async () => { eq.disabled = true; eq.textContent = 'Envoi…'; try { await Equipe.ajouterFilm(r.blob, { titre: p.fiche.titre || '' }); filmEnAttente = null; toast('Film envoyé : visible dans 🎬 Vidéos pour toute l\'équipe'); eq.textContent = '✓ Envoyé'; } catch (e) { eq.disabled = false; eq.textContent = '☁ Réessayer l\'envoi'; toast('Envoi impossible : ' + e.message, 6000); } };
-          $$('[data-ranger]', z).forEach(b => b.onclick = async () => { filmEnAttente = null; z.innerHTML = ''; if (b.dataset.ranger === 'videos') { await validerFilm(fl.id); } else { Films.maj(fl.id, { dossier: 'brouillon' }); toast('📁 Film enregistré en brouillon (Films de cet événement, et 🎬 Vidéos → « Voir aussi les brouillons »)', 6000); } ongletPublier(p); });
+          $$('[data-ranger]', z).forEach(b => b.onclick = async () => { filmEnAttente = null; z.innerHTML = ''; if (b.dataset.ranger === 'videos') { await validerFilm(fl.id); } else { Films.maj(fl.id, { dossier: 'brouillon' }); toast('📁 Film mis en brouillon : il reste dans « Films de cet événement »', 6000); } ongletPublier(p); });
         };
         boite(null, 'enregistrement en cours…');
         (async () => {
           try { const est = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate() : null; if (est && est.quota && est.quota - est.usage < r.blob.size * 1.2) throw new Error('plus assez de place dans le navigateur'); } catch (e) { if (/place/.test(e.message)) throw e; }
-          return Films.garder(r.blob, p, { duree: r.duree, dossier: 'brouillon' });
-        })().then(fl => { boite(fl); rendreFilmsEvt(); }).catch(e => { boite(null, e.message); toast('Film non gardé sur cet ordinateur : ' + e.message, 8000); });
+          const fl0 = await Films.garder(r.blob, p, { duree: r.duree, dossier: 'videos' }); Films.maj(fl0.id, { a_valider: true }); return Films.liste().find(x => x.id === fl0.id) || fl0;   // un film enregistré va dans 🎬 Vidéos ; les brouillons restent dans l'événement
+        })().then(fl => { filmEnAttente = null; boite(fl); rendreFilmsEvt(); toast('🎞 Film enregistré : Films de cet événement + 🎬 Vidéos', 5000); }).catch(e => { boite(null, e.message); toast('Film non gardé sur cet ordinateur : ' + e.message, 8000); });
         $('#film-etat').textContent = `Film prêt en ${dureeTexte(sec)} (film de ${Math.round(r.duree)} s, ${(r.blob.size / 1e6).toFixed(1)} Mo, ${r.extension.toUpperCase()})`;
         Equipe.noter('film', 'Film — ' + (p.fiche.titre || ''), sec, p);
       } catch (e) { console.error(e); $('#film-etat').textContent = 'Erreur : ' + e.message; }
