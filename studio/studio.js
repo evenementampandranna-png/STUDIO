@@ -308,8 +308,30 @@
       const cache = new Map(((this.items && this.items.length) ? this.items : Stock.lire('studio.equipe.biblio', [])).map(x => [x.id, x]));
       const manquants = ids.filter(id => !cache.has(id));
       for (let k = 0; k < manquants.length; k += 100) ((await this.rpc('equipe_biblio_lire_ids', { p_ids: manquants.slice(k, k + 100) })) || []).forEach(x => cache.set(x.id, x));
-      this.items = ids.map(id => cache.get(id)).filter(Boolean);
+      this.items = ids.map(id => cache.get(id)).filter(x => x && x.type !== 'config');
       Stock.ecrire('studio.equipe.biblio', this.items);
+      this.lireConfig();
+    },
+    // Publication partagée par l'admin : chaque membre peut publier / retirer / supprimer sur le site sans passer par l'admin
+    idConfig() { let h = 7; for (const ch of String((reglages.equipe || {}).cle || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return 'cfg-gh-' + h.toString(36); },
+    async lireConfig() {
+      if (!this.actif()) return;
+      try {
+        const it = ((await this.rpc('equipe_biblio_lire_ids', { p_ids: [this.idConfig()] })) || [])[0];
+        let c = null; if (it && it.description) { try { c = JSON.parse(decodeURIComponent(escape(atob(it.description)))); } catch (e) {} }
+        this.config = c;
+        const g = reglages.github || {};
+        if (c && c.token && c.owner && c.repo) { if ((!g.token || g.partage) && g.token !== c.token) { reglages.github = { owner: c.owner, repo: c.repo, token: c.token, branche: 'main', partage: true }; sauverReglages(); } }
+        else if (g.partage) { delete reglages.github; sauverReglages(); }
+      } catch (e) {}
+    },
+    async partagerPublication(oui) {
+      const g = reglages.github || {};
+      if (oui) {
+        if (!(g.owner && g.repo && g.token)) throw new Error('enregistrez d\'abord votre jeton GitHub ci-dessus');
+        await this.rpc('equipe_biblio_ajouter', { p_item: { id: this.idConfig(), auteur: this.membre(), type: 'config', nom: 'Publication partagée', chemin: '', description: btoa(unescape(encodeURIComponent(JSON.stringify({ owner: g.owner, repo: g.repo, token: g.token })))) } });
+      } else await this.rpc('equipe_biblio_supprimer', { p_id: this.idConfig() });
+      await this.lireConfig();
     },
     // éléments de l'équipe présentés comme des fichiers de la bibliothèque (sauf ceux qui sont déjà les miens en local)
     medias() {
@@ -757,6 +779,9 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-21-1', date: '21 novembre 2026', titre: 'Chaque membre publie, utilise et supprime les vidéos', points: [
+      '<b>Admin</b> : Réglages → Publication sur GitHub Pages → <b>« Partager avec l\'équipe »</b>. Chaque membre peut alors, sans passer par l\'admin, <b>publier</b> sur le site, <b>retirer</b> du site et <b>supprimer</b> (🗑) les vidéos de l\'équipe — les siennes et celles des autres. « Arrêter le partage » reprend la main.',
+      'Tout le monde voit toutes les vidéos et tous les fonds de l\'équipe (🎬 Vidéos, Bibliothèque) et peut les télécharger et les utiliser comme fond.'] },
     { id: '2026-11-20-2', date: '20 novembre 2026', titre: 'Film enregistré = rangé dans Vidéos', points: [
       '« Enregistrer le film » range maintenant le film tout de suite dans <b>🎞 Films de cet événement</b> et dans <b>🎬 Vidéos → Mes films</b>. « 📁 Mettre en brouillon » le garde seulement dans l\'événement ; « ✅ Valider » le partage avec l\'équipe (et le site).'] },
     { id: '2026-11-20-1', date: '20 novembre 2026', titre: 'Films fabriqués : jamais perdus', points: [
@@ -5669,7 +5694,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
         <video src="${esc(u)}" ${f.chemin && !/^site:/.test(f.chemin) ? `data-chemin="${esc(f.chemin)}"` : ''} poster="${esc(f.vignette || '')}" controls preload="none" playsinline style="width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:8px;background:#000"></video>
         <div class="ligne" style="justify-content:space-between">${!estFilm ? '<span class="badge">🎞 fond vidéo</span>' : sv ? '<span class="badge ok">✓ sur le site</span>' : '<span class="badge">pas encore publié</span>'}${peutPublier && estFilm && !sv ? `<input type="checkbox" data-vp-sel="${esc(f.id)}" title="Sélectionner">` : ''}</div>
         <b style="font-size:13px">${esc((f.evenement || f.nom || '').replace(/^Film — /, ''))}</b><div class="muet" style="font-size:12px">par <b>${esc(f.auteur || '—')}</b> · ${date(f.cree)}${f.duree ? ' · ' + Math.round(f.duree) + ' s' : ''}</div>
-        <div class="ligne"><a class="btn petit" href="${esc(u)}" download target="_blank">Télécharger</a>${!estFilm ? '<a class="btn petit" href="#/bibliotheque">Dans la bibliothèque</a>' : !peutPublier ? (sv ? '' : demandesFilms[f.id] ? `<span class="badge">${demandesFilms[f.id] === 'attente' ? '⏳ demandé' : demandesFilms[f.id] === 'refusee' ? 'refusé' : ''}</span>` : `<button class="btn petit plein" data-vp-demander="${esc(f.id)}">Demander la publication</button>`) : peutPublier ? (sv ? `<button class="btn petit danger" data-vp-retirer="${esc(f.id)}">Retirer du site</button>` : `<button class="btn petit plein" data-vp-pub="${esc(f.id)}">Publier sur le site</button>`) : ''}</div></div>`; }).join('') || '<p class="muet">Aucune vidéo ici. Les films fabriqués par l\'équipe arrivent tout seuls ; on peut aussi en ajouter avec « + Ajouter un film terminé ».</p>'}</div>`;
+        <div class="ligne"><a class="btn petit" href="${esc(u)}" download target="_blank">Télécharger</a>${!estFilm ? '<a class="btn petit" href="#/bibliotheque">Dans la bibliothèque</a>' : !peutPublier ? (sv ? '' : demandesFilms[f.id] ? `<span class="badge">${demandesFilms[f.id] === 'attente' ? '⏳ demandé' : demandesFilms[f.id] === 'refusee' ? 'refusé' : ''}</span>` : `<button class="btn petit plein" data-vp-demander="${esc(f.id)}">Demander la publication</button>`) : peutPublier ? (sv ? `<button class="btn petit danger" data-vp-retirer="${esc(f.id)}">Retirer du site</button>` : `<button class="btn petit plein" data-vp-pub="${esc(f.id)}">Publier sur le site</button>`) : ''}<button class="btn petit danger" data-vp-suppr="${esc(f.id)}" title="Supprimer cette vidéo pour toute l'équipe${sv ? ' (et du site)' : ''}">🗑</button></div></div>`; }).join('') || '<p class="muet">Aucune vidéo ici. Les films fabriqués par l\'équipe arrivent tout seuls ; on peut aussi en ajouter avec « + Ajouter un film terminé ».</p>'}</div>`;
     $$('[data-vpf]', zone).forEach(b => b.onclick = () => { vpFiltre.etat = b.dataset.vpf; Stock.ecrire('studio.vp.filtre', vpFiltre); vueVideos(); });
     $$('video[data-chemin]', zone).forEach(v => { IDB.lire('cache:' + Equipe.url(v.dataset.chemin).split('/object/public/')[1]).then(b => { if (b && b.size) v.src = URL.createObjectURL(b); }).catch(() => {}); });
     $$('[data-vpt]', zone).forEach(b => b.onclick = () => { vpFiltre.type = b.dataset.vpt; Stock.ecrire('studio.vp.filtre', vpFiltre); vueVideos(); });
@@ -5698,6 +5723,26 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     $('#vp-pub-sel', zone).onclick = () => publierListe(sel());
     $('#vp-pub-tout', zone).onclick = () => { const l = films.filter(f => !pub(f)); if (l.length && confirm(`Publier sur le site les ${l.length} vidéo(s) de l'équipe qui n'y sont pas encore ?`)) publierListe(l); };
     $$('[data-vp-pub]', zone).forEach(b => b.onclick = () => publierListe([films.find(f => f.id === b.dataset.vpPub)]));
+    // 🗑 chaque membre peut supprimer une vidéo de l'équipe (et la retirer du site si elle y est)
+    $$('[data-vp-suppr]', zone).forEach(b => b.onclick = async () => {
+      const f = tout.find(x => x.id === b.dataset.vpSuppr) || films.find(x => x.id === b.dataset.vpSuppr); if (!f) return;
+      const nom = (f.evenement || f.nom || '').replace(/^Film — /, ''), slug = /^site:/.test(f.id) ? f.id.slice(5) : 'film-' + String(f.id).replace(/^site-/, '');
+      const surLeSite = f.type === 'film' && pub(f);
+      if (surLeSite && !peutPublier) return toast('Cette vidéo est sur le site : il faut la publication (partagée par l\'admin dans Réglages) pour la retirer');
+      if (!confirm(`Supprimer « ${nom} » pour toute l'équipe ?${surLeSite ? '\nElle sera aussi retirée du site.' : ''}\n\nCette suppression est définitive.`)) return;
+      b.disabled = true;
+      try {
+        if (surLeSite || /^site:/.test(f.chemin || '')) {
+          const index = await lireVitrine(), e = index.find(x => x.slug === slug);
+          if (e) await ecrireVitrine(index.filter(x => x.slug !== slug), 'Vitrine : suppression film ' + nom);
+          for (const c of [e && e.video, e && e.vignette, /^site:/.test(f.chemin || '') ? f.chemin.slice(5) : null]) if (c && /^medias\/films\//.test(c)) { try { await GitHub.supprimer(c, 'Suppression film ' + nom); } catch (er) { console.warn(er.message); } }
+        }
+        if (f.chemin && !/^site:/.test(f.chemin)) await Equipe.supprimerFichier(f.chemin);
+        if (!/^site:/.test(f.id)) await Equipe.rpc('equipe_biblio_supprimer', { p_id: f.id });
+        Equipe.items = (Equipe.items || []).filter(x => x.id !== f.id); Stock.ecrire('studio.equipe.biblio', Equipe.items);
+        toast('« ' + nom + ' » supprimée' + (surLeSite ? ' (et retirée du site dans quelques minutes)' : ''), 5000); setTimeout(vueVideos, 600);
+      } catch (err) { toast('Suppression impossible : ' + err.message, 6000); b.disabled = false; }
+    });
     $$('[data-vp-retirer]', zone).forEach(b => b.onclick = async () => {
       if (!confirm('Retirer cette vidéo du site ?')) return;
       b.disabled = true;
@@ -5939,6 +5984,10 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
           <div class="deux"><label class="champ">Compte GitHub<input type="text" id="g-owner" value="${esc(g.owner || depotDuSite().owner)}" placeholder="votre-compte"></label><label class="champ">Dépôt<input type="text" id="g-repo" value="${esc(g.repo || depotDuSite().repo)}" placeholder="STUDIO"></label></div>
           <label class="champ">Jeton d'accès (fine-grained token, droit « Contents : Read and write » sur ce dépôt)<input type="password" id="g-token" value="${esc(g.token)}" placeholder="github_pat_…"></label>
           <div class="ligne"><button class="btn plein" id="g-ok">Enregistrer</button><button class="btn" id="g-test">Tester</button><span class="muet" id="g-etat"></span></div>
+          ${g.partage ? '<div class="ok-boite" style="margin:0">✓ Publication partagée par l\'admin de l\'équipe : vous pouvez publier, retirer et supprimer sur le site sans attendre l\'admin.</div>' : ''}
+          ${Equipe.actif() && Equipe.admin() ? `<div class="carte pile" style="padding:10px;background:#fbf7f1;gap:6px"><b>👥 Publication pour toute l'équipe</b>
+            <span class="muet" style="font-size:12.5px">Les membres reçoivent ce jeton : chacun peut publier les vidéos et les invitations sur le site, les retirer et les supprimer, sans passer par vous. Si un membre quitte l'équipe, créez un nouveau jeton sur GitHub et repartagez.</span>
+            <div class="ligne"><button class="btn petit plein" id="g-partager">Partager avec l'équipe</button><button class="btn petit" id="g-departager">Arrêter le partage</button><span class="muet" id="g-partage-etat">${Equipe.config ? '✓ partagé' : 'non partagé'}</span></div></div>` : ''}
           <details><summary class="muet" style="cursor:pointer">Comment obtenir le jeton ?</summary><ol class="muet">
             <li><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Ouvrir la page de création du jeton ↗</a> (connecté au compte <b>${esc(depotDuSite().owner || 'du site')}</b>), ou sur github.com : photo de profil → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token.</li>
             <li>Repository access : Only select repositories → choisir le dépôt du studio (<b>${esc(depotDuSite().repo || 'STUDIO')}</b>).</li>
@@ -6023,7 +6072,9 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
           <div class="ligne"><button class="btn" id="exp-tout">Exporter tous les projets</button><label class="btn">Importer une sauvegarde<input type="file" id="imp-tout" accept=".json" hidden></label></div>
         </div>
       </div>`;
-    $('#g-ok').onclick = () => { reglages.github = { owner: $('#g-owner').value.trim(), repo: $('#g-repo').value.trim(), token: $('#g-token').value.trim(), branche: 'main' }; sauverReglages(); toast('Enregistré'); };
+    const gp = $('#g-partager'); if (gp) gp.onclick = async () => { try { await Equipe.partagerPublication(true); $('#g-partage-etat').textContent = '✓ partagé'; toast('Publication partagée : chaque membre peut publier, retirer et supprimer (à sa prochaine ouverture du studio)', 7000); } catch (e) { toast(e.message, 6000); } };
+    const gd = $('#g-departager'); if (gd) gd.onclick = async () => { try { await Equipe.partagerPublication(false); $('#g-partage-etat').textContent = 'non partagé'; toast('Partage arrêté (pensez à supprimer l\'ancien jeton sur GitHub)', 7000); } catch (e) { toast(e.message, 6000); } };
+    $('#g-ok').onclick = () => { reglages.github = { owner: $('#g-owner').value.trim(), repo: $('#g-repo').value.trim(), token: $('#g-token').value.trim(), branche: 'main' }; sauverReglages(); toast('Enregistré'); if (Equipe.actif() && Equipe.admin() && Equipe.config) Equipe.partagerPublication(true).then(() => toast('Nouveau jeton partagé avec l\'équipe')).catch(() => {}); };
     $('#g-test').onclick = async () => {
       reglages.github = { owner: $('#g-owner').value.trim(), repo: $('#g-repo').value.trim(), token: $('#g-token').value.trim(), branche: 'main' };
       sauverReglages();
