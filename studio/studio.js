@@ -779,6 +779,9 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-21-2', date: '21 novembre 2026', titre: 'Publier et retirer tous les films', points: [
+      'Chaque film terminé (🎬 Vidéos, Mes films, Films de l\'événement, brouillon compris) a <b>Publier sur le site</b>, et une fois publié <b>Retirer du site</b> (le film est enlevé de la rubrique et ses fichiers supprimés du site ; il reste sur l\'ordinateur).',
+      'Admin : Réglages → Publication → <b>🔗 Copier le lien de publication</b> à envoyer aux membres : en l\'ouvrant une fois, ils peuvent publier et retirer, même quand la base de l\'équipe est bloquée.'] },
     { id: '2026-11-21-1', date: '21 novembre 2026', titre: 'Chaque membre publie, utilise et supprime les vidéos', points: [
       '<b>Admin</b> : Réglages → Publication sur GitHub Pages → <b>« Partager avec l\'équipe »</b>. Chaque membre peut alors, sans passer par l\'admin, <b>publier</b> sur le site, <b>retirer</b> du site et <b>supprimer</b> (🗑) les vidéos de l\'équipe — les siennes et celles des autres. « Arrêter le partage » reprend la main.',
       'Tout le monde voit toutes les vidéos et tous les fonds de l\'équipe (🎬 Vidéos, Bibliothèque) et peut les télécharger et les utiliser comme fond.'] },
@@ -1143,6 +1146,12 @@
     if (h[0] === 'guide') return vueGuide();
     if (h[0] === 'nouveautes') return vueNouveautes();
     if (h[0] === 'rejoindre') return vueRejoindre(h[1], h[2]);
+    if (h[0] === 'publication') {
+      try { const c = deB64(h[1]); if (!c.o || !c.r || !c.t) throw new Error('lien incomplet');
+        const g = reglages.github || {}; if (!g.token || g.partage) { reglages.github = { owner: c.o, repo: c.r, token: c.t, branche: 'main', partage: true }; sauverReglages(); }
+        toast('✓ Publication activée : vous pouvez publier et retirer les vidéos (🎬 Vidéos)', 8000); } catch (e) { toast('Lien de publication invalide : ' + e.message, 6000); }
+      location.hash = '#/videos'; return;
+    }
     if (h[0] === 'equipe') return vueEquipe();
     if (h[0] === 'videos') return vueVideos();
     if (h[0] === 'commandes') return vueCommandes(h[1]);
@@ -4478,6 +4487,12 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     await ecrireVitrine(index, 'Vitrine : film ' + f.titre);
     Films.maj(f.id, { site: new Date().toISOString() });
   }
+  // retire un film du site : enlevé de la vitrine, fichiers supprimés du dépôt
+  async function retirerFilmSite(slug) {
+    const index = await lireVitrine(), e = index.find(x => x.slug === slug);
+    await ecrireVitrine(index.filter(x => x.slug !== slug), 'Vitrine : retrait film ' + slug);
+    for (const c of [e && e.video, e && e.vignette]) if (c && /^medias\/films\//.test(c)) { try { await GitHub.supprimer(c, 'Retrait ' + slug); } catch (er) { console.warn(er.message); } }
+  }
   function peutPublierGitHub() { const g = reglages.github || {}; return !!(g.owner && g.repo && g.token); }
   // pas de GitHub sur ce studio : les deux façons de publier
   function aidePublier(f, apres) {
@@ -4563,7 +4578,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
       <div class="ligne" style="justify-content:space-between;gap:4px;flex-wrap:wrap">${f.dossier === 'videos' ? (f.a_valider ? '<span class="badge">🎬 Enregistré</span>' : '<span class="badge ok">✅ Validé</span>') : '<span class="badge">📁 Brouillon</span>'}${f.site ? '<span class="badge ok">✓ sur le site</span>' : ''}${f.equipe_id ? '<span class="badge">équipe ✓</span>' : ''}</div>
       <b style="font-size:13px">${esc(f.titre)}</b><div class="muet" style="font-size:12px">${pr ? '' : 'événement supprimé · '}${new Date(f.date).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}${f.duree ? ' · ' + f.duree + ' s' : ''} · ${(f.taille / 1e6).toFixed(1)} Mo</div>
       <div class="ligne" style="gap:4px;flex-wrap:wrap">
-        ${f.dossier === 'videos' ? `${f.a_valider ? '<button class="btn petit plein" data-fl-dos="videos" title="Partager avec l\'équipe (et publier sur le site)">✅ Valider</button>' : ''}<button class="btn petit ${f.a_valider ? '' : 'plein'}" data-fl-pub>${f.site ? 'Republier' : 'Publier sur le site'}</button><button class="btn petit" data-fl-dos="brouillon">→ Brouillon</button>` : '<button class="btn petit plein" data-fl-dos="videos" title="Le film passe dans 🎬 Vidéos et peut être publié">✅ Valider</button>'}
+        ${f.dossier === 'videos' ? `${f.a_valider ? '<button class="btn petit plein" data-fl-dos="videos" title="Partager avec l\'équipe (et publier sur le site)">✅ Valider</button>' : ''}<button class="btn petit ${f.a_valider ? '' : 'plein'}" data-fl-pub>${f.site ? 'Republier' : 'Publier sur le site'}</button><button class="btn petit" data-fl-dos="brouillon">→ Brouillon</button>` : `<button class="btn petit plein" data-fl-dos="videos" title="Le film passe dans 🎬 Vidéos et peut être publié">✅ Valider</button><button class="btn petit" data-fl-pub>${f.site ? 'Republier' : 'Publier sur le site'}</button>`}${f.site ? '<button class="btn petit danger" data-fl-ret>Retirer du site</button>' : ''}
         <button class="btn petit" data-fl-dl>Télécharger</button><button class="btn petit danger" data-fl-suppr title="Supprimer de cet ordinateur">🗑</button></div></div>`;
   }
   function lierFilmsLocaux(zone, relancer) {
@@ -4579,6 +4594,12 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
         toast('📁 Film remis en brouillon');
         relancer();
       });
+      const fr = $('[data-fl-ret]', el); if (fr) fr.onclick = async e => {
+        if (!peutPublierGitHub()) return aidePublier(f(), relancer);
+        if (!confirm('Retirer « ' + f().titre + ' » du site ? (le film reste sur cet ordinateur)')) return;
+        const b = e.currentTarget; b.disabled = true; b.textContent = 'Retrait…';
+        try { await retirerFilmSite('film-' + f().id); Films.maj(id, { site: null }); toast('Film retiré du site ✓ (dans quelques minutes)'); relancer(); } catch (er) { toast('Échec : ' + er.message); b.disabled = false; b.textContent = 'Retirer du site'; }
+      };
       const fp = $('[data-fl-pub]', el); if (fp) fp.onclick = async e => {
         if (!peutPublierGitHub()) return aidePublier(f(), relancer);
         const b = e.currentTarget; b.disabled = true; b.textContent = 'Publication…';
@@ -5746,7 +5767,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     $$('[data-vp-retirer]', zone).forEach(b => b.onclick = async () => {
       if (!confirm('Retirer cette vidéo du site ?')) return;
       b.disabled = true;
-      try { const index = (await lireVitrine()).filter(x => x.slug !== 'film-' + b.dataset.vpRetirer); await ecrireVitrine(index, 'Vitrine : retrait film'); toast('Vidéo retirée du site (dans quelques minutes)'); setTimeout(vueVideos, 800); } catch (err) { toast(err.message); b.disabled = false; }
+      try { const id = b.dataset.vpRetirer; await retirerFilmSite(/^site:/.test(id) ? id.slice(5) : 'film-' + id.replace(/^site-/, '')); Films.liste().filter(x => 'film-' + x.id === 'film-' + id.replace(/^site-/, '')).forEach(x => Films.maj(x.id, { site: null })); toast('Vidéo retirée du site (dans quelques minutes)'); setTimeout(vueVideos, 800); } catch (err) { toast(err.message); b.disabled = false; }
     });
   }
 
@@ -5985,8 +6006,9 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
           <label class="champ">Jeton d'accès (fine-grained token, droit « Contents : Read and write » sur ce dépôt)<input type="password" id="g-token" value="${esc(g.token)}" placeholder="github_pat_…"></label>
           <div class="ligne"><button class="btn plein" id="g-ok">Enregistrer</button><button class="btn" id="g-test">Tester</button><span class="muet" id="g-etat"></span></div>
           ${g.partage ? '<div class="ok-boite" style="margin:0">✓ Publication partagée par l\'admin de l\'équipe : vous pouvez publier, retirer et supprimer sur le site sans attendre l\'admin.</div>' : ''}
-          ${Equipe.actif() && Equipe.admin() ? `<div class="carte pile" style="padding:10px;background:#fbf7f1;gap:6px"><b>👥 Publication pour toute l'équipe</b>
+          ${(Equipe.admin() || !Equipe.actif()) && g.token && !g.partage ? `<div class="carte pile" style="padding:10px;background:#fbf7f1;gap:6px"><b>👥 Publication pour toute l'équipe</b>
             <span class="muet" style="font-size:12.5px">Les membres reçoivent ce jeton : chacun peut publier les vidéos et les invitations sur le site, les retirer et les supprimer, sans passer par vous. Si un membre quitte l'équipe, créez un nouveau jeton sur GitHub et repartagez.</span>
+            <div class="ligne"><button class="btn petit" id="g-lien" title="Fonctionne même quand la base de l'équipe est bloquée">🔗 Copier le lien de publication (à envoyer aux membres)</button></div>
             <div class="ligne"><button class="btn petit plein" id="g-partager">Partager avec l'équipe</button><button class="btn petit" id="g-departager">Arrêter le partage</button><span class="muet" id="g-partage-etat">${Equipe.config ? '✓ partagé' : 'non partagé'}</span></div></div>` : ''}
           <details><summary class="muet" style="cursor:pointer">Comment obtenir le jeton ?</summary><ol class="muet">
             <li><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Ouvrir la page de création du jeton ↗</a> (connecté au compte <b>${esc(depotDuSite().owner || 'du site')}</b>), ou sur github.com : photo de profil → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token.</li>
@@ -6072,6 +6094,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
           <div class="ligne"><button class="btn" id="exp-tout">Exporter tous les projets</button><label class="btn">Importer une sauvegarde<input type="file" id="imp-tout" accept=".json" hidden></label></div>
         </div>
       </div>`;
+    const gl = $('#g-lien'); if (gl) gl.onclick = () => { const g2 = reglages.github || {}; const u = location.href.replace(/#.*$/, '').replace(/\?.*$/, '') + '#/publication/' + b64({ o: g2.owner, r: g2.repo, t: g2.token }); copier(u).then(() => toast('Lien copié : envoyez-le aux membres (WhatsApp…). En l\'ouvrant une fois, ils peuvent publier et retirer les vidéos.', 8000)); };
     const gp = $('#g-partager'); if (gp) gp.onclick = async () => { try { await Equipe.partagerPublication(true); $('#g-partage-etat').textContent = '✓ partagé'; toast('Publication partagée : chaque membre peut publier, retirer et supprimer (à sa prochaine ouverture du studio)', 7000); } catch (e) { toast(e.message, 6000); } };
     const gd = $('#g-departager'); if (gd) gd.onclick = async () => { try { await Equipe.partagerPublication(false); $('#g-partage-etat').textContent = 'non partagé'; toast('Partage arrêté (pensez à supprimer l\'ancien jeton sur GitHub)', 7000); } catch (e) { toast(e.message, 6000); } };
     $('#g-ok').onclick = () => { reglages.github = { owner: $('#g-owner').value.trim(), repo: $('#g-repo').value.trim(), token: $('#g-token').value.trim(), branche: 'main' }; sauverReglages(); toast('Enregistré'); if (Equipe.actif() && Equipe.admin() && Equipe.config) Equipe.partagerPublication(true).then(() => toast('Nouveau jeton partagé avec l\'équipe')).catch(() => {}); };
