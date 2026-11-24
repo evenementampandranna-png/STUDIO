@@ -792,6 +792,9 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-24-3', date: '24 novembre 2026', titre: 'Publier une vidéo : on voit où ça en est', points: [
+      '🎬 Vidéos → « Publier sur le site » : seul le bouton de cette vidéo est grisé et affiche l\'avancement (Récupération … Mo, Envoi sur le site, ✓ Publié). Les autres restent utilisables (ils attendent leur tour).',
+      'Une vidéo publiée a le badge vert <b>« ✓ publié sur le site ↗ »</b> (clic = la voir sur le site) et se retrouve dans le filtre « Sur le site ».'] },
     { id: '2026-11-24-2', date: '24 novembre 2026', titre: 'Publier sur la vitrine : plus de blocage sans fin', points: [
       '« Publier sur la vitrine » d\'une invitation de l\'équipe : la copie des fichiers affiche sa progression (Mo copiés) et s\'arrête avec un message clair si elle ne progresse plus, au lieu de rester bloquée sur « Copie du fichier d\'équipe… ».'] },
     { id: '2026-11-24-1', date: '24 novembre 2026', titre: 'Les vidéos de chacun visibles par tous', points: [
@@ -4663,25 +4666,36 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
   // Supabase (base + espace d'équipe) bloqué par le quota, ou injoignable
   function baseBloquee(e) { return /restricted|exceed_\w*quota|\b402\b|spend cap|Failed to fetch|NetworkError/i.test((e && e.message) || String(e || '')); }
   // le fichier d'un film de l'équipe : copie déjà gardée sur cet ordinateur, sinon le cache du navigateur, sinon Supabase
-  async function blobFilmEquipe(f) {
-    const url = Equipe.url(f.chemin);
-    try { const b = await IDB.lire('cache:' + Equipe.url(f.chemin).split('/object/public/')[1]); if (b && b.size) return b; } catch (e) {}
-    const local = Films.liste().find(x => x.equipe_id === f.id); if (local) { try { return await Films.blob(local); } catch (e) {} }
-    for (const mode of ['force-cache', 'default']) {
-      const r = await fetch(url, { cache: mode }).catch(() => null);
-      if (r && r.ok) { const b = await r.blob(); IDB.mettre('cache:' + Equipe.url(f.chemin).split('/object/public/')[1], b).catch(() => {}); return b; }
+  async function blobFilmEquipe(f, suivi) {
+    const url = Equipe.url(f.chemin), court = (pr, ms) => Promise.race([pr, new Promise(ok => setTimeout(() => ok(null), ms))]);
+    try { const b = await court(IDB.lire('cache:' + Equipe.url(f.chemin).split('/object/public/')[1]), 3000); if (b && b.size) return b; } catch (e) {}
+    const local = Films.liste().find(x => x.equipe_id === f.id); if (local) { try { const b = await court(Films.blob(local), 3000); if (b && b.size) return b; } catch (e) {} }
+    for (const mode of ['default']) {
+      const ctl = new AbortController(); let dernier = Date.now(); const garde = setInterval(() => { if (Date.now() - dernier > 45000) ctl.abort(); }, 5000);
+      let r = null; try { r = await fetch(url, { cache: mode, signal: ctl.signal }); } catch (e) { clearInterval(garde); throw new Error(e.name === 'AbortError' ? 'le téléchargement du film ne progresse plus — réessayez' : e.message); }
+      if (r && r.ok) {
+        try {
+          const total = Number(r.headers.get('content-length')) || 0, parts = []; let n = 0; const lec = r.body.getReader();
+          for (;;) { const { done, value } = await lec.read(); if (done) break; parts.push(value); n += value.length; dernier = Date.now(); suivi && suivi('Récupération ' + (n / 1e6).toFixed(1) + (total ? ' / ' + (total / 1e6).toFixed(1) : '') + ' Mo…'); }
+          const b = new Blob(parts, { type: r.headers.get('content-type') || 'video/mp4' }); return b;
+        } catch (e) { throw new Error(e.name === 'AbortError' ? 'le téléchargement du film ne progresse plus — réessayez' : e.message); }
+        finally { clearInterval(garde); }
+      }
+      clearInterval(garde);
       if (r && r.status !== 402 && r.status !== 0) throw new Error('film introuvable (' + r.status + ')');
     }
     const e = new Error('bloqué'); e.bloque = true; throw e;
   }
-  async function publierFilmVitrine(f) {
-    const blob = await blobFilmEquipe(f);
+  async function publierFilmVitrine(f, suivi) {
+    const blob = await blobFilmEquipe(f, suivi);
+    suivi && suivi('Envoi sur le site (' + (blob.size / 1e6).toFixed(1) + ' Mo)…');
     const ext = (f.chemin.split('.').pop() || 'mp4').toLowerCase(), chemin = 'medias/films/' + f.id + '.' + ext;
     await GitHub.envoyer(chemin, blob, 'Film ' + f.nom);
     let vignette = 'fonds/fond_2.jpg';
     if (/^data:/.test(f.vignette || '')) { vignette = 'medias/films/' + f.id + '.jpg'; await GitHub.envoyer(vignette, dataURLversBlob(f.vignette), 'Vignette ' + f.nom); }
     const index = (await lireVitrine()).filter(x => x.slug !== 'film-' + f.id);
     index.unshift({ slug: 'film-' + f.id, film: true, video: chemin, titre: (f.evenement || f.nom.replace(/^Film — /, '')), type: 'Film vidéo', vignette, auteur: f.auteur || '', date: new Date().toISOString().slice(0, 10) });
+    suivi && suivi('Ajout à la rubrique…');
     await ecrireVitrine(index, 'Vitrine : film ' + f.nom);
   }
   // Met une invitation de l'équipe sur la vitrine (noms remplacés par des exemples)
@@ -5766,7 +5780,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
       <div class="muet" id="vp-etat" style="margin:0 0 8px"></div>
       <div class="grille" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr))">${visibles.map(f => { const u = f.url || Equipe.url(f.chemin), sv = pub(f), estFilm = f.type === 'film'; return `<div class="carte pile" style="padding:10px">
         <video src="${esc(u)}" ${f.chemin && !/^site:/.test(f.chemin) ? `data-chemin="${esc(f.chemin)}"` : ''} poster="${esc(f.vignette || '')}" controls preload="none" playsinline style="width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:8px;background:#000"></video>
-        <div class="ligne" style="justify-content:space-between">${!estFilm ? '<span class="badge">🎞 fond vidéo</span>' : sv ? '<span class="badge ok">✓ sur le site</span>' : '<span class="badge">pas encore publié</span>'}${peutPublier && estFilm && !sv ? `<input type="checkbox" data-vp-sel="${esc(f.id)}" title="Sélectionner">` : ''}</div>
+        <div class="ligne" style="justify-content:space-between">${!estFilm ? '<span class="badge">🎞 fond vidéo</span>' : sv ? '<a class="badge ok" href="' + urlSite() + '#films" target="_blank" title="Voir sur le site">✓ publié sur le site ↗</a>' : '<span class="badge">pas encore publié</span>'}${peutPublier && estFilm && !sv ? `<input type="checkbox" data-vp-sel="${esc(f.id)}" title="Sélectionner">` : ''}</div>
         <b style="font-size:13px">${esc((f.evenement || f.nom || '').replace(/^Film — /, ''))}</b><div class="muet" style="font-size:12px">par <b>${esc(f.auteur || '—')}</b> · ${date(f.cree)}${f.duree ? ' · ' + Math.round(f.duree) + ' s' : ''}</div>
         <div class="ligne"><a class="btn petit" href="${esc(u)}" download target="_blank">Télécharger</a>${!estFilm ? '<a class="btn petit" href="#/bibliotheque">Dans la bibliothèque</a>' : !peutPublier ? (sv ? '' : demandesFilms[f.id] ? `<span class="badge">${demandesFilms[f.id] === 'attente' ? '⏳ demandé' : demandesFilms[f.id] === 'refusee' ? 'refusé' : ''}</span>` : `<button class="btn petit plein" data-vp-demander="${esc(f.id)}">Demander la publication</button>`) : peutPublier ? (sv ? `<button class="btn petit danger" data-vp-retirer="${esc(f.id)}">Retirer du site</button>` : `<button class="btn petit plein" data-vp-pub="${esc(f.id)}">Publier sur le site</button>`) : ''}<button class="btn petit danger" data-vp-suppr="${esc(f.id)}" title="Supprimer cette vidéo pour toute l'équipe${sv ? ' (et du site)' : ''}">🗑</button></div></div>`; }).join('') || '<p class="muet">Aucune vidéo ici. Les films fabriqués par l\'équipe arrivent tout seuls ; on peut aussi en ajouter avec « + Ajouter un film terminé ».</p>'}</div>`;
     $$('[data-vpf]', zone).forEach(b => b.onclick = () => { vpFiltre.etat = b.dataset.vpf; Stock.ecrire('studio.vp.filtre', vpFiltre); vueVideos(); });
@@ -5782,13 +5796,17 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     const etat = $('#vp-etat', zone);
     const publierListe = async liste => {
       if (!liste.length) return toast('Rien à publier');
-      $$('button', zone).forEach(b => b.disabled = true); let ok = 0; const rates = [];
+      // seuls les films en cours sont grisés ; on voit l'avancement sur leur bouton (et en haut de la page)
+      const btn = f => $(`[data-vp-pub="${CSS.escape(f.id)}"]`, zone);
+      liste.forEach(f => { const b = btn(f); if (b) { b.disabled = true; b.textContent = 'En attente…'; } });
+      let ok = 0; const rates = [];
       const bloques = [];
-      for (const [k, f] of liste.entries()) { etat.textContent = `Publication ${k + 1}/${liste.length} : ${f.evenement || f.nom}…`; try { await publierFilmVitrine(f); ok++; } catch (err) { if (err.bloque) bloques.push(f); else rates.push((f.evenement || f.nom) + ' (' + err.message + ')'); } }
+      for (const [k, f] of liste.entries()) { const b = btn(f); const suivi = t => { etat.textContent = `Publication ${k + 1}/${liste.length} : ${f.evenement || f.nom} — ${t}`; if (b) b.textContent = t; }; suivi('Préparation…');
+        try { await publierFilmVitrine(f, suivi); ok++; if (b) { b.textContent = '✓ Publié'; } } catch (err) { if (err.bloque) bloques.push(f); else rates.push((f.evenement || f.nom) + ' (' + err.message + ')'); } }
       toast(ok ? ok + ' vidéo(s) publiée(s) sur le site (visibles dans quelques minutes)' : 'Aucune vidéo publiée', 5000);
       const auteurs = [...new Set(bloques.map(f => f.auteur || '?'))];
       etat.innerHTML = (ok ? `✓ ${ok} publiée(s). ` : '') + (bloques.length ? `<div class="alerte-boite" style="margin-top:6px">⚠ <b>${bloques.length} film(s) non publiés</b> : ils sont rangés dans l'espace d'équipe (Supabase), qui est bloqué par le quota, et ils ne sont pas encore sur cet ordinateur.<br>Solution tout de suite : ${esc(auteurs.join(', '))} ouvre 🎬 Vidéos → <b>« + Ajouter un film terminé »</b> (le fichier MP4 téléchargé) puis <b>Publier sur le site</b>. Sinon ils se publieront dès que Supabase sera débloqué.</div>` : '') + (rates.length ? ' Non publiées : ' + esc(rates.join(' · ')) : '');
-      if (!bloques.length) setTimeout(vueVideos, rates.length ? 4000 : 1200); else $$('button', zone).forEach(b => b.disabled = false);
+      if (!bloques.length && !rates.length) setTimeout(vueVideos, 1500); else liste.forEach(f => { const b = btn(f); if (b && !/Publié/.test(b.textContent)) { b.disabled = false; b.textContent = 'Réessayer'; } });
     };
     const sel = () => $$('[data-vp-sel]', zone).filter(c => c.checked).map(c => films.find(f => f.id === c.dataset.vpSel));
     const majSel = () => { const n = sel().length, b = $('#vp-pub-sel', zone); b.disabled = !n; b.textContent = n ? `Publier la sélection (${n})` : 'Publier la sélection'; };
@@ -5796,7 +5814,8 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     $('#vp-tous', zone).onchange = e => { $$('[data-vp-sel]', zone).forEach(c => c.checked = e.target.checked); majSel(); };
     $('#vp-pub-sel', zone).onclick = () => publierListe(sel());
     $('#vp-pub-tout', zone).onclick = () => { const l = films.filter(f => !pub(f)); if (l.length && confirm(`Publier sur le site les ${l.length} vidéo(s) de l'équipe qui n'y sont pas encore ?`)) publierListe(l); };
-    $$('[data-vp-pub]', zone).forEach(b => b.onclick = () => publierListe([films.find(f => f.id === b.dataset.vpPub)]));
+    let filePub = Promise.resolve();
+    $$('[data-vp-pub]', zone).forEach(b => b.onclick = () => { const f = films.find(x => x.id === b.dataset.vpPub); b.disabled = true; b.textContent = 'En attente…'; filePub = filePub.then(() => publierListe([f])).catch(() => {}); });
     // 🗑 chaque membre peut supprimer une vidéo de l'équipe (et la retirer du site si elle y est)
     $$('[data-vp-suppr]', zone).forEach(b => b.onclick = async () => {
       const f = tout.find(x => x.id === b.dataset.vpSuppr) || films.find(x => x.id === b.dataset.vpSuppr); if (!f) return;
