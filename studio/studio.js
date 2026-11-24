@@ -780,6 +780,8 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-24-2', date: '24 novembre 2026', titre: 'Publier sur la vitrine : plus de blocage sans fin', points: [
+      '« Publier sur la vitrine » d\'une invitation de l\'équipe : la copie des fichiers affiche sa progression (Mo copiés) et s\'arrête avec un message clair si elle ne progresse plus, au lieu de rester bloquée sur « Copie du fichier d\'équipe… ».'] },
     { id: '2026-11-24-1', date: '24 novembre 2026', titre: 'Les vidéos de chacun visibles par tous', points: [
       'Chaque film fabriqué sur un ordinateur est maintenant <b>envoyé automatiquement à l\'équipe</b> (comme les fonds) : tous les membres le voient dans 🎬 Vidéos, sans qu\'il soit mis sur le site. Bouton « Les partager maintenant » pour le faire tout de suite.',
       'La publication est partagée automatiquement par le studio de l\'admin : chaque membre peut <b>publier</b> et <b>retirer du site</b> les vidéos, et les supprimer (🗑).'] },
@@ -4449,10 +4451,25 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     for (const src of srcs) {
       suivi && suivi('Copie du fichier d\'équipe ' + src.split('/').pop() + '…');
       const nom = 'medias/eq-' + src.split('/').pop();
-      let existe = false; try { existe = !!(await GitHub.sha(nom)); } catch (e) {}
+      const court = (pr, ms) => Promise.race([pr, new Promise(ok => setTimeout(() => ok(null), ms))]);
+      let existe = false; try { existe = !!(await court(GitHub.sha(nom), 20000)); } catch (e) {}
       if (!existe) {
-        let b = null; try { b = await IDB.lire('cache:' + src.split('/object/public/')[1]); } catch (e) {}
-        if (!b || !b.size) { const r = await fetch(Equipe.actuelle(src)); if (!r.ok) throw new Error('Fichier d\'équipe introuvable (' + r.status + ')'); b = await r.blob(); }
+        // copie locale (si le navigateur répond vite), sinon téléchargement avec progression et garde-fou
+        let b = null; try { b = await court(IDB.lire('cache:' + src.split('/object/public/')[1]), 3000); } catch (e) {}
+        if (!b || !b.size) {
+          const ctl = new AbortController(); let dernier = Date.now();
+          const garde = setInterval(() => { if (Date.now() - dernier > 45000) ctl.abort(); }, 5000);
+          try {
+            const r = await fetch(Equipe.actuelle(src), { signal: ctl.signal });
+            if (!r.ok) throw new Error('Fichier d\'équipe introuvable (' + r.status + ')' + (r.status === 402 ? ' — espace d\'équipe bloqué' : ''));
+            const total = Number(r.headers.get('content-length')) || 0, parts = []; let n = 0;
+            const lec = r.body.getReader();
+            for (;;) { const { done, value } = await lec.read(); if (done) break; parts.push(value); n += value.length; dernier = Date.now(); suivi && suivi('Copie du fichier d\'équipe ' + src.split('/').pop() + ' : ' + (n / 1e6).toFixed(1) + (total ? ' / ' + (total / 1e6).toFixed(1) : '') + ' Mo…'); }
+            b = new Blob(parts, { type: r.headers.get('content-type') || 'video/mp4' });
+          } catch (e) { throw new Error(e.name === 'AbortError' ? 'le téléchargement du fichier d\'équipe ne progresse plus (connexion ?) — réessayez' : e.message); }
+          finally { clearInterval(garde); }
+        }
+        suivi && suivi('Envoi sur le site : ' + src.split('/').pop() + ' (' + (b.size / 1e6).toFixed(1) + ' Mo)…');
         await GitHub.envoyer(nom, b, 'Fichier d\'équipe ' + src.split('/').pop());
       }
     }
