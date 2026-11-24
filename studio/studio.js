@@ -9,7 +9,19 @@
   let dbGrand = null;
   try {
     dbGrand = await new Promise((ok, ko) => { const r = indexedDB.open('studio', 1); r.onupgradeneeded = () => r.result.createObjectStore('fichiers'); r.onsuccess = () => ok(r.result); r.onerror = () => ko(r.error); });
+    // si le stockage du navigateur ne répond pas (souvent : un autre onglet du studio est bloqué en pleine écriture),
+    // on le dit au lieu d'afficher une page vide — et on ne démarre pas (pour ne rien écraser)
+    const alerte = setTimeout(() => {
+      const a = document.getElementById('app'); if (!a) return;
+      a.innerHTML = `<div class="carte pile" style="max-width:640px;margin:40px auto;padding:18px;background:#fff4e5;border:1px solid #f0c27a">
+        <h2 style="margin:0">Le studio attend le stockage du navigateur…</h2>
+        <p>Un <b>autre onglet du studio</b> est probablement bloqué (par exemple une publication ou un enregistrement de film qui ne finit pas) et occupe le stockage.</p>
+        <p><b>Fermez tous les autres onglets du studio</b> (et de l'invitation), puis cliquez « Recharger ». Si cela ne suffit pas : quittez Chrome complètement (Cmd+Q / Ctrl+Q) et rouvrez-le.</p>
+        <p class="muet" style="font-size:12.5px">Vos invitations ne sont pas perdues : elles sont gardées dans ce navigateur et dans la copie en ligne.</p>
+        <div><button class="btn plein" onclick="location.reload()">Recharger</button></div></div>`;
+    }, 6000);
     await Promise.all(GRANDS.map(k => new Promise(ok => { const q = dbGrand.transaction('fichiers').objectStore('fichiers').get('ls:' + k); q.onsuccess = () => { if (typeof q.result === 'string') GRAND[k] = q.result; ok(); }; q.onerror = () => ok(); })));
+    clearTimeout(alerte);
   } catch (e) { dbGrand = null; }
   const ecrireGrand = (k, txt) => new Promise(ok => {
     if (!dbGrand) return ok(false);
