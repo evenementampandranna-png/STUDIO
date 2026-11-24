@@ -321,6 +321,7 @@
         let c = null; if (it && it.description) { try { c = JSON.parse(decodeURIComponent(escape(atob(it.description)))); } catch (e) {} }
         this.config = c;
         const g = reglages.github || {};
+        if (!c && this.admin() && g.token && g.owner && g.repo && !g.partage && !Stock.lire('studio.pub.nonpartage', false)) { try { await this.partagerPublication(true); } catch (e) {} return; }
         if (c && c.token && c.owner && c.repo) { if ((!g.token || g.partage) && g.token !== c.token) { reglages.github = { owner: c.owner, repo: c.repo, token: c.token, branche: 'main', partage: true }; sauverReglages(); } }
         else if (g.partage) { delete reglages.github; sauverReglages(); }
       } catch (e) {}
@@ -779,6 +780,9 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-24-1', date: '24 novembre 2026', titre: 'Les vidéos de chacun visibles par tous', points: [
+      'Chaque film fabriqué sur un ordinateur est maintenant <b>envoyé automatiquement à l\'équipe</b> (comme les fonds) : tous les membres le voient dans 🎬 Vidéos, sans qu\'il soit mis sur le site. Bouton « Les partager maintenant » pour le faire tout de suite.',
+      'La publication est partagée automatiquement par le studio de l\'admin : chaque membre peut <b>publier</b> et <b>retirer du site</b> les vidéos, et les supprimer (🗑).'] },
     { id: '2026-11-21-2', date: '21 novembre 2026', titre: 'Publier et retirer tous les films', points: [
       'Chaque film terminé (🎬 Vidéos, Mes films, Films de l\'événement, brouillon compris) a <b>Publier sur le site</b>, et une fois publié <b>Retirer du site</b> (le film est enlevé de la rubrique et ses fichiers supprimés du site ; il reste sur l\'ordinateur).',
       'Admin : Réglages → Publication → <b>🔗 Copier le lien de publication</b> à envoyer aux membres : en l\'ouvrant une fois, ils peuvent publier et retirer, même quand la base de l\'équipe est bloquée.'] },
@@ -4570,6 +4574,26 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     for (const f of Films.liste().filter(x => x.dossier === 'videos' && !x.a_valider && !x.site && !x.equipe_id)) { try { await validerFilm(f.id); } catch (e) { console.warn('film', f.titre, e.message); } }
   }
   setTimeout(rattraperFilms, 40000);
+  // chaque film fabriqué sur cet ordinateur est envoyé à l'équipe (visible par tous dans 🎬 Vidéos) — le site reste un choix à part
+  let filmsEnPartage = false;
+  async function partagerFilmsEquipe(suivi) {
+    if (filmsEnPartage || !Equipe.actif() || !navigator.onLine) return 0;
+    filmsEnPartage = true; let n = 0;
+    try {
+      for (const f of Films.liste().filter(x => !x.equipe_id && !x.site && !x.equipe_refus)) {
+        try {
+          const blob = await Films.blob(f); if (!blob) continue;
+          if (blob.size > 50e6) { Films.maj(f.id, { equipe_refus: 'plus de 50 Mo' }); continue; }
+          if (suivi) suivi(f.titre);
+          const it = await Equipe.ajouterFilm(blob, { titre: f.titre, vignette: f.vignette });
+          if (it && it.id) { Films.maj(f.id, { equipe_id: it.id }); n++; }
+        } catch (e) { console.warn('partage film', f.titre, e.message); if (/bloqu|402|restricted/i.test(e.message)) break; }
+      }
+    } finally { filmsEnPartage = false; }
+    if (n) Equipe.charger().catch(() => {});
+    return n;
+  }
+  setTimeout(() => partagerFilmsEquipe().catch(() => {}), 45000);
   // carte d'un film de cet ordinateur (Vidéos et Film et publication)
   function carteFilmLocal(f) {
     const pr = projets[f.projet];
@@ -5683,7 +5707,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     const tout = (Equipe.items || []).filter(x => x.type === 'film' || x.type === 'fond' || x.type === 'video').sort((a, b) => String(b.cree || '').localeCompare(String(a.cree || '')));
     films = tout.filter(x => x.type === 'film');
     const fondsEq = tout.filter(x => x.type !== 'film');
-    const aPartager = medias.filter(m => (m.type === 'fond' || m.type === 'video' || m.anime) && !m.equipe_id && !m.brouillon && /^idb:/.test(m.src || '')).length;
+    const aPartager = medias.filter(m => (m.type === 'fond' || m.type === 'video' || m.anime) && !m.equipe_id && !m.brouillon && /^idb:/.test(m.src || '')).length + (Equipe.actif() ? Films.liste().filter(x => !x.equipe_id && !x.site && !x.equipe_refus).length : 0);
     let indexSite = [];
     try { const r = await fetch(urlSite() + 'vitrine/index.json?v=' + Date.now(), { cache: 'no-store' }); if (r.ok) { indexSite = await r.json(); surSite = new Set(indexSite.map(x => x.slug)); } } catch (e) {}
     // films déjà publiés sur le site (par n'importe quel membre) : visibles par toute l'équipe, sans passer par la base
@@ -5719,7 +5743,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     $$('[data-vpf]', zone).forEach(b => b.onclick = () => { vpFiltre.etat = b.dataset.vpf; Stock.ecrire('studio.vp.filtre', vpFiltre); vueVideos(); });
     $$('video[data-chemin]', zone).forEach(v => { IDB.lire('cache:' + Equipe.url(v.dataset.chemin).split('/object/public/')[1]).then(b => { if (b && b.size) v.src = URL.createObjectURL(b); }).catch(() => {}); });
     $$('[data-vpt]', zone).forEach(b => b.onclick = () => { vpFiltre.type = b.dataset.vpt; Stock.ecrire('studio.vp.filtre', vpFiltre); vueVideos(); });
-    const vr = $('#vp-rattraper', zone); if (vr) vr.onclick = async () => { vr.disabled = true; vr.textContent = 'Partage en cours…'; await Equipe.rattraper(); vueVideos(); };
+    const vr = $('#vp-rattraper', zone); if (vr) vr.onclick = async () => { vr.disabled = true; vr.textContent = 'Partage en cours…'; await Equipe.rattraper(); await partagerFilmsEquipe(t => { vr.textContent = 'Envoi : ' + t.slice(0, 30) + '…'; }); vueVideos(); };
     $('#vp-membre', zone).onchange = e => { vpFiltre.membre = e.target.value; Stock.ecrire('studio.vp.filtre', vpFiltre); vueVideos(); };
     $$('[data-vp-demander]', zone).forEach(b => b.onclick = async () => {
       const f = films.find(x => x.id === b.dataset.vpDemander); b.disabled = true;
@@ -6095,8 +6119,8 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
         </div>
       </div>`;
     const gl = $('#g-lien'); if (gl) gl.onclick = () => { const g2 = reglages.github || {}; const u = location.href.replace(/#.*$/, '').replace(/\?.*$/, '') + '#/publication/' + b64({ o: g2.owner, r: g2.repo, t: g2.token }); copier(u).then(() => toast('Lien copié : envoyez-le aux membres (WhatsApp…). En l\'ouvrant une fois, ils peuvent publier et retirer les vidéos.', 8000)); };
-    const gp = $('#g-partager'); if (gp) gp.onclick = async () => { try { await Equipe.partagerPublication(true); $('#g-partage-etat').textContent = '✓ partagé'; toast('Publication partagée : chaque membre peut publier, retirer et supprimer (à sa prochaine ouverture du studio)', 7000); } catch (e) { toast(e.message, 6000); } };
-    const gd = $('#g-departager'); if (gd) gd.onclick = async () => { try { await Equipe.partagerPublication(false); $('#g-partage-etat').textContent = 'non partagé'; toast('Partage arrêté (pensez à supprimer l\'ancien jeton sur GitHub)', 7000); } catch (e) { toast(e.message, 6000); } };
+    const gp = $('#g-partager'); if (gp) gp.onclick = async () => { try { Stock.ecrire('studio.pub.nonpartage', false); await Equipe.partagerPublication(true); $('#g-partage-etat').textContent = '✓ partagé'; toast('Publication partagée : chaque membre peut publier, retirer et supprimer (à sa prochaine ouverture du studio)', 7000); } catch (e) { toast(e.message, 6000); } };
+    const gd = $('#g-departager'); if (gd) gd.onclick = async () => { try { Stock.ecrire('studio.pub.nonpartage', true); await Equipe.partagerPublication(false); $('#g-partage-etat').textContent = 'non partagé'; toast('Partage arrêté (pensez à supprimer l\'ancien jeton sur GitHub)', 7000); } catch (e) { toast(e.message, 6000); } };
     $('#g-ok').onclick = () => { reglages.github = { owner: $('#g-owner').value.trim(), repo: $('#g-repo').value.trim(), token: $('#g-token').value.trim(), branche: 'main' }; sauverReglages(); toast('Enregistré'); if (Equipe.actif() && Equipe.admin() && Equipe.config) Equipe.partagerPublication(true).then(() => toast('Nouveau jeton partagé avec l\'équipe')).catch(() => {}); };
     $('#g-test').onclick = async () => {
       reglages.github = { owner: $('#g-owner').value.trim(), repo: $('#g-repo').value.trim(), token: $('#g-token').value.trim(), branche: 'main' };
