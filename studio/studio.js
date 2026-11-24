@@ -792,6 +792,9 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-24-4', date: '24 novembre 2026', titre: 'Jeton GitHub : une seule personne le renouvelle', points: [
+      'Quand le jeton de publication expire : seul l\'<b>admin</b> le recolle (une fois) ; il est aussitôt partagé avec toute l\'équipe. Les membres ne voient plus la demande de jeton : leur studio reprend tout seul le nouveau.',
+      'Conseil : à la création du jeton sur GitHub, choisissez l\'expiration la plus longue (« No expiration » si proposé).'] },
     { id: '2026-11-24-3', date: '24 novembre 2026', titre: 'Publier une vidéo : on voit où ça en est', points: [
       '🎬 Vidéos → « Publier sur le site » : seul le bouton de cette vidéo est grisé et affiche l\'avancement (Récupération … Mo, Envoi sur le site, ✓ Publié). Les autres restent utilisables (ils attendent leur tour).',
       'Une vidéo publiée a le badge vert <b>« ✓ publié sur le site ↗ »</b> (clic = la voir sur le site) et se retrouve dans le filtre « Sur le site ».'] },
@@ -5305,12 +5308,26 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
   }
   function demanderJeton() {
     if (demandeJeton) return demandeJeton;
-    demandeJeton = new Promise(fin => {
+    demandeJeton = (async () => {
+      // 1) l'admin a peut-être déjà partagé un nouveau jeton : on le reprend sans rien demander
+      const avant = (reglages.github || {}).token;
+      try { if (Equipe.actif()) { await Equipe.lireConfig(); if ((reglages.github || {}).token && reglages.github.token !== avant) { toast('Nouveau jeton de l\'équipe repris'); return true; } } } catch (e) {}
+      // 2) un membre ne peut pas créer de jeton pour le dépôt : c'est l'admin qui le renouvelle
+      if (Equipe.actif() && !Equipe.admin() && (reglages.github || {}).partage) {
+        await new Promise(ok => modale(`<h2>Publication en pause</h2><p>Le jeton de publication partagé par l'admin a expiré. <b>L'admin</b> doit ouvrir son studio et coller un nouveau jeton (la fenêtre s'ouvre toute seule chez lui) : la publication reprendra alors pour tout le monde, sans rien faire de votre côté.</p><div class="ligne"><button class="btn plein" id="jp-ok">Compris</button></div>`, (box, fermer) => { $('#jp-ok', box).onclick = () => { fermer(); ok(); }; }));
+        return false;
+      }
+      return demanderJetonAdmin();
+    })().finally(() => { demandeJeton = null; });
+    return demandeJeton;
+  }
+  function demanderJetonAdmin() {
+    return new Promise(fin => {
       const b = document.createElement('div'); b.id = 'boite-jeton';
-      b.innerHTML = `<div class="bj-carte"><h3>Jeton GitHub refusé</h3><p class="muet">GitHub n'accepte plus le jeton enregistré (il a expiré ou a été supprimé). Créez-en un nouveau : <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">page de création du jeton ↗</a> (dépôt <b>${esc((reglages.github || {}).repo || 'STUDIO')}</b>, droit « Contents : Read and write », expiration longue), puis collez-le ici.</p>
+      b.innerHTML = `<div class="bj-carte"><h3>Jeton GitHub refusé</h3><p class="muet">GitHub n'accepte plus le jeton enregistré (il a expiré ou a été supprimé). Créez-en un nouveau : <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">page de création du jeton ↗</a> (dépôt <b>${esc((reglages.github || {}).repo || 'STUDIO')}</b>, droit « Contents : Read and write », expiration : la plus longue possible — « No expiration » si proposé), puis collez-le ici.</p>
         <input type="password" id="bj-jeton" placeholder="github_pat_…" autocomplete="off"><div class="ligne" style="margin-top:10px;justify-content:space-between"><button class="btn" id="bj-non">Annuler</button><span class="muet" id="bj-etat"></span><button class="btn plein" id="bj-ok">Enregistrer et continuer</button></div></div>`;
       document.body.appendChild(b); setTimeout(() => $('#bj-jeton').focus(), 50);
-      const finir = ok => { b.remove(); demandeJeton = null; fin(ok); };
+      const finir = ok => { b.remove(); fin(ok); };
       $('#bj-non').onclick = () => finir(false);
       $('#bj-ok').onclick = async () => {
         const t = $('#bj-jeton').value.trim(); if (!t) return;
@@ -5321,7 +5338,10 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
           const j = await r.json().catch(() => ({}));
           if (!r.ok) { $('#bj-etat').textContent = 'Refusé : ' + (j.message || r.status); return; }
           if (j.permissions && !j.permissions.push) { $('#bj-etat').textContent = 'Ce jeton ne peut pas écrire dans le dépôt'; return; }
-          reglages.github = Object.assign({}, g, { token: t }); sauverReglages(); toast('Nouveau jeton enregistré'); finir(true);
+          reglages.github = Object.assign({}, g, { token: t }); delete reglages.github.partage; sauverReglages();
+          // partagé tout de suite avec l'équipe : personne d'autre n'aura à le saisir
+          if (Equipe.actif()) { Stock.ecrire('studio.pub.nonpartage', false); Equipe.partagerPublication(true).then(() => toast('Nouveau jeton enregistré et partagé avec toute l\'équipe')).catch(() => toast('Nouveau jeton enregistré')); } else toast('Nouveau jeton enregistré');
+          finir(true);
         } catch (err) { $('#bj-etat').textContent = 'Échec : ' + err.message; }
       };
     });
