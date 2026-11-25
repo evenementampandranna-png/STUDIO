@@ -1,5 +1,15 @@
 window.VITRINE = [
  {
+  "slug": "film-filmmwurbof2grq9",
+  "film": true,
+  "video": "medias/films/filmmwurbof2grq9.mp4",
+  "titre": "FANASANA VODIONDRY",
+  "type": "Film vidéo",
+  "vignette": "medias/films/filmmwurbof2grq9.jpg",
+  "auteur": "Rova",
+  "date": "2026-11-25"
+ },
+ {
   "slug": "demo-anniversaire-de-ely-8961",
   "titre": "Anniversaire de Ely (copie)",
   "type": "Anniversaire",
