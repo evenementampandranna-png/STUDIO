@@ -47,15 +47,15 @@
 <body>
 <div id="fond-flou"></div>
 <div id="scene"></div>
-<div id="ecran-ouvrir"><div class="titre" id="titre-ouvrir">Vous êtes invités</div><div class="langues" id="langues-ouvrir" hidden></div><button class="bouton" id="btn-ouvrir">Ouvrir l'invitation</button></div>
+<div id="ecran-ouvrir"><div class="langues" id="langues-ouvrir" hidden></div><button class="bouton" id="btn-ouvrir">Ouvrir l'invitation</button></div>
 <button id="btn-langue" aria-label="Langue">🌐</button><div id="menu-langue" role="menu"></div>
 <button id="son" aria-label="Son">♪</button><button id="pause" aria-label="Pause">❚❚</button>
 <div id="bandeau" role="dialog"></div>
 <div id="erreur"></div>
-<script src="../config.js?v=202611251421"></script>
-<script src="../moteur/moteur.js?v=202611251421"></script>
-<script src="../moteur/fabrique.js?v=202611251421"></script>
-<script src="../moteur/base.js?v=202611251421"></script>
+<script src="../config.js?v=202611251537"></script>
+<script src="../moteur/moteur.js?v=202611251537"></script>
+<script src="../moteur/fabrique.js?v=202611251537"></script>
+<script src="../moteur/base.js?v=202611251537"></script>
 <script>
 (async function () {
   const q = new URLSearchParams(location.search);
@@ -103,7 +103,7 @@
     if (memo) { try { localStorage.setItem('inv.langue.' + (slug || 'apercu'), l); } catch (e) {} }
     if (moteurPret) moteurPret.changerLangue(l);
   }
-  $('#titre-ouvrir').textContent = fiche.titre || 'Invitation';
+  $('#titre-ouvrir').remove();   // pas de grand titre sur l'écran d'ouverture : l'invitation commence par son propre plan
   // toutes les langues : celles préparées dans le studio, et les autres traduites à la demande (Google, gardé sur ce téléphone)
   const toutes = langues.concat(Object.keys(NOMS).filter(l => !langues.includes(l)));
   async function traduireAuVol(l) {
