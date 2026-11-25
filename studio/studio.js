@@ -345,6 +345,7 @@
         const it = ((await this.rpc('equipe_biblio_lire_ids', { p_ids: [this.idConfig()] })) || [])[0];
         let c = null; if (it && it.description) { try { c = JSON.parse(decodeURIComponent(escape(atob(it.description)))); } catch (e) {} }
         this.config = c;
+        if (c && c.audd && !(reglages.audd && reglages.audd.cle)) { reglages.audd = { cle: c.audd }; sauverReglages(); }
         const g = reglages.github || {};
         if (!c && this.admin() && g.token && g.owner && g.repo && !g.partage && !Stock.lire('studio.pub.nonpartage', false)) { try { await this.partagerPublication(true); } catch (e) {} return; }
         if (c && c.token && c.owner && c.repo) {
@@ -364,7 +365,7 @@
       const g = reglages.github || {};
       if (oui) {
         if (!(g.owner && g.repo && g.token)) throw new Error('enregistrez d\'abord votre jeton GitHub ci-dessus');
-        await this.rpc('equipe_biblio_ajouter', { p_item: { id: this.idConfig(), auteur: this.membre(), type: 'config', nom: 'Publication partagée', chemin: '', description: btoa(unescape(encodeURIComponent(JSON.stringify({ owner: g.owner, repo: g.repo, token: g.token })))) } });
+        await this.rpc('equipe_biblio_ajouter', { p_item: { id: this.idConfig(), auteur: this.membre(), type: 'config', nom: 'Publication partagée', chemin: '', description: btoa(unescape(encodeURIComponent(JSON.stringify({ owner: g.owner, repo: g.repo, token: g.token, audd: (reglages.audd || {}).cle || '' })))) } });
       } else await this.rpc('equipe_biblio_supprimer', { p_id: this.idConfig() });
       await this.lireConfig();
     },
@@ -437,7 +438,7 @@
         catch (e) { dernier = e; if (/\(4\d\d\)/.test(e.message) && !/\(409\)/.test(e.message)) break; await new Promise(ok => setTimeout(ok, 2000 * (essai + 1))); }
       }
       if (dernier) throw dernier;
-      await this.rpc('equipe_biblio_ajouter', { p_item: { id, auteur: this.membre(), type: 'film', nom: 'Film — ' + (o.titre || 'Sans titre'), chemin, vignette: vignette.length < 150000 ? vignette : '', duree, secondes_creation: o.secondes || null, evenement: o.titre || '' } });
+      await this.rpc('equipe_biblio_ajouter', { p_item: { id, auteur: this.membre(), type: 'film', nom: 'Film — ' + (o.titre || 'Sans titre'), chemin, vignette: vignette.length < 150000 ? vignette : '', description: droitsTexte(o.droits), duree, secondes_creation: o.secondes || null, evenement: o.titre || '' } });
       await this.charger(); this._dernierFilm = id; return { id };
     },
     // fichiers d'une invitation envoyés dans l'espace d'équipe (une seule fois chacun), pour que l'admin ait tout
@@ -814,6 +815,9 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-25-7', date: '25 novembre 2026', titre: 'Droits d\'auteur des musiques', points: [
+      '🎵 À chaque musique ajoutée (Film et publication → Musique), le studio vérifie ses droits : étiquettes du fichier (artiste, maison de disques) et, avec une clé AudD (Réglages → 🎵 Droits des musiques), reconnaissance de la chanson.',
+      'Chanson protégée : alerte, puis confirmation avant de fabriquer le film et avant de le publier ; badge « ⚠ musique protégée » dans 🎬 Vidéos. Case « Nous avons l\'autorisation » si vous avez la licence.'] },
     { id: '2026-11-25-6', date: '25 novembre 2026', titre: '« Utiliser ce modèle » sur chaque film', points: [
       '🎬 Vidéos : chaque film a un bouton <b>🧩 Utiliser ce modèle</b>. Il crée une nouvelle invitation (« Nouveau client — … ») à partir de celle du film : on change ensuite les noms, la date, les lieux, puis on enregistre le film du client.',
       'Commandes : quand un client commande un film du site (« Commander ce modèle »), « Créer l\'invitation depuis le modèle » part maintenant de l\'invitation de ce film.'] },
@@ -3728,6 +3732,61 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
   // MP3 et M4A/AAC sont gardés tels quels. Les autres (WAV, FLAC, OGG, OPUS, AIFF, vidéo…) sont décodés
   // par le navigateur puis réencodés en MP3 (lisible sur tous les téléphones).
   async function chargerScript(url) { return new Promise((ok, ko) => { const s = document.createElement('script'); s.src = url; s.onload = ok; s.onerror = () => ko(new Error('Encodeur MP3 indisponible (connexion ?)')); document.head.appendChild(s); }); }
+  /* ---------- Musique : droits d'auteur ----------
+     1) étiquettes du fichier (artiste, titre, maison de disques) ; 2) reconnaissance AudD (si une clé est enregistrée dans Réglages).
+     Résultat gardé dans p.musique.droits = { statut: 'protege' | 'probable' | 'non_reconnu' | 'inconnu', artiste, titre, label, source, autorise } */
+  async function lireTagsAudio(blob) {
+    const b = new Uint8Array(await blob.slice(0, 262144).arrayBuffer()), tags = {};
+    if (b[0] === 0x49 && b[1] === 0x44 && b[2] === 0x33) {
+      const v = b[3], taille = ((b[6] & 127) << 21) | ((b[7] & 127) << 14) | ((b[8] & 127) << 7) | (b[9] & 127), fin = Math.min(b.length, 10 + taille);
+      let i = 10;
+      while (i + 10 < fin) {
+        const id = String.fromCharCode(b[i], b[i + 1], b[i + 2], b[i + 3]); if (!/^[A-Z0-9]{4}$/.test(id)) break;
+        const sz = v === 4 ? ((b[i + 4] & 127) << 21) | ((b[i + 5] & 127) << 14) | ((b[i + 6] & 127) << 7) | (b[i + 7] & 127) : (b[i + 4] << 24) | (b[i + 5] << 16) | (b[i + 6] << 8) | b[i + 7];
+        if (sz <= 0) break;
+        const d = b.subarray(i + 10, i + 10 + sz);
+        if (/^(TIT2|TPE1|TPE2|TALB|TPUB|TCOP)$/.test(id) && d.length > 1) { const e = d[0]; try { tags[id] = new TextDecoder(e === 1 ? 'utf-16' : e === 2 ? 'utf-16be' : e === 3 ? 'utf-8' : 'iso-8859-1').decode(d.subarray(1)).replace(/\0/g, ' ').trim(); } catch (er) {} }
+        i += 10 + sz;
+      }
+    }
+    return tags;
+  }
+  async function verifierDroits(fichier, audio, nom) {
+    let res = { statut: 'inconnu', source: '' };
+    try {
+      const tags = await lireTagsAudio(fichier);
+      const art = tags.TPE1 || tags.TPE2 || '', tit = tags.TIT2 || '', lab = tags.TPUB || tags.TCOP || '';
+      if (art || lab) res = { statut: 'probable', artiste: art, titre: tit, label: lab, source: 'étiquettes du fichier' };
+    } catch (e) {}
+    const base = String(nom || '').replace(/\.\w+$/, '').replace(/[_]+/g, ' ');
+    if (res.statut === 'inconnu' && / [-–] /.test(base) && !/libre|royalty|free|no copyright|sans droit/i.test(base)) { const [a, ...t] = base.split(/ [-–] /); res = { statut: 'probable', artiste: a.trim(), titre: t.join(' - ').trim(), source: 'nom du fichier' }; }
+    const cle = reglages.audd && reglages.audd.cle;
+    if (cle) {
+      try {
+        const fd = new FormData(); fd.append('api_token', cle); fd.append('return', 'spotify');
+        const src = audio || fichier; fd.append('file', src.size > 9.5e6 ? src.slice(0, 9.5e6, src.type) : src, nom || 'musique.mp3');
+        const r = await Promise.race([fetch('https://api.audd.io/', { method: 'POST', body: fd }), new Promise((ok, ko) => setTimeout(() => ko(new Error('délai')), 40000))]);
+        const j = await r.json();
+        if (j.status === 'success') {
+          if (j.result && j.result.title) res = { statut: 'protege', artiste: j.result.artist || '', titre: j.result.title || '', label: j.result.label || '', lien: j.result.song_link || '', source: 'reconnaissance AudD' };
+          else if (res.statut !== 'probable') res = { statut: 'non_reconnu', source: 'reconnaissance AudD' };
+        } else res.erreur = (j.error && j.error.error_message) || 'AudD : erreur';
+      } catch (e) { res.erreur = 'AudD injoignable (' + e.message + ')'; }
+    }
+    res.date = new Date().toISOString();
+    return res;
+  }
+  const droitsAlerte = d => !!d && (d.statut === 'protege' || d.statut === 'probable') && !d.autorise;
+  const droitsTexte = d => d && d.statut ? 'droits:' + JSON.stringify({ s: d.statut, a: d.artiste || '', t: d.titre || '', ok: !!d.autorise }).slice(0, 900) : '';
+  const droitsDe = it => { try { const m = String(it && it.description || '').match(/^droits:(.*)$/); if (!m) return null; const j = JSON.parse(m[1]); return { statut: j.s, artiste: j.a, titre: j.t, autorise: j.ok }; } catch (e) { return null; } };
+  function blocDroits(d) {
+    if (!d) return '';
+    const qui = [d.artiste, d.titre].filter(Boolean).join(' — ') + (d.label ? ' (' + d.label + ')' : '');
+    if (d.statut === 'protege' || d.statut === 'probable') return `<div class="alerte-boite" style="margin-top:6px">⚠ <b>${d.statut === 'protege' ? 'Chanson protégée par le droit d\'auteur' : 'Semble être une chanson du commerce'}</b>${qui ? ' : ' + esc(qui) : ''} <span class="muet">(${esc(d.source || '')})</span>${d.lien ? ` · <a href="${esc(d.lien)}" target="_blank">écouter ↗</a>` : ''}<br>Facebook, Instagram, TikTok et YouTube peuvent <b>couper le son ou bloquer</b> le film, et la publier sur le site sans autorisation est interdit. Prenez une musique libre de droits (Pixabay Music, bibliothèque audio YouTube…) ou gardez celle-ci seulement si vous avez l'autorisation.
+      <label class="cases" style="margin-top:6px"><input type="checkbox" id="droits-ok" ${d.autorise ? 'checked' : ''}> Nous avons l'autorisation / la licence pour cette musique</label></div>`;
+    if (d.statut === 'non_reconnu') return `<div class="muet" style="margin-top:6px">✓ Aucune chanson connue reconnue (${esc(d.source || '')}).${d.erreur ? ' ' + esc(d.erreur) : ''}</div>`;
+    return `<div class="muet" style="margin-top:6px">Vérification automatique des droits : ${reglages.audd && reglages.audd.cle ? (d.erreur ? esc(d.erreur) : 'rien de trouvé dans le fichier.') : 'activez la reconnaissance dans <a href="#/reglages">Réglages → 🎵 Droits des musiques</a>.'} Utilisez une piste dont vous avez les droits.</div>`;
+  }
   async function preparerChanson(f, suivi) {
     const ext = (f.name.split('.').pop() || '').toLowerCase();
     if (['mp3', 'm4a', 'aac', 'mpga'].includes(ext) || /^audio\/(mpeg|mp3|mp4|aac|x-m4a)$/.test(f.type)) return f;
@@ -4624,7 +4683,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
       await Promise.race([IDB.mettre(src, blob), new Promise((ok, ko) => setTimeout(() => ko(new Error('le stockage du navigateur ne répond pas (un autre onglet du studio l\'occupe ?) — téléchargez le film, puis « + Ajouter un film terminé »')), 120000))]);
       let vignette = '';
       try { const u = URL.createObjectURL(blob); const info = await Promise.race([vignetteVideo(u), new Promise(ok => setTimeout(() => ok({}), 12000))]); URL.revokeObjectURL(u); vignette = info.vignette || ''; } catch (e) {}
-      const f = { id, src, projet: p ? p.id : '', titre: o.titre || (p && p.fiche.titre) || 'Film', date: new Date().toISOString(), taille: blob.size, duree: Math.round(o.duree || 0), dossier: o.dossier || 'brouillon', auteur: (reglages.equipe && reglages.equipe.membre) || '', vignette: vignette.length < 150000 ? vignette : '' };
+      const f = { id, src, projet: p ? p.id : '', titre: o.titre || (p && p.fiche.titre) || 'Film', date: new Date().toISOString(), taille: blob.size, duree: Math.round(o.duree || 0), dossier: o.dossier || 'brouillon', droits: (p && p.musique && p.musique.droits) || null, auteur: (reglages.equipe && reglages.equipe.membre) || '', vignette: vignette.length < 150000 ? vignette : '' };
       this.ecrire([f].concat(this.liste())); return f;
     },
     maj(id, champs) { const l = this.liste(), f = l.find(x => x.id === id); if (f) Object.assign(f, champs); this.ecrire(l); return f; },
@@ -4640,7 +4699,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     if (Equipe.actif()) {
       try {
         let it = f.equipe_id && (Equipe.items || []).find(x => x.id === f.equipe_id);
-        if (!it) { const r = await Equipe.ajouterFilm(blob, { titre: f.titre, vignette: f.vignette }); if (r && r.id) { Films.maj(f.id, { equipe_id: r.id }); it = (Equipe.items || []).find(x => x.id === r.id); } }
+        if (!it) { const r = await Equipe.ajouterFilm(blob, { titre: f.titre, vignette: f.vignette, droits: f.droits }); if (r && r.id) { Films.maj(f.id, { equipe_id: r.id }); it = (Equipe.items || []).find(x => x.id === r.id); } }
         if (it && it.chemin && !/^site:/.test(it.chemin) && await filmEnLigne(Equipe.url(it.chemin))) chemin = Equipe.url(it.chemin);
       } catch (e) { console.warn('film → équipe', e.message); }
     }
@@ -4674,7 +4733,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
       $('#ap-reg', m).onclick = () => fermer();
       const d = $('#ap-dem', m); if (d) d.onclick = async () => {
         d.disabled = true; d.textContent = 'Envoi…';
-        try { const it = f.equipe_id ? { id: f.equipe_id } : await Equipe.ajouterFilm(await Films.blob(f), { titre: f.titre, vignette: f.vignette }); if (it && it.id) Films.maj(f.id, { equipe_id: it.id, dossier: 'videos' }); await demanderPublication('film', (it && it.id) || f.id, f.titre); toast('Demande envoyée à l\'admin'); fermer(); if (apres) apres(); }
+        try { const it = f.equipe_id ? { id: f.equipe_id } : await Equipe.ajouterFilm(await Films.blob(f), { titre: f.titre, vignette: f.vignette, droits: f.droits }); if (it && it.id) Films.maj(f.id, { equipe_id: it.id, dossier: 'videos' }); await demanderPublication('film', (it && it.id) || f.id, f.titre); toast('Demande envoyée à l\'admin'); fermer(); if (apres) apres(); }
         catch (e) { d.disabled = false; d.textContent = 'Réessayer'; toast(e.message); }
       };
     });
@@ -4700,7 +4759,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
       toast('✅ Validé · envoi pour publication…', 6000);
       try {
         let eid = f.equipe_id;
-        if (!eid) { const it = await Equipe.ajouterFilm(await Films.blob(f), { titre: f.titre, vignette: f.vignette }); eid = it && it.id; if (eid) Films.maj(id, { equipe_id: eid }); }
+        if (!eid) { const it = await Equipe.ajouterFilm(await Films.blob(f), { titre: f.titre, vignette: f.vignette, droits: f.droits }); eid = it && it.id; if (eid) Films.maj(id, { equipe_id: eid }); }
         if (eid) await demanderPublication('film', eid, f.titre);
         toast('✅ Film validé : il sera publié sur le site automatiquement (par le studio de l\'admin)', 8000);
       } catch (e) { toast('Film validé, mais l\'envoi a échoué : ' + e.message, 9000); }
@@ -4834,7 +4893,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
           const blob = await Films.blob(f); if (!blob) continue;
           if (blob.size > 200e6) { Films.maj(f.id, { equipe_refus: 'plus de 200 Mo' }); continue; }
           if (suivi) suivi(f.titre);
-          const it = await Equipe.ajouterFilm(blob, { titre: f.titre, vignette: f.vignette });
+          const it = await Equipe.ajouterFilm(blob, { titre: f.titre, vignette: f.vignette, droits: f.droits });
           if (it && it.id) { Films.maj(f.id, { equipe_id: it.id }); n++; }
         } catch (e) { console.warn('partage film', f.titre, e.message); if (/bloqu|402|restricted/i.test(e.message)) break; }
       }
@@ -4891,6 +4950,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
       };
       const fp = $('[data-fl-pub]', el); if (fp) fp.onclick = async e => {
         if (!peutPublierGitHub()) return aidePublier(f(), relancer);
+        if (droitsAlerte(f().droits) && !confirm('⚠ La musique de ce film est probablement protégée (' + [f().droits.artiste, f().droits.titre].filter(Boolean).join(' — ') + '). Le publier seulement si vous avez l\'autorisation. Continuer ?')) return;
         const b = e.currentTarget; b.disabled = true; b.textContent = 'Publication…';
         try { await publierFilmLocal(f()); toast('Film publié sur le site ✓ (visible dans quelques minutes)'); relancer(); } catch (er) { toast('Échec : ' + er.message); b.disabled = false; b.textContent = 'Publier sur le site'; }
       };
@@ -4998,7 +5058,8 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
           <div class="ligne"><button class="btn" id="ap-gen">Lien général</button><button class="btn" id="ap-fam">Lien personnel (famille test)</button></div></div>
         <div class="carte pile"><h3>Musique du film</h3>
           <p class="muet">${p.musique ? 'Musique : ' + esc(p.musique.nom || p.musique.src) : 'Aucune musique. Utilisez une piste dont vous avez les droits.'}</p>
-          <div class="ligne"><label class="btn">${p.musique ? 'Changer' : 'Ajouter une musique'}<input type="file" id="musique" accept="audio/*,video/*,.mp3,.m4a,.aac,.wav,.wave,.ogg,.oga,.opus,.flac,.wma,.aif,.aiff,.aifc,.caf,.amr,.3gp,.3ga,.webm,.weba,.mka,.mp2,.mpga,.ac3,.mp4,.m4v,.mov,.mkv,.avi" hidden></label>${p.musique ? '<button class="btn danger" id="musique-suppr">Retirer</button>' : ''}</div>
+          <div class="ligne"><label class="btn">${p.musique ? 'Changer' : 'Ajouter une musique'}<input type="file" id="musique" accept="audio/*,video/*,.mp3,.m4a,.aac,.wav,.wave,.ogg,.oga,.opus,.flac,.wma,.aif,.aiff,.aifc,.caf,.amr,.3gp,.3ga,.webm,.weba,.mka,.mp2,.mpga,.ac3,.mp4,.m4v,.mov,.mkv,.avi" hidden></label>${p.musique ? '<button class="btn danger" id="musique-suppr">Retirer</button><button class="btn" id="musique-verif" title="Reconnaître la chanson et ses droits">🎵 Vérifier les droits</button>' : ''}</div>
+          ${p.musique ? blocDroits(p.musique.droits || { statut: 'inconnu' }) : ''}
           ${p.musique ? `<label class="champ">Volume<input type="range" id="volume" min="0" max="1" step="0.05" value="${p.musique.volume != null ? p.musique.volume : 0.8}"></label>` : ''}</div>
         <div class="carte pile"><h3>Film vidéo</h3>
           <p class="muet">Fabrique le film MP4 (ouverture, plans intermédiaires, remerciement) avec la chanson, image par image : le fichier est complet, avec les transitions et les boutons, et se lit partout (téléphone, WhatsApp, Facebook, QuickTime). Comptez environ 1 à 2 minutes ; vous pouvez changer d'onglet pendant ce temps. Tous les plans y sont, confirmation comprise (7 s).</p>
@@ -5069,7 +5130,16 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
         const f = await preparerChanson(brut, t => toast(t));
         const id = 'idb:' + uid() + '.' + (f.name.split('.').pop() || 'mp3').toLowerCase();
         await IDB.mettre(id, f); p.musique = { src: id, nom: brut.name, volume: 0.8, debut: 0 }; enregistrer(p); ongletPublier(p);
+        toast('🎵 Vérification des droits de la musique…');
+        const d = await verifierDroits(brut, f, brut.name);
+        if (p.musique && p.musique.src === id) { p.musique.droits = d; enregistrer(p); ongletPublier(p); if (droitsAlerte(d)) alert('⚠ Droits d\'auteur : ' + ([d.artiste, d.titre].filter(Boolean).join(' — ') || 'chanson du commerce') + '.\n\nCette musique est probablement protégée : Facebook, Instagram, TikTok et YouTube peuvent couper le son ou bloquer le film, et le site ne peut pas la diffuser sans autorisation.\n\nPrenez une musique libre de droits, ou cochez « Nous avons l\'autorisation » si c\'est le cas.'); }
       } catch (err) { toast(err.message); }
+    };
+    const dok = $('#droits-ok'); if (dok) dok.onchange = () => { p.musique.droits = Object.assign({}, p.musique.droits, { autorise: dok.checked }); enregistrer(p); };
+    const mv = $('#musique-verif'); if (mv) mv.onclick = async () => {
+      mv.disabled = true; mv.textContent = 'Vérification…';
+      try { const b = await IDB.lire(p.musique.src); if (!b) throw new Error('fichier de la musique introuvable'); const d = await verifierDroits(b, b, p.musique.nom); d.autorise = !!(p.musique.droits && p.musique.droits.autorise); p.musique.droits = d; enregistrer(p); ongletPublier(p); toast(d.statut === 'protege' ? '⚠ Chanson protégée reconnue' : d.statut === 'probable' ? '⚠ Chanson du commerce probable' : 'Aucune chanson protégée trouvée'); }
+      catch (e) { toast(e.message); mv.disabled = false; mv.textContent = '🎵 Vérifier les droits'; }
     };
     const ms = $('#musique-suppr'); if (ms) ms.onclick = () => { p.musique = null; enregistrer(p); ongletPublier(p); };
     const vol = $('#volume'); if (vol) vol.oninput = e => { p.musique.volume = Number(e.target.value); enregistrer(p); };
@@ -5109,6 +5179,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     };
     $('#film').onclick = async () => {
       if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) return toast('Ce navigateur ne sait pas enregistrer : utilisez Chrome sur ordinateur');
+      if (p.musique && droitsAlerte(p.musique.droits) && !confirm('⚠ La musique « ' + ([p.musique.droits.artiste, p.musique.droits.titre].filter(Boolean).join(' — ') || p.musique.nom) + ' » est probablement protégée par le droit d\'auteur.\n\nLe film pourra être coupé ou bloqué sur Facebook, Instagram, TikTok, YouTube, et ne pourra pas être publié sur le site sans autorisation.\n\nFabriquer le film quand même ?')) return;
       const b = $('#film'); b.disabled = true; $('#film-etat').textContent = 'Fabrication du film…'; const t0 = Date.now();
       try {
         const mus = p.musique ? await resoudre(p.musique.src) : null;
@@ -5130,7 +5201,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
                  ${Equipe.actif() ? '<div class="ligne"><button class="btn petit plein" data-film-equipe>☁ Envoyer à l\'équipe (🎬 Vidéos)</button></div>' : ''}`}
           </div>`;
           const dl = $('[data-film-dl]', z); if (dl) dl.onclick = () => telecharger(nomFichier, r.blob);
-          const eq = $('[data-film-equipe]', z); if (eq) eq.onclick = async () => { eq.disabled = true; eq.textContent = 'Envoi…'; try { await Equipe.ajouterFilm(r.blob, { titre: p.fiche.titre || '' }); filmEnAttente = null; toast('Film envoyé : visible dans 🎬 Vidéos pour toute l\'équipe'); eq.textContent = '✓ Envoyé'; } catch (e) { eq.disabled = false; eq.textContent = '☁ Réessayer l\'envoi'; toast('Envoi impossible : ' + e.message, 6000); } };
+          const eq = $('[data-film-equipe]', z); if (eq) eq.onclick = async () => { eq.disabled = true; eq.textContent = 'Envoi…'; try { await Equipe.ajouterFilm(r.blob, { droits: p.musique && p.musique.droits, titre: p.fiche.titre || '' }); filmEnAttente = null; toast('Film envoyé : visible dans 🎬 Vidéos pour toute l\'équipe'); eq.textContent = '✓ Envoyé'; } catch (e) { eq.disabled = false; eq.textContent = '☁ Réessayer l\'envoi'; toast('Envoi impossible : ' + e.message, 6000); } };
           $$('[data-ranger]', z).forEach(b => b.onclick = async () => { filmEnAttente = null; z.innerHTML = ''; if (b.dataset.ranger === 'videos') { await validerFilm(fl.id); } else { Films.maj(fl.id, { dossier: 'brouillon' }); toast('📁 Film mis en brouillon : il reste dans « Films de cet événement »', 6000); } ongletPublier(p); });
         };
         boite(null, 'enregistrement en cours…');
@@ -6096,7 +6167,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
       <div class="grille" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr))">${visibles.map(f => { const u = f.url || Equipe.url(f.chemin), sv = pub(f), estFilm = f.type === 'film'; return `<div class="carte pile" style="padding:10px">
         <video src="${esc(u)}" ${f.chemin && !/^site:/.test(f.chemin) ? `data-chemin="${esc(f.chemin)}"` : ''} poster="${esc(f.vignette || '')}" controls preload="none" playsinline style="width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:8px;background:#000"></video>
         <div class="ligne" style="justify-content:space-between">${!estFilm ? '<span class="badge">🎞 fond vidéo</span>' : sv ? '<a class="badge ok" href="' + urlSite() + '#modeles" target="_blank" title="Voir sur le site">✓ publié sur le site ↗</a>' : (perdus.has(f.id) ? '<span class="badge alerte" title="Le fichier de ce film n\'est plus en ligne : son auteur ouvre son studio (copie renvoyée toute seule) ou l\'enregistre de nouveau">⚠ fichier introuvable</span>' : '<span class="badge">pas encore publié</span>')}${peutPublier && estFilm && !sv ? `<input type="checkbox" data-vp-sel="${esc(f.id)}" title="Sélectionner">` : ''}</div>
-        <b style="font-size:13px">${esc((f.evenement || f.nom || '').replace(/^Film — /, ''))}</b><div class="muet" style="font-size:12px">par <b>${esc(f.auteur || '—')}</b> · ${date(f.cree)}${f.duree ? ' · ' + Math.round(f.duree) + ' s' : ''}</div>
+        <b style="font-size:13px">${esc((f.evenement || f.nom || '').replace(/^Film — /, ''))}</b>${estFilm && droitsAlerte(droitsDe(f)) ? `<span class="badge alerte" title="${esc([droitsDe(f).artiste, droitsDe(f).titre].filter(Boolean).join(' — '))}">⚠ musique protégée</span>` : ''}<div class="muet" style="font-size:12px">par <b>${esc(f.auteur || '—')}</b> · ${date(f.cree)}${f.duree ? ' · ' + Math.round(f.duree) + ' s' : ''}</div>
         <div class="ligne"><a class="btn petit" href="${esc(u)}" download target="_blank">Télécharger</a>${!estFilm ? '<a class="btn petit" href="#/bibliotheque">Dans la bibliothèque</a>' : !peutPublier ? (sv ? '' : demandesFilms[f.id] ? `<span class="badge">${demandesFilms[f.id] === 'attente' ? '⏳ demandé' : demandesFilms[f.id] === 'refusee' ? 'refusé' : ''}</span>` : `<button class="btn petit plein" data-vp-demander="${esc(f.id)}">Demander la publication</button>`) : peutPublier ? (sv ? `<button class="btn petit danger" data-vp-retirer="${esc(f.id)}">Retirer du site</button>` : `<button class="btn petit plein" data-vp-pub="${esc(f.id)}">Publier sur le site</button>`) : ''}${estFilm ? `<button class="btn petit" data-vp-modele="${esc(f.id)}" title="Nouvelle invitation pour un client, à partir de ce film (textes à changer)">🧩 Utiliser ce modèle</button>` : ''}${estFilm && perdus.has(f.id) ? `<button class="btn petit plein" data-vp-refaire="${esc(f.id)}">🎬 Refaire le film</button>` : ''}<button class="btn petit danger" data-vp-suppr="${esc(f.id)}" title="Supprimer cette vidéo pour toute l'équipe${sv ? ' (et du site)' : ''}">🗑</button></div></div>`; }).join('') || '<p class="muet">Aucune vidéo ici. Les films fabriqués par l\'équipe arrivent tout seuls ; on peut aussi en ajouter avec « + Ajouter un film terminé ».</p>'}</div>`;
     $$('[data-vpf]', zone).forEach(b => b.onclick = () => { vpFiltre.etat = b.dataset.vpf; Stock.ecrire('studio.vp.filtre', vpFiltre); vueVideos(); });
     $$('video[data-chemin]', zone).forEach(v => { IDB.lire('cache:' + Equipe.url(v.dataset.chemin).split('/object/public/')[1]).then(b => { if (b && b.size) v.src = URL.createObjectURL(b); }).catch(() => {}); });
@@ -6130,6 +6201,8 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     const etat = $('#vp-etat', zone);
     const publierListe = async liste => {
       if (!liste.length) return toast('Rien à publier');
+      const prot = liste.filter(f => droitsAlerte(droitsDe(f)));
+      if (prot.length && !confirm('⚠ ' + prot.length + ' film(s) avec une musique probablement protégée par le droit d\'auteur :\n' + prot.map(f => '• ' + (f.evenement || f.nom || '').replace(/^Film — /, '') + ' (' + [droitsDe(f).artiste, droitsDe(f).titre].filter(Boolean).join(' — ') + ')').join('\n') + '\n\nLes publier sur le site seulement si vous avez l\'autorisation. Continuer ?')) { liste.forEach(f => { const b = $(`[data-vp-pub="${CSS.escape(f.id)}"]`, zone); if (b) { b.disabled = false; b.textContent = 'Publier sur le site'; } }); return; }
       // seuls les films en cours sont grisés ; on voit l'avancement sur leur bouton (et en haut de la page)
       const btn = f => $(`[data-vp-pub="${CSS.escape(f.id)}"]`, zone);
       liste.forEach(f => { const b = btn(f); if (b) { b.disabled = true; b.textContent = 'En attente…'; } });
@@ -6468,6 +6541,11 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
           <label class="champ">Modèle<input id="ia-modele" value="${esc((reglages.ia || {}).modele || 'claude-sonnet-5-5')}"></label>
           <div class="ligne"><button class="btn plein" id="ia-ok">Enregistrer</button><button class="btn" id="ia-test">Tester</button><span class="muet" id="ia-etat"></span></div>
         </div>
+        <div class="carte pile"><h3>🎵 Droits des musiques (reconnaissance automatique)</h3>
+          <p class="muet">À chaque musique ajoutée, le studio lit ses étiquettes (artiste, maison de disques) et, avec une clé AudD, <b>reconnaît la chanson</b> comme Shazam : si elle est protégée, une alerte s'affiche avant de fabriquer et de publier le film. Clé : créez un compte sur <a href="https://dashboard.audd.io" target="_blank">dashboard.audd.io</a> → API token. Elle est partagée avec l'équipe (comme la publication).</p>
+          <label class="champ">Clé AudD (api_token)<input type="password" id="audd-cle" autocomplete="off" value="${esc((reglages.audd || {}).cle || '')}"></label>
+          <div class="ligne"><button class="btn plein" id="audd-ok">Enregistrer</button><span class="muet" id="audd-etat"></span></div>
+        </div>
         <div class="carte pile"><h3>Wan 2.2 sur RunPod (ComfyUI)</h3>
           <p class="muet">Pour que le bouton « Générer avec Wan 2.2 » du fond sur mesure envoie la demande à votre pod et récupère la vidéo tout seul.</p>
           <div class="ligne"><button class="btn plein" id="cf-assistant">▶ Démarrer le pod (étapes guidées)</button><span class="muet">Les liens à cliquer, pas à pas.</span></div>
@@ -6563,6 +6641,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
       catch (err) { e.textContent = /function|schema cache|Could not find/i.test(err.message) ? 'Connecté, mais le script SQL n\'est pas encore installé (étape 2).' : 'Échec : ' + err.message; }
     };
     $('#sb-sql').onclick = async () => { try { copier(await (await fetch('../outils/supabase.sql?v=' + Date.now())).text()); toast('Script copié : collez-le dans Supabase → SQL Editor'); } catch (e) { toast('Script introuvable'); } };
+    $('#audd-ok').onclick = async () => { const v = $('#audd-cle').value.trim(); if (v) reglages.audd = { cle: v }; else delete reglages.audd; sauverReglages(); $('#audd-etat').textContent = 'Enregistré'; if (Equipe.actif() && (reglages.github || {}).token && !(reglages.github || {}).partage) { try { await Equipe.partagerPublication(true); $('#audd-etat').textContent = 'Enregistré et partagé avec l\'équipe'; } catch (e) {} } };
     $('#ia-ok').onclick = () => { reglages.ia = { cle: $('#ia-cle').value.trim(), modele: $('#ia-modele').value.trim() || 'claude-sonnet-5-5' }; if (!reglages.ia.cle) delete reglages.ia.cle; sauverReglages(); toast('Enregistré'); };
     $('#ia-test').onclick = async () => { const e = $('#ia-etat'); e.textContent = 'Test…'; reglages.ia = { cle: $('#ia-cle').value.trim(), modele: $('#ia-modele').value.trim() || 'claude-sonnet-5-5' }; sauverReglages();
       try { const r = await demanderIA('Réponds seulement : OK', 50); e.textContent = '✓ ' + r.moteur + ' répond'; } catch (x) { e.textContent = '✗ ' + x.message; } };
