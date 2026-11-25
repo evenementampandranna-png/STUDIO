@@ -5809,7 +5809,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
       await Equipe.charger();
       toast(info.admin ? 'Vous êtes l\'admin de l\'équipe « ' + info.nom + ' »' : 'Vous avez rejoint l\'équipe « ' + info.nom + ' »');
       location.hash = info.admin ? '#/equipe' : '#/bibliotheque';
-    } catch (e) { $('#rj-etat').textContent = 'Lien d\'équipe invalide : ' + e.message + '. Demandez le lien à jour à votre admin.'; }
+    } catch (e) { $('#rj-etat').innerHTML = baseBloquee(e) && /fetch|network/i.test(e.message) ? 'Le serveur de l\'équipe ne répond pas depuis cet ordinateur (connexion Internet, VPN, bloqueur de publicité ou réseau qui filtre « supabase.co »). Le lien est bon : essayez un autre réseau (partage de connexion du téléphone), puis <a href="" onclick="location.reload();return false">réessayez</a>.' : 'Lien d\'équipe invalide : ' + esc(e.message) + '. Demandez le lien à jour à votre admin.'; }
   }
   // Modèles (invitations) et films de l'équipe : tout le monde les voit ; l'admin publie les films sur la vitrine
   const vidFiltre = Object.assign({ type: 'tout', membre: '' }, Stock.lire('studio.vid.filtre', {}));
