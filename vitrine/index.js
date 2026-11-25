@@ -229,16 +229,6 @@ window.VITRINE = [
   "date": "2026-11-25"
  },
  {
-  "slug": "film-filmmwur55mf1uij",
-  "film": true,
-  "video": "medias/films/filmmwur55mf1uij.mp4",
-  "titre": "FANASANA VODIONDRY",
-  "type": "Film vidéo",
-  "vignette": "medias/films/filmmwur55mf1uij.jpg",
-  "auteur": "Rova",
-  "date": "2026-11-25"
- },
- {
   "slug": "film-filmmwur7og4usta",
   "film": true,
   "video": "medias/films/filmmwur7og4usta.mp4",
@@ -265,16 +255,6 @@ window.VITRINE = [
   "titre": "INVITATION DE MARIAGE",
   "type": "Film vidéo",
   "vignette": "medias/films/filmmwur8w60rq9z.jpg",
-  "auteur": "Rova",
-  "date": "2026-11-25"
- },
- {
-  "slug": "film-filmmwur9nquofkv",
-  "film": true,
-  "video": "medias/films/filmmwur9nquofkv.mp4",
-  "titre": "FANASANA VODIONDRY",
-  "type": "Film vidéo",
-  "vignette": "medias/films/filmmwur9nquofkv.jpg",
   "auteur": "Rova",
   "date": "2026-11-25"
  },
