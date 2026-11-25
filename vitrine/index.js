@@ -1,5 +1,15 @@
 window.VITRINE = [
  {
+  "slug": "film-filmmwuqkdqb9rgh",
+  "film": true,
+  "video": "https://wckwwupnidcnufnlclbw.supabase.co/storage/v1/object/public/equipe/d29aee1cf2ec46fa937028bb468d3ba7/filmmwuqkdqb9rgh.mp4",
+  "titre": "Invitation",
+  "type": "Film vidéo",
+  "vignette": "medias/films/filmmwuqkdqb9rgh.jpg",
+  "auteur": "JULIA",
+  "date": "2026-11-25"
+ },
+ {
   "slug": "film-filmmwuqkoy5f3px",
   "film": true,
   "video": "https://wckwwupnidcnufnlclbw.supabase.co/storage/v1/object/public/equipe/d29aee1cf2ec46fa937028bb468d3ba7/filmmwuqkoy5f3px.mp4",
