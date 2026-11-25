@@ -1,5 +1,15 @@
 window.VITRINE = [
  {
+  "slug": "film-filmmwur1x9vc56k",
+  "film": true,
+  "video": "https://wckwwupnidcnufnlclbw.supabase.co/storage/v1/object/public/equipe/d29aee1cf2ec46fa937028bb468d3ba7/filmmwur1x9vc56k.mp4",
+  "titre": "NOS FIANÇAILLES",
+  "type": "Film vidéo",
+  "vignette": "medias/films/filmmwur1x9vc56k.jpg",
+  "auteur": "Rova",
+  "date": "2026-11-25"
+ },
+ {
   "slug": "film-filmmwur2zlyevyq",
   "film": true,
   "video": "https://wckwwupnidcnufnlclbw.supabase.co/storage/v1/object/public/equipe/d29aee1cf2ec46fa937028bb468d3ba7/filmmwur2zlyevyq.mp4",
