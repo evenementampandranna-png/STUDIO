@@ -1,5 +1,15 @@
 window.VITRINE = [
  {
+  "slug": "film-filmmwurfj6soytv",
+  "film": true,
+  "video": "medias/films/filmmwurfj6soytv.mp4",
+  "titre": "INVITATION DE MARIAGE",
+  "type": "Film vidéo",
+  "vignette": "medias/films/filmmwurfj6soytv.jpg",
+  "auteur": "Rova",
+  "date": "2026-11-25"
+ },
+ {
   "slug": "film-filmmwur2zlyevyq",
   "film": true,
   "video": "medias/films/filmmwur2zlyevyq.mp4",
@@ -16,16 +26,6 @@ window.VITRINE = [
   "titre": "NOS FIANÇAILLES",
   "type": "Film vidéo",
   "vignette": "medias/films/filmmwurclvhwdw7.jpg",
-  "auteur": "Rova",
-  "date": "2026-11-25"
- },
- {
-  "slug": "film-filmmwurfj6soytv",
-  "film": true,
-  "video": "medias/films/filmmwurfj6soytv.mp4",
-  "titre": "INVITATION DE MARIAGE",
-  "type": "Film vidéo",
-  "vignette": "medias/films/filmmwurfj6soytv.jpg",
   "auteur": "Rova",
   "date": "2026-11-25"
  },
