@@ -1,5 +1,15 @@
 window.VITRINE = [
  {
+  "slug": "film-filmmwurclvhwdw7",
+  "film": true,
+  "video": "medias/films/filmmwurclvhwdw7.mp4",
+  "titre": "NOS FIANÇAILLES",
+  "type": "Film vidéo",
+  "vignette": "medias/films/filmmwurclvhwdw7.jpg",
+  "auteur": "Rova",
+  "date": "2026-11-25"
+ },
+ {
   "slug": "demo-my-sweet-18-jmwt",
   "titre": "MY SWEET 18",
   "type": "anniversaire",
@@ -185,16 +195,6 @@ window.VITRINE = [
   "titre": "NOS FIANÇAILLES",
   "type": "Film vidéo",
   "vignette": "medias/films/filmmwur2zlyevyq.jpg",
-  "auteur": "Rova",
-  "date": "2026-11-25"
- },
- {
-  "slug": "film-filmmwurclvhwdw7",
-  "film": true,
-  "video": "https://wckwwupnidcnufnlclbw.supabase.co/storage/v1/object/public/equipe/d29aee1cf2ec46fa937028bb468d3ba7/filmmwurclvhwdw7.mp4",
-  "titre": "NOS FIANÇAILLES",
-  "type": "Film vidéo",
-  "vignette": "medias/films/filmmwurclvhwdw7.jpg",
   "auteur": "Rova",
   "date": "2026-11-25"
  },
