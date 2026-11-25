@@ -254,13 +254,13 @@
   <a class="pied-mail" id="pied-mail" hidden>✉ <span id="pied-mail-t"></span></a>
 </div></footer>
 <div id="boite"><button id="fermer" aria-label="Fermer">×</button><div class="lecteur" id="lecteur"><div class="fin-film" id="fin"><button id="revoir">↺ Revoir le film</button><a id="essayer" target="_blank">Essayer l'invitation interactive</a></div></div><div class="barre-lecture"><div id="progression"></div></div></div>
-<script src="config.js?v=202611251117"></script>
-<script src="moteur/langue.js?v=202611251117"></script>
-<script src="moteur/lecteur-plein.js?v=202611251117"></script>
-<script src="moteur/vitrine-en.js?v=202611251117"></script>
-<script src="moteur/moteur.js?v=202611251117"></script>
-<script src="moteur/fabrique.js?v=202611251117"></script>
-<script src="vitrine/index.js?v=202611251117"></script>
+<script src="config.js?v=202611251126"></script>
+<script src="moteur/langue.js?v=202611251126"></script>
+<script src="moteur/lecteur-plein.js?v=202611251126"></script>
+<script src="moteur/vitrine-en.js?v=202611251126"></script>
+<script src="moteur/moteur.js?v=202611251126"></script>
+<script src="moteur/fabrique.js?v=202611251126"></script>
+<script src="vitrine/index.js?v=202611251126"></script>
 <script>
 (async function () {
   const $ = s => document.querySelector(s);
@@ -296,8 +296,10 @@
     $('#devis').href = lien; brancherWhatsApp(n);
   }
   const charger = src => new Promise(ok => { const sc = document.createElement('script'); sc.src = src; sc.onload = ok; sc.onerror = ok; document.head.appendChild(sc); });
-  let liste = window.VITRINE || [];
-  if (!liste.length) { try { const r = await fetch('vitrine/index.json?v=' + Date.now()); if (r.ok) liste = await r.json(); } catch (e) {} }
+  // toujours la liste à jour (un retrait fait dans le studio se voit tout de suite) ; sinon la copie chargée avec la page
+  let liste = null;
+  try { const r = await fetch('vitrine/index.json?v=' + Date.now(), { cache: 'no-store' }); if (r.ok) liste = await r.json(); } catch (e) {}
+  if (!Array.isArray(liste)) liste = window.VITRINE || [];
   await Promise.all(liste.filter(m => !m.film).map(m => charger('projets/' + encodeURIComponent(m.slug) + '.js?v=' + Date.now())));
   const projets = window.PROJETS || {};
   liste = liste.filter(m => m.film ? m.video : projets[m.slug]);
