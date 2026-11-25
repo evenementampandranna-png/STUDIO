@@ -22,3 +22,6 @@ end $$;
 
 grant execute on function public.equipe_projets_tous(text) to anon, authenticated;
 grant execute on function public.equipe_projet_voir(text, text) to anon, authenticated;
+
+-- films plus lourds acceptés dans l'espace d'équipe (200 Mo). Supabase → Storage → Settings : « Upload file size limit » doit aussi être à 200 MB au moins.
+update storage.buckets set file_size_limit = 209715200 where id = 'equipe';

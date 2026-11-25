@@ -183,7 +183,7 @@
       const enLigne = async src => {
         if (!/^idb:/.test(src || '')) return src;
         if (Equipe.urlDe(src)) return Equipe.urlDe(src);
-        const b = await IDB.lire(src); if (!b || b.size > 50e6) return src;
+        const b = await IDB.lire(src); if (!b || b.size > 200e6) return src;
         const chemin = reglages.equipe.cle + '/' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7) + '.' + ((src.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin');
         await Equipe.envoyerFichier(chemin, b); Equipe.urls[src] = Equipe.url(chemin); Stock.ecrire('studio.equipe.urls', Equipe.urls);
         return Equipe.urls[src];
@@ -334,7 +334,16 @@
         this.config = c;
         const g = reglages.github || {};
         if (!c && this.admin() && g.token && g.owner && g.repo && !g.partage && !Stock.lire('studio.pub.nonpartage', false)) { try { await this.partagerPublication(true); } catch (e) {} return; }
-        if (c && c.token && c.owner && c.repo) { if ((!g.token || g.partage) && g.token !== c.token) { reglages.github = { owner: c.owner, repo: c.repo, token: c.token, branche: 'main', partage: true }; sauverReglages(); } }
+        if (c && c.token && c.owner && c.repo) {
+          if (g.token !== c.token) {
+            // jeton fixe pour toute l'équipe : chaque membre prend toujours celui de l'équipe ;
+            // l'admin qui a un autre jeton valide le partage (sinon il reprend celui de l'équipe)
+            let garder = false;
+            if (this.admin() && g.token && !g.partage) { try { const r = await fetch(`https://api.github.com/repos/${g.owner}/${g.repo}`, { headers: { Authorization: 'Bearer ' + g.token.trim() }, cache: 'no-store' }); garder = r.ok && ((await r.json()).permissions || {}).push; } catch (e) {} }
+            if (garder) { try { await this.partagerPublication(true); } catch (e) {} return; }
+            reglages.github = { owner: c.owner, repo: c.repo, token: c.token, branche: 'main', partage: true }; sauverReglages();
+          }
+        }
         else if (g.partage) { delete reglages.github; sauverReglages(); }
       } catch (e) {}
     },
@@ -402,7 +411,7 @@
     // un film terminé (fabriqué ici, ou un fichier MP4 déjà fait) : envoyé dans l'espace d'équipe, visible par tous
     async ajouterFilm(blob, o) {
       if (!this.actif()) throw new Error('vous n\'êtes dans aucune équipe');
-      if (blob.size > 50e6) throw new Error('film de plus de 50 Mo (limite de l\'espace d\'équipe)');
+      if (blob.size > 200e6) throw new Error('film de plus de 200 Mo (limite de l\'espace d\'équipe)');
       const type = /webm/.test(blob.type) ? 'video/webm' : /quicktime/.test(blob.type) ? 'video/quicktime' : 'video/mp4';
       const ext = type === 'video/webm' ? 'webm' : type === 'video/quicktime' ? 'mov' : 'mp4';
       const id = 'film' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -430,7 +439,7 @@
       const m = medias.find(x => x.src === src);
       if (m && (m.type === 'fond' || m.anime) && !m.brouillon) { await this.partager(m, ''); if (this.urlDe(src)) return; }
       const blob = await IDB.lire(src); if (!blob) return;
-      if (blob.size > 50e6) throw new Error('fichier de plus de 50 Mo');
+      if (blob.size > 200e6) throw new Error('fichier de plus de 200 Mo');
       // chemin tiré du nom local : toujours le même pour ce fichier (jamais de doublon)
       const chemin = reglages.equipe.cle + '/s-' + src.replace(/^idb:/, '').replace(/[^\w.-]+/g, '_').slice(-80);
       await this.envoyerFichier(chemin, blob, true);
@@ -794,7 +803,9 @@
   const NOUVEAUTES = [
     { id: '2026-11-25-1', date: '25 novembre 2026', titre: 'Films publiés sans recopie, invitations de toute l\'équipe', points: [
       '🎬 Vidéos → « Publier sur le site » : le film déjà rangé dans l\'espace d\'équipe est mis sur le site directement (plus de recopie de 40 Mo qui échouait). Quelques secondes suffisent.',
-      '📁 Événements : nouvelle partie « 👥 Invitations de toute l\'équipe ». Chaque membre voit les invitations des autres, en regarde l\'aperçu et peut en ouvrir une copie (l\'original ne change pas).'] },
+      '📁 Événements : nouvelle partie « 👥 Invitations de toute l\'équipe ». Chaque membre voit les invitations des autres, en regarde l\'aperçu et peut en ouvrir une copie (l\'original ne change pas).',
+      '🔑 Jeton GitHub fixe : chaque membre prend toujours le jeton de l\'équipe (plus de demande de jeton à chaque publication).',
+      '🎬 Films jusqu\'à 200 Mo partagés avec l\'équipe ; les films restés sur un ordinateur repartent tout seuls (🎬 Vidéos → « Les partager maintenant »).'] },
     { id: '2026-11-24-4', date: '24 novembre 2026', titre: 'Jeton GitHub : une seule personne le renouvelle', points: [
       'Quand le jeton de publication expire : seul l\'<b>admin</b> le recolle (une fois) ; il est aussitôt partagé avec toute l\'équipe. Les membres ne voient plus la demande de jeton : leur studio reprend tout seul le nouveau.',
       'Conseil : à la création du jeton sur GitHub, choisissez l\'expiration la plus longue (« No expiration » si proposé).'] },
@@ -4701,10 +4712,11 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     if (filmsEnPartage || !Equipe.actif() || !navigator.onLine) return 0;
     filmsEnPartage = true; let n = 0;
     try {
-      for (const f of Films.liste().filter(x => !x.equipe_id && !x.site && !x.equipe_refus)) {
+      Films.liste().filter(x => x.equipe_refus === 'plus de 50 Mo').forEach(x => Films.maj(x.id, { equipe_refus: null }));   // limite passée à 200 Mo : on réessaie
+      for (const f of Films.liste().filter(x => !x.equipe_id && !x.equipe_refus)) {
         try {
           const blob = await Films.blob(f); if (!blob) continue;
-          if (blob.size > 50e6) { Films.maj(f.id, { equipe_refus: 'plus de 50 Mo' }); continue; }
+          if (blob.size > 200e6) { Films.maj(f.id, { equipe_refus: 'plus de 200 Mo' }); continue; }
           if (suivi) suivi(f.titre);
           const it = await Equipe.ajouterFilm(blob, { titre: f.titre, vignette: f.vignette });
           if (it && it.id) { Films.maj(f.id, { equipe_id: it.id }); n++; }
@@ -5868,7 +5880,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     const tout = (Equipe.items || []).filter(x => x.type === 'film' || x.type === 'fond' || x.type === 'video').sort((a, b) => String(b.cree || '').localeCompare(String(a.cree || '')));
     films = tout.filter(x => x.type === 'film');
     const fondsEq = tout.filter(x => x.type !== 'film');
-    const aPartager = medias.filter(m => (m.type === 'fond' || m.type === 'video' || m.anime) && !m.equipe_id && !m.brouillon && /^idb:/.test(m.src || '')).length + (Equipe.actif() ? Films.liste().filter(x => !x.equipe_id && !x.site && !x.equipe_refus).length : 0);
+    const aPartager = medias.filter(m => (m.type === 'fond' || m.type === 'video' || m.anime) && !m.equipe_id && !m.brouillon && /^idb:/.test(m.src || '')).length + (Equipe.actif() ? Films.liste().filter(x => !x.equipe_id && !x.equipe_refus).length : 0);
     let indexSite = [];
     try { const r = await fetch(urlSite() + 'vitrine/index.json?v=' + Date.now(), { cache: 'no-store' }); if (r.ok) { indexSite = await r.json(); surSite = new Set(indexSite.map(x => x.slug)); } } catch (e) {}
     // films déjà publiés sur le site (par n'importe quel membre) : visibles par toute l'équipe, sans passer par la base

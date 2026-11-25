@@ -885,3 +885,5 @@ end $$;
 
 grant execute on function public.equipe_projets_tous(text) to anon, authenticated;
 grant execute on function public.equipe_projet_voir(text, text) to anon, authenticated;
+
+update storage.buckets set file_size_limit = 209715200 where id = 'equipe';
