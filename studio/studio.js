@@ -4706,13 +4706,15 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
       // tous les films de l'équipe encore dans la base : publiés sur le site, puis retirés de la base (place libérée)
       let att = []; try { att = (await mesDemandes()).filter(d => d.statut === 'attente' && d.type === 'film'); } catch (e) {}
       await Equipe.charger().catch(() => {});
-      const aDeplacer = (Equipe.items || []).filter(x => x.type === 'film' && x.chemin && !/^site:/.test(x.chemin));
+      let surSite = new Set(); try { surSite = new Set((await lireVitrine()).map(x => x.slug)); } catch (e) { return; }
+      const aDeplacer = (Equipe.items || []).filter(x => x.type === 'film' && x.chemin && !/^site:/.test(x.chemin) && !surSite.has('film-' + x.id) && att.some(d => d.objet === x.id));
       let n = 0;
       for (const f of aDeplacer) {
         try {
           await publierFilmVitrine(f);
           const ext = (f.chemin.split('.').pop() || 'mp4').toLowerCase();
-          await Equipe.rpc('equipe_biblio_deplacer', { p_id: f.id, p_chemin: 'site:medias/films/' + f.id + '.' + ext }).then(() => Equipe.supprimerFichier(f.chemin)).catch(e => console.warn('déplacement', e.message));
+          // le film reste dans l'espace d'équipe (le site le lit là-bas) : on ne le retire JAMAIS de la base
+          void ext;
           const d = att.find(x => x.objet === f.id); if (d) await Equipe.rpc('equipe_pub_maj', { p_id: d.id, p_statut: 'publiee', p_message: 'publié automatiquement', p_resultat: { date: new Date().toISOString(), auto: true } }).catch(() => {});
           n++;
         } catch (e) { console.warn('publication auto', f.nom, e.message); if (baseBloquee(e)) break; }
