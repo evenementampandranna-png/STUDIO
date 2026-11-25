@@ -1,5 +1,15 @@
 [
  {
+  "slug": "film-filmmwuqkyiwafl2",
+  "film": true,
+  "video": "https://wckwwupnidcnufnlclbw.supabase.co/storage/v1/object/public/equipe/d29aee1cf2ec46fa937028bb468d3ba7/filmmwuqkyiwafl2.mp4",
+  "titre": "Invitation de mariage de VONITIANA Joro & AMBOARA Tina",
+  "type": "Film vidéo",
+  "vignette": "medias/films/filmmwuqkyiwafl2.jpg",
+  "auteur": "JULIA",
+  "date": "2026-11-25"
+ },
+ {
   "slug": "film-filmmwuql9hql770",
   "film": true,
   "video": "https://wckwwupnidcnufnlclbw.supabase.co/storage/v1/object/public/equipe/d29aee1cf2ec46fa937028bb468d3ba7/filmmwuql9hql770.mp4",
