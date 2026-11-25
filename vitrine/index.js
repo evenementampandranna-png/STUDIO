@@ -1,5 +1,15 @@
 window.VITRINE = [
  {
+  "slug": "film-filmmwvthlnyqiu3",
+  "film": true,
+  "video": "https://wckwwupnidcnufnlclbw.supabase.co/storage/v1/object/public/equipe/d29aee1cf2ec46fa937028bb468d3ba7/filmmwvthlnyqiu3.mp4",
+  "titre": "Mariazin'i Nathan sy Anna — 14 Novambra 2026",
+  "type": "Film vidéo",
+  "vignette": "medias/films/filmmwvthlnyqiu3.jpg",
+  "auteur": "Rova",
+  "date": "2026-11-25"
+ },
+ {
   "slug": "film-filmmwvq16pkttnn",
   "film": true,
   "video": "https://wckwwupnidcnufnlclbw.supabase.co/storage/v1/object/public/equipe/d29aee1cf2ec46fa937028bb468d3ba7/filmmwvq16pkttnn.mp4",
