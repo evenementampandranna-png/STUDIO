@@ -1,0 +1,743 @@
+{
+ "id": "es5dmbh6",
+ "cree": "2026-11-19T10:55:33.446Z",
+ "slug": "barbie-birthday-party-es5d",
+ "fiche": {
+  "date": "2026-12-05",
+  "type": "anniversaire",
+  "heure": "14:00",
+  "hotes": [
+   {
+    "surnom": "Votre petite Barbie",
+    "nom_complet": "SAROBIDY"
+   }
+  ],
+  "lieux": [
+   {
+    "nom": "Chez nous à Ivato",
+    "maps": "",
+    "role": "reception",
+    "adresse": ""
+   }
+  ],
+  "titre": "BARBIE BIRTHDAY PARTY",
+  "langue": "fr",
+  "phrases": [
+   "🎀 BARBIE BIRTHDAY PARTY 💕",
+   "💖 SAROBIDY 💖",
+   "🎂 5 ANS 🎂",
+   "Bienvenue dans mon univers magique, où les rêves deviennent réalité !",
+   "Une petite princesse grandit, et aujourd’hui, elle s’apprête à souffler ses 5 bougies !",
+   "C’est avec beaucoup de joie, d’amour et de magie que je vous invite à célébrer mon 5ᵉ anniversaire dans un merveilleux univers rose, rempli de bonheur, de rires et de jolies surprises !",
+   "💕 SAVE THE DATE 💕",
+   "Dress Code : Rose & Univers Disney",
+   "✨ UNE TOUCHE DE MAGIE ✨",
+   "« Chaque jour est une nouvelle occasion de faire briller ses rêves et de créer de merveilleux souvenirs. »",
+   "💖 UN MOMENT INOUBLIABLE 💖",
+   "Votre présence sera le plus beau des cadeaux pour rendre cette journée encore plus magique, joyeuse et inoubliable !",
+   "Venez partager avec moi un moment féerique, rempli de sourires, de douceur et de magie !",
+   "🎀 MERCI DU FOND DU CŒUR 🎀",
+   "Avec tout mon amour,",
+   "Votre petite Barbie, SAROBIDY !",
+   "💕 See you at my Barbie Party ! 💕"
+  ],
+  "celebres": [
+   {
+    "occasion": "5ᵉ anniversaire",
+    "nom_complet": "SAROBIDY"
+   }
+  ],
+  "contacts": [],
+  "a_verifier": [
+   "Le nom complet de SAROBIDY n'est pas précisé.",
+   "Le surnom « Votre petite Barbie » est déduit de la signature et n'est pas explicitement présenté comme un surnom.",
+   "L'adresse exacte du lieu « Chez nous à Ivato » n'est pas précisée.",
+   "Aucune date limite de confirmation de présence n'est indiquée.",
+   "Aucun contact téléphonique n'est fourni.",
+   "SAROBIDY est considérée comme l'hôte de l'invitation, mais aucun organisateur adulte n'est mentionné."
+  ],
+  "date_limite": "2026-12-01",
+  "remerciement": "Merci de faire partie de mon petit monde enchanté. J’ai tellement hâte de partager cette merveilleuse journée avec vous !"
+ },
+ "plans": [
+  {
+   "id": "pp866f60",
+   "fond": {
+    "media": "medias/eq-mwnjgdt8ri9qat.mp4",
+    "boucle": true,
+    "assombrir": 0,
+    "eclaircir": 0
+   },
+   "role": "ouverture",
+   "duree": 6.3,
+   "calques": [
+    {
+     "x": 84,
+     "y": 4,
+     "id": "tf5vok46",
+     "type": "bouton",
+     "debut": 0,
+     "style": "lien",
+     "texte": "Passer ›",
+     "action": "passer",
+     "taille": 2,
+     "couleur": "#7a1f2b",
+     "largeur": 26,
+     "trad": {
+      "mg": "Mandalo >",
+      "en": "Pass >",
+      "de": "Pass >",
+      "it": "Passa >",
+      "es": "Pase >"
+     }
+    }
+   ],
+   "transition": {
+    "type": "aucune",
+    "duree": 0.8
+   }
+  },
+  {
+   "id": "1opeyu4f",
+   "fond": {
+    "media": "medias/eq-mwnfop7okddo8y.mp4",
+    "boucle": true,
+    "assombrir": 0,
+    "eclaircir": 0
+   },
+   "role": "intermediaire",
+   "duree": 4,
+   "calques": [
+    {
+     "x": 50,
+     "y": 50,
+     "id": "l27ja9rf",
+     "fin": "",
+     "gras": false,
+     "type": "texte",
+     "align": "center",
+     "debut": 0.3,
+     "ombre": true,
+     "texte": "BIRTHDAY PARTY",
+     "police": "Intro",
+     "taille": 7.8,
+     "couleur": "#f40b9e",
+     "largeur": 73.5,
+     "animation": "ecriture",
+     "trad": {
+      "mg": "FETY FETY",
+      "en": "BIRTHDAY PARTY",
+      "de": "GEBURTSTAGSFEIER",
+      "it": "FESTA DI COMPLEANNO",
+      "es": "FIESTA DE CUMPLEAÑOS"
+     }
+    },
+    {
+     "x": 51.8,
+     "y": 71.7,
+     "id": "x3dskq0v",
+     "type": "texte",
+     "align": "center",
+     "debut": 0.4,
+     "ombre": true,
+     "texte": "SAROBIDY",
+     "police": "Intro",
+     "sortie": "aucune",
+     "taille": 5.2,
+     "contour": "#f40b9e",
+     "couleur": "#ffffff",
+     "largeur": 53.6,
+     "italique": true,
+     "animation": "fondu-montee",
+     "ombre_force": 0,
+     "contour_epaisseur": 16,
+     "trad": {
+      "mg": "SAROBIDY",
+      "en": "SAROBIDY",
+      "de": "SAROBIDY",
+      "it": "SAROBIDIA",
+      "es": "SAROBIDIA"
+     }
+    }
+   ],
+   "transition": {
+    "type": "fondu",
+    "duree": 0.8
+   }
+  },
+  {
+   "id": "g3f7td78",
+   "fond": {
+    "media": "medias/eq-mwnidw24sybzr0.mp4",
+    "boucle": true,
+    "assombrir": 0,
+    "eclaircir": 0
+   },
+   "role": "intermediaire",
+   "duree": 5,
+   "calques": [],
+   "transition": {
+    "type": "fondu",
+    "duree": 0.8
+   }
+  },
+  {
+   "id": "duw2guhx",
+   "fond": {
+    "media": "medias/eq-mwnlasc8bm4703.mp4",
+    "boucle": true,
+    "assombrir": 0,
+    "eclaircir": 0
+   },
+   "role": "intermediaire",
+   "duree": 8,
+   "calques": [],
+   "transition": {
+    "type": "fondu",
+    "duree": 0.8
+   }
+  },
+  {
+   "id": "46ni2rr0",
+   "fond": {
+    "media": "medias/eq-mwnimgnoi6h9lv.mp4",
+    "boucle": true,
+    "assombrir": 0,
+    "eclaircir": 0
+   },
+   "role": "intermediaire",
+   "duree": 8,
+   "calques": [],
+   "transition": {
+    "type": "fondu",
+    "duree": 0.8
+   }
+  },
+  {
+   "id": "583whnza",
+   "fond": {
+    "media": "medias/eq-mwnhuxg81ccrko.mp4",
+    "boucle": true,
+    "assombrir": 0,
+    "eclaircir": 0
+   },
+   "role": "intermediaire",
+   "duree": 7,
+   "calques": [],
+   "transition": {
+    "type": "fondu",
+    "duree": 0.8
+   }
+  },
+  {
+   "id": "otp5evyf",
+   "fond": {
+    "media": "medias/eq-mwnjl7px3udfwd.mp4",
+    "boucle": true,
+    "assombrir": 0,
+    "eclaircir": 0
+   },
+   "role": "intermediaire",
+   "duree": 10,
+   "calques": [],
+   "transition": {
+    "type": "fondu",
+    "duree": 0.8
+   }
+  },
+  {
+   "id": "o3n76iy9",
+   "fond": {
+    "media": "medias/eq-mwnjvcgevfrehk.mp4",
+    "boucle": true,
+    "assombrir": 0,
+    "eclaircir": 0
+   },
+   "role": "confirmation",
+   "duree": 0,
+   "calques": [
+    {
+     "x": 51,
+     "y": 27.4,
+     "id": "ovaff94e",
+     "fin": "",
+     "gras": false,
+     "type": "texte",
+     "align": "center",
+     "debut": 0.2,
+     "ombre": true,
+     "texte": "Pour Confirmation",
+     "police": "Great Vibes",
+     "taille": 6.6,
+     "couleur": "#9c6b3f",
+     "largeur": 100,
+     "animation": "fondu-descente",
+     "condition": "famille",
+     "trad": {
+      "mg": "Ho an'ny fanamafisana",
+      "en": "For Confirmation",
+      "de": "Zur Konfirmation",
+      "it": "Per la Cresima",
+      "es": "Para confirmación"
+     }
+    },
+    {
+     "x": 51,
+     "y": 33.9,
+     "id": "7wg4aoyy",
+     "fin": "",
+     "gras": true,
+     "type": "texte",
+     "align": "center",
+     "debut": 0.4,
+     "ombre": true,
+     "texte": "Nous invitons {places} personnes",
+     "police": "Cormorant Garamond",
+     "taille": 3.5,
+     "couleur": "#f40b9e",
+     "largeur": 83.1,
+     "animation": "fondu-descente",
+     "condition": "famille",
+     "trad": {
+      "mg": "Manasa olona {places} izahay",
+      "en": "We invite {places} people",
+      "de": "Wir laden {places} Personen ein",
+      "it": "Invitiamo {places} persone",
+      "es": "Invitamos a {places} personas"
+     }
+    },
+    {
+     "x": 51.5,
+     "y": 41.6,
+     "id": "qlonx183",
+     "fin": "",
+     "gras": false,
+     "type": "texte",
+     "align": "center",
+     "debut": 0.6,
+     "ombre": true,
+     "texte": "Merci de répondre avant le {date_limite}",
+     "police": "Cormorant Garamond",
+     "taille": 2.9,
+     "couleur": "#7a1f2b",
+     "largeur": 75.8,
+     "animation": "fondu-descente",
+     "trad": {
+      "mg": "Mba valio alohan'ny {date_limite}",
+      "en": "Please respond before {date_limite}",
+      "de": "Bitte antworten Sie vor dem {date_limite}",
+      "it": "Per favore rispondi prima del {date_limite}",
+      "es": "Por favor responda antes del {date_limite}"
+     }
+    },
+    {
+     "x": 50,
+     "y": 48.6,
+     "id": "ir255jjh",
+     "fin": "",
+     "gras": false,
+     "type": "texte",
+     "align": "center",
+     "debut": 0.8,
+     "ombre": true,
+     "texte": "Le grand jour dans",
+     "police": "Cormorant Garamond",
+     "taille": 3.4,
+     "couleur": "#f40b9e",
+     "largeur": 96.7,
+     "animation": "fondu-descente",
+     "majuscules": true,
+     "trad": {
+      "mg": "Ny andro lehibe ao",
+      "en": "The big day in",
+      "de": "Der große Tag in",
+      "it": "Il grande giorno",
+      "es": "El gran día en"
+     }
+    },
+    {
+     "x": 50,
+     "y": 55.8,
+     "id": "59857x92",
+     "fin": "",
+     "gras": true,
+     "type": "texte",
+     "align": "center",
+     "debut": 0.8,
+     "ombre": true,
+     "texte": "{compte_a_rebours}",
+     "police": "Bebas Neue",
+     "taille": 4.6,
+     "couleur": "#7a1f2b",
+     "largeur": 100,
+     "animation": "fondu",
+     "trad": {
+      "mg": "{compte_a_rebours}",
+      "en": "{compte_a_rebours}",
+      "de": "{compte_a_rebours}",
+      "it": "{compte_a_rebours}",
+      "es": "{compte_a_rebours}"
+     }
+    },
+    {
+     "x": 51.5,
+     "y": 63,
+     "id": "lxrphs8r",
+     "min": 0,
+     "type": "compteur",
+     "champ": "adultes",
+     "debut": 1.5,
+     "style": "plein",
+     "texte": "Adultes",
+     "action": "",
+     "defaut": 1,
+     "sortie": "aucune",
+     "taille": 2.08,
+     "couleur": "#9c6b3f",
+     "largeur": 59.5,
+     "animation": "fondu-descente",
+     "condition": "famille",
+     "duree_animation": 0.8,
+     "trad": {
+      "mg": "OLON-DEHIBE",
+      "en": "Adults",
+      "de": "Erwachsene",
+      "it": "Adulti",
+      "es": "Adultos"
+     }
+    },
+    {
+     "x": 51.5,
+     "y": 68.9,
+     "id": "m552eni2",
+     "min": 0,
+     "type": "compteur",
+     "champ": "enfants",
+     "debut": 1.7,
+     "style": "plein",
+     "texte": "Enfants",
+     "action": "",
+     "defaut": 0,
+     "sortie": "aucune",
+     "taille": 2.08,
+     "couleur": "#9c6b3f",
+     "largeur": 59.5,
+     "animation": "fondu-descente",
+     "condition": "famille",
+     "duree_animation": 0.8,
+     "trad": {
+      "mg": "aNKIZY",
+      "en": "Children",
+      "de": "Kinder",
+      "it": "Bambini",
+      "es": "Niños"
+     }
+    },
+    {
+     "x": 51.5,
+     "y": 75.6,
+     "id": "tmh59idp",
+     "type": "bouton",
+     "debut": 1.9,
+     "style": "plein",
+     "texte": "Je confirme ma présence",
+     "action": "confirmer",
+     "sortie": "aucune",
+     "taille": 2.16,
+     "couleur": "#9c6b3f",
+     "largeur": 59.5,
+     "animation": "fondu-descente",
+     "condition": "famille",
+     "duree_animation": 0.8,
+     "trad": {
+      "mg": "Manamafy ny fanatrehany aho",
+      "en": "I confirm my presence",
+      "de": "Ich bestätige meine Anwesenheit",
+      "it": "Confermo la mia presenza",
+      "es": "confirmo mi presencia"
+     }
+    },
+    {
+     "x": 51.5,
+     "y": 81.5,
+     "id": "p14w7pt7",
+     "type": "bouton",
+     "debut": 2.1,
+     "style": "contour",
+     "texte": "Je ne pourrai pas venir",
+     "action": "refuser",
+     "sortie": "aucune",
+     "taille": 1.89,
+     "couleur": "#9c6b3f",
+     "largeur": 59.5,
+     "animation": "fondu-descente",
+     "condition": "famille",
+     "duree_animation": 0.8,
+     "trad": {
+      "mg": "Tsy ho tonga aho",
+      "en": "I won't be able to come",
+      "de": "Ich werde nicht kommen können",
+      "it": "Non potrò venire",
+      "es": "no podré venir"
+     }
+    },
+    {
+     "x": 50,
+     "y": 54.00000000000001,
+     "id": "68h4s6q4",
+     "type": "bouton",
+     "cible": 0,
+     "debut": 0,
+     "style": "plein",
+     "texte": "Répondre sur WhatsApp",
+     "action": "whatsapp",
+     "taille": 2.4,
+     "couleur": "#7a1f2b",
+     "largeur": 66,
+     "condition": "general",
+     "trad": {
+      "mg": "Valio amin'ny WhatsApp",
+      "en": "Reply on WhatsApp",
+      "de": "Auf WhatsApp antworten",
+      "it": "Rispondi su WhatsApp",
+      "es": "Responder en WhatsApp"
+     }
+    },
+    {
+     "x": 51.5,
+     "y": 88.5,
+     "id": "46657mlf",
+     "type": "bouton",
+     "cible": 0,
+     "debut": 2,
+     "style": "contour",
+     "texte": "Maps",
+     "action": "map",
+     "taille": 1.8,
+     "b_icone": "gmaps",
+     "couleur": "#9c6b3f",
+     "largeur": 37.2,
+     "animation": "fondu-descente",
+     "trad": {
+      "mg": "Maps",
+      "en": "Maps",
+      "de": "Karten",
+      "it": "Mappe",
+      "es": "Mapas"
+     }
+    }
+   ],
+   "transition": {
+    "type": "fondu",
+    "duree": 0.8
+   }
+  },
+  {
+   "id": "2mldidcz",
+   "fond": {
+    "media": "medias/eq-mwnj4xuejcdujl.mp4",
+    "boucle": true,
+    "assombrir": 0,
+    "eclaircir": 0
+   },
+   "role": "remerciement",
+   "duree": 6,
+   "calques": [
+    {
+     "x": 48,
+     "y": 24.6,
+     "id": "e2vnhfvs",
+     "fin": "",
+     "gras": false,
+     "type": "texte",
+     "align": "center",
+     "debut": 0.3,
+     "ombre": true,
+     "texte": "Merci",
+     "police": "Great Vibes",
+     "taille": 8.4,
+     "couleur": "#f40b9e",
+     "largeur": 84.2,
+     "animation": "ecriture",
+     "trad": {
+      "mg": "MISAOTRA",
+      "en": "THANKS",
+      "de": "DANKE",
+      "it": "GRAZIE",
+      "es": "GRACIAS"
+     }
+    },
+    {
+     "x": 50,
+     "y": 48.6,
+     "id": "xfu7poaf",
+     "fin": "",
+     "gras": false,
+     "type": "texte",
+     "align": "center",
+     "debut": 1.6,
+     "ombre": true,
+     "texte": "Merci de faire partie de mon petit monde enchanté. J’ai tellement hâte de partager cette merveilleuse journée avec vous !",
+     "police": "Cormorant Garamond",
+     "taille": 4,
+     "couleur": "#ffffff",
+     "largeur": 81.3,
+     "italique": true,
+     "animation": "fondu-montee",
+     "ombre_force": 0,
+     "trad": {
+      "mg": "Misaotra anao amin'ny maha-ampahany amin'ny tontolo keliko mahafinaritra ahy. Tsy andriko ny hizara ity andro mahafinaritra ity aminareo!",
+      "en": "Thank you for being part of my enchanted little world. I can’t wait to share this wonderful day with you!",
+      "de": "Danke, dass du Teil meiner verzauberten kleinen Welt bist. Ich kann es kaum erwarten, diesen wundervollen Tag mit Ihnen zu teilen!",
+      "it": "Grazie per far parte del mio piccolo mondo incantato. Non vedo l’ora di condividere questa meravigliosa giornata con voi!",
+      "es": "Gracias por ser parte de mi pequeño mundo encantado. ¡No puedo esperar para compartir este maravilloso día contigo!"
+     }
+    },
+    {
+     "x": 50,
+     "y": 74,
+     "id": "nvg90ui3",
+     "type": "bouton",
+     "debut": 0,
+     "style": "plein",
+     "texte": "Partager",
+     "action": "partager",
+     "taille": 2.4,
+     "couleur": "#f40b9e",
+     "largeur": 52,
+     "trad": {
+      "mg": "anjara",
+      "en": "Share",
+      "de": "Aktie",
+      "it": "Condividere",
+      "es": "Compartir"
+     }
+    },
+    {
+     "x": 50,
+     "y": 81,
+     "id": "j6q4f385",
+     "type": "bouton",
+     "debut": 0,
+     "style": "contour",
+     "texte": "Revoir le film",
+     "action": "revoir",
+     "taille": 2.1,
+     "couleur": "#f40b9e",
+     "largeur": 52,
+     "trad": {
+      "mg": "Jereo indray ilay sarimihetsika",
+      "en": "Watch the movie again",
+      "de": "Schauen Sie sich den Film noch einmal an",
+      "it": "Guarda di nuovo il film",
+      "es": "Mira la película de nuevo"
+     }
+    }
+   ],
+   "transition": {
+    "type": "fondu",
+    "duree": 0.8
+   }
+  }
+ ],
+ "style": {
+  "couleur": "#7a1f2b",
+  "couleur2": "#9c6b3f",
+  "police_texte": "Cormorant Garamond",
+  "police_titre": "Great Vibes"
+ },
+ "guides": {
+  "h": [],
+  "v": []
+ },
+ "modifie": "2026-11-25T12:20:43.761Z",
+ "musique": {
+  "nom": "WhatsApp Audio 2026-11-19 at 11.00.03.mpeg",
+  "src": "medias/eq-s-ridjqqg0.mp3",
+  "debut": 0,
+  "volume": 0.5
+ },
+ "version": 1,
+ "mise_en_page": true,
+ "polices_perso": [
+  {
+   "nom": "Intro",
+   "src": "medias/police-nnuwaw6m.ttf"
+  },
+  {
+   "nom": "Accidental Presidency",
+   "src": "polices/accidental-presidency.ttf"
+  }
+ ],
+ "statut": "brouillon",
+ "langues": [
+  "fr",
+  "mg",
+  "en",
+  "de",
+  "it",
+  "es"
+ ],
+ "client": {
+  "nom": "Ely",
+  "telephone": "0347157744"
+ },
+ "licence": {
+  "code": "LIC-DA47-7C4B",
+  "client": "Ely",
+  "date": "2026-11-25T12:20:39.061Z"
+ },
+ "reponses_generales": [],
+ "liens": {
+  "CR7JJFVX": {
+   "nom": "Nouvelle famille",
+   "places": 2,
+   "adultes": 2,
+   "enfants": 0
+  },
+  "J44NPUQR": {
+   "nom": "Nouvelle famille",
+   "places": 2,
+   "adultes": 2,
+   "enfants": 0
+  },
+  "B38W4CWJ": {
+   "nom": "Nouvelle famille",
+   "places": 2,
+   "adultes": 2,
+   "enfants": 0
+  },
+  "YLPLP2RP": {
+   "nom": "Nouvelle famille",
+   "places": 2,
+   "adultes": 2,
+   "enfants": 0
+  },
+  "PRCKQRYM": {
+   "nom": "Nouvelle famille",
+   "places": 2,
+   "adultes": 2,
+   "enfants": 0
+  },
+  "E4ZCUDYR": {
+   "nom": "santatra",
+   "places": 2,
+   "adultes": 1,
+   "enfants": 1
+  },
+  "9VCTA9F4": {
+   "nom": "Rova",
+   "places": 1,
+   "adultes": 1,
+   "enfants": 0
+  }
+ },
+ "publication": {
+  "date": "2026-11-25T12:21:42.113Z",
+  "firebase": null,
+  "supabase": {
+   "url": "https://wckwwupnidcnufnlclbw.supabase.co",
+   "anon": "sb_publishable_VzdoRK9u8WvDk1cZ6sIQZQ_qcxHeCZX"
+  }
+ }
+}
