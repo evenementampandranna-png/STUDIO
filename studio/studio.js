@@ -4765,6 +4765,37 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     return { repares, perdus };
   }
   setTimeout(() => reparerFilmsEquipe().catch(e => console.warn(e)), 12000);
+  // Refaire un film de l'équipe dont le fichier est perdu, à partir de son invitation en ligne (comme l'aperçu du studio)
+  async function refaireFilmEquipe(f, suivi) {
+    suivi = suivi || (() => {});
+    const norm = t => String(t || '').replace(/^Film — /, '').replace(/\(copie\)/gi, '').toLowerCase().replace(/[^a-z0-9à-ÿ]+/g, ' ').trim();
+    const titre = norm(f.evenement || f.nom), auteur = norm(f.auteur);
+    suivi('Recherche de l\'invitation…');
+    const l = (await projetsEquipeTous()) || [];
+    const parDate = (a, b) => String(b.maj || '').localeCompare(String(a.maj || ''));
+    const t = l.filter(x => norm(x.titre) === titre && norm(x.auteur) === auteur).sort(parDate)[0] || l.filter(x => norm(x.titre) === titre).sort(parDate)[0];
+    if (!t) throw new Error('invitation « ' + (f.evenement || f.nom) + ' » introuvable dans la copie en ligne');
+    const pr = await projetEquipeLire(t.projet); if (!pr || !pr.plans) throw new Error('invitation illisible');
+    try { await recevoirPolices(pr); } catch (e) {}
+    const box = document.createElement('div'); box.style.cssText = 'position:fixed;left:-12000px;top:0;width:360px;height:640px;overflow:hidden'; document.body.appendChild(box);
+    const eng = new Moteur(box, { mode: 'rendu', resolveur: resoudre });
+    try {
+      eng.famille = Object.assign({}, FAMILLE_TEST); eng.form = Object.assign(eng.form || {}, { adultes: FAMILLE_TEST.adultes, enfants: FAMILLE_TEST.enfants });
+      suivi('Préparation…');
+      await eng.setProjet(Fabrique.confirmationPourTous(pr));
+      const mus = pr.musique ? await resoudre(pr.musique.src) : null;
+      const r = await eng.exporterFilm({ musique: mus, debut: pr.musique ? Number(pr.musique.debut) || 0 : 0, volume: pr.musique ? pr.musique.volume : 0.8, etape: x => suivi(x), progres: v => suivi('Fabrication ' + Math.round(v * 100) + ' %') });
+      if (!r || !r.blob || r.blob.size < 10000) throw new Error('film vide');
+      suivi('Envoi (' + (r.blob.size / 1e6).toFixed(1) + ' Mo)…');
+      const chemin = reglages.equipe.cle + '/' + f.id + '.' + (r.extension || 'mp4');
+      await Equipe.envoyerFichier(chemin, r.blob, true);
+      await Equipe.rpc('equipe_biblio_deplacer', { p_id: f.id, p_chemin: chemin });
+      try { await IDB.mettre('cache:equipe/' + chemin, r.blob); } catch (e) {}
+      if (peutPublierGitHub()) { try { const index = await lireVitrine(), e = index.find(x => x.slug === 'film-' + f.id); if (e) { e.video = Equipe.url(chemin); await ecrireVitrine(index, 'Vitrine : film refait ' + (f.evenement || f.nom)); } } catch (e) { console.warn(e.message); } }
+      Stock.ecrire('studio.films.perdus', Stock.lire('studio.films.perdus', []).filter(x => x.id !== f.id));
+      return r;
+    } finally { try { eng.detruire(); } catch (e) {} box.remove(); }
+  }
   // films validés sur cet ordinateur mais jamais partagés (ex. faits avant cette version) : envoyés pour que toute l'équipe les voie
   let filmsRattrapes = false;
   async function rattraperFilms() {
@@ -6026,7 +6057,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     // un même film enregistré plusieurs fois (même invitation, même auteur) : seule la version la plus récente est montrée
     const cleFilm = f => (f.auteur || '').trim().toLowerCase() + '|' + String(f.evenement || f.nom || '').replace(/^Film — /, '').toLowerCase().replace(/[^a-z0-9à-ÿ]+/g, ' ').trim();
     const recent = {}; films.forEach(f => { const k = cleFilm(f); if (!recent[k] || String(f.cree || '') > String(recent[k].cree || '')) recent[k] = f; });
-    const anciens = new Set(films.filter(f => recent[cleFilm(f)] !== f && !pub(f)).map(f => f.id));
+    const anciens = new Set(films.filter(f => recent[cleFilm(f)] !== f && !surSite.has('film-' + f.id)).map(f => f.id));
     const visibles = base.filter(f => (vpFiltre.versions || !anciens.has(f.id)) && (f.type !== 'film' || vpFiltre.etat === 'tout' || (vpFiltre.etat === 'oui' ? pub(f) : !pub(f))) && (!vpFiltre.membre || (f.auteur || '—') === vpFiltre.membre));
     const date = x => x ? new Date(x).toLocaleString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
     const nPub = films.filter(pub).length;
@@ -6038,18 +6069,31 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
       ${peutPublier ? '' : '<div class="carte" style="padding:10px 12px;margin-top:10px;background:#fbf4ec">Pour mettre un film sur le site : « Demander la publication » — l\'admin valide et il est publié. Vous pouvez regarder et télécharger toutes les vidéos de l\'équipe.</div>'}
       <div class="ligne" style="margin:14px 0 10px;gap:6px;flex-wrap:wrap">
         ${[['tout', 'Toutes', films.length], ['non', 'Pas encore sur le site', films.length - nPub], ['oui', 'Sur le site', nPub]].map(([k, n, c]) => `<button class="btn petit ${vpFiltre.etat === k ? 'plein' : ''}" data-vpf="${k}">${n} (${c})</button>`).join('')}
-        ${anciens.size ? `<button class="btn petit ${vpFiltre.versions ? 'plein' : ''}" id="vp-versions" title="Le même film enregistré plusieurs fois">${vpFiltre.versions ? 'Cacher' : 'Voir'} les anciennes versions (${anciens.size})</button>` : ''}<select id="vp-membre"><option value="">Tous les membres</option>${membres.map(m => `<option ${vpFiltre.membre === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select>
+        ${films.some(f => perdus.has(f.id) && !anciens.has(f.id)) ? `<button class="btn petit plein" id="vp-refaire-tout" title="Refait chaque film introuvable à partir de son invitation en ligne (laissez l'onglet ouvert)">🎬 Refaire les films introuvables (${films.filter(f => perdus.has(f.id) && !anciens.has(f.id)).length})</button>` : ''}${anciens.size ? `<button class="btn petit ${vpFiltre.versions ? 'plein' : ''}" id="vp-versions" title="Le même film enregistré plusieurs fois">${vpFiltre.versions ? 'Cacher' : 'Voir'} les anciennes versions (${anciens.size})</button>` : ''}<select id="vp-membre"><option value="">Tous les membres</option>${membres.map(m => `<option ${vpFiltre.membre === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select>
         ${peutPublier ? `<span style="margin-left:auto" class="ligne"><label class="cases" style="margin:0"><input type="checkbox" id="vp-tous"> Tout cocher</label><button class="btn petit plein" id="vp-pub-sel" disabled>Publier la sélection</button><button class="btn petit" id="vp-pub-tout">Publier tout ce qui manque (${films.length - nPub})</button></span>` : ''}</div>
       <div class="muet" id="vp-etat" style="margin:0 0 8px"></div>
       <div class="grille" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr))">${visibles.map(f => { const u = f.url || Equipe.url(f.chemin), sv = pub(f), estFilm = f.type === 'film'; return `<div class="carte pile" style="padding:10px">
         <video src="${esc(u)}" ${f.chemin && !/^site:/.test(f.chemin) ? `data-chemin="${esc(f.chemin)}"` : ''} poster="${esc(f.vignette || '')}" controls preload="none" playsinline style="width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:8px;background:#000"></video>
         <div class="ligne" style="justify-content:space-between">${!estFilm ? '<span class="badge">🎞 fond vidéo</span>' : sv ? '<a class="badge ok" href="' + urlSite() + '#modeles" target="_blank" title="Voir sur le site">✓ publié sur le site ↗</a>' : (perdus.has(f.id) ? '<span class="badge alerte" title="Le fichier de ce film n\'est plus en ligne : son auteur ouvre son studio (copie renvoyée toute seule) ou l\'enregistre de nouveau">⚠ fichier introuvable</span>' : '<span class="badge">pas encore publié</span>')}${peutPublier && estFilm && !sv ? `<input type="checkbox" data-vp-sel="${esc(f.id)}" title="Sélectionner">` : ''}</div>
         <b style="font-size:13px">${esc((f.evenement || f.nom || '').replace(/^Film — /, ''))}</b><div class="muet" style="font-size:12px">par <b>${esc(f.auteur || '—')}</b> · ${date(f.cree)}${f.duree ? ' · ' + Math.round(f.duree) + ' s' : ''}</div>
-        <div class="ligne"><a class="btn petit" href="${esc(u)}" download target="_blank">Télécharger</a>${!estFilm ? '<a class="btn petit" href="#/bibliotheque">Dans la bibliothèque</a>' : !peutPublier ? (sv ? '' : demandesFilms[f.id] ? `<span class="badge">${demandesFilms[f.id] === 'attente' ? '⏳ demandé' : demandesFilms[f.id] === 'refusee' ? 'refusé' : ''}</span>` : `<button class="btn petit plein" data-vp-demander="${esc(f.id)}">Demander la publication</button>`) : peutPublier ? (sv ? `<button class="btn petit danger" data-vp-retirer="${esc(f.id)}">Retirer du site</button>` : `<button class="btn petit plein" data-vp-pub="${esc(f.id)}">Publier sur le site</button>`) : ''}<button class="btn petit danger" data-vp-suppr="${esc(f.id)}" title="Supprimer cette vidéo pour toute l'équipe${sv ? ' (et du site)' : ''}">🗑</button></div></div>`; }).join('') || '<p class="muet">Aucune vidéo ici. Les films fabriqués par l\'équipe arrivent tout seuls ; on peut aussi en ajouter avec « + Ajouter un film terminé ».</p>'}</div>`;
+        <div class="ligne"><a class="btn petit" href="${esc(u)}" download target="_blank">Télécharger</a>${!estFilm ? '<a class="btn petit" href="#/bibliotheque">Dans la bibliothèque</a>' : !peutPublier ? (sv ? '' : demandesFilms[f.id] ? `<span class="badge">${demandesFilms[f.id] === 'attente' ? '⏳ demandé' : demandesFilms[f.id] === 'refusee' ? 'refusé' : ''}</span>` : `<button class="btn petit plein" data-vp-demander="${esc(f.id)}">Demander la publication</button>`) : peutPublier ? (sv ? `<button class="btn petit danger" data-vp-retirer="${esc(f.id)}">Retirer du site</button>` : `<button class="btn petit plein" data-vp-pub="${esc(f.id)}">Publier sur le site</button>`) : ''}${estFilm && perdus.has(f.id) ? `<button class="btn petit plein" data-vp-refaire="${esc(f.id)}">🎬 Refaire le film</button>` : ''}<button class="btn petit danger" data-vp-suppr="${esc(f.id)}" title="Supprimer cette vidéo pour toute l'équipe${sv ? ' (et du site)' : ''}">🗑</button></div></div>`; }).join('') || '<p class="muet">Aucune vidéo ici. Les films fabriqués par l\'équipe arrivent tout seuls ; on peut aussi en ajouter avec « + Ajouter un film terminé ».</p>'}</div>`;
     $$('[data-vpf]', zone).forEach(b => b.onclick = () => { vpFiltre.etat = b.dataset.vpf; Stock.ecrire('studio.vp.filtre', vpFiltre); vueVideos(); });
     $$('video[data-chemin]', zone).forEach(v => { IDB.lire('cache:' + Equipe.url(v.dataset.chemin).split('/object/public/')[1]).then(b => { if (b && b.size) v.src = URL.createObjectURL(b); }).catch(() => {}); });
     $$('[data-vpt]', zone).forEach(b => b.onclick = () => { vpFiltre.type = b.dataset.vpt; Stock.ecrire('studio.vp.filtre', vpFiltre); vueVideos(); });
     const vr = $('#vp-rattraper', zone); if (vr) vr.onclick = async () => { vr.disabled = true; vr.textContent = 'Partage en cours…'; await Equipe.rattraper(); await partagerFilmsEquipe(t => { vr.textContent = 'Envoi : ' + t.slice(0, 30) + '…'; }); vueVideos(); };
+    const refaire = async (liste, etatEl) => {
+      let ok = 0; const rates = [];
+      for (const [k, f] of liste.entries()) {
+        const b = $(`[data-vp-refaire="${CSS.escape(f.id)}"]`, zone);
+        const suivi = t => { const x = `Film ${k + 1}/${liste.length} — ${(f.evenement || f.nom || '').replace(/^Film — /, '')} : ${t}`; if (etatEl) etatEl.textContent = x; if (b) b.textContent = t; };
+        try { await refaireFilmEquipe(f, suivi); ok++; if (b) b.textContent = '✓ Refait'; } catch (e) { rates.push((f.evenement || f.nom) + ' (' + e.message + ')'); if (b) { b.disabled = false; b.textContent = 'Réessayer'; } }
+      }
+      toast(ok + ' film(s) refait(s) et remis en ligne' + (rates.length ? ' · échec : ' + rates.join(' · ') : ''), 8000);
+      if (etatEl) etatEl.textContent = rates.length ? 'Non refaits : ' + rates.join(' · ') : '✓ ' + ok + ' film(s) refait(s)';
+      setTimeout(vueVideos, 1500);
+    };
+    $$('[data-vp-refaire]', zone).forEach(b => b.onclick = () => { const f = films.find(x => x.id === b.dataset.vpRefaire); b.disabled = true; refaire([f], $('#vp-etat', zone)); });
+    const vr2 = $('#vp-refaire-tout', zone); if (vr2) vr2.onclick = () => { vr2.disabled = true; refaire(films.filter(f => perdus.has(f.id) && !anciens.has(f.id)), $('#vp-etat', zone)); };
     const vv = $('#vp-versions', zone); if (vv) vv.onclick = () => { vpFiltre.versions = !vpFiltre.versions; Stock.ecrire('studio.vp.filtre', vpFiltre); vueVideos(); };
     $('#vp-membre', zone).onchange = e => { vpFiltre.membre = e.target.value; Stock.ecrire('studio.vp.filtre', vpFiltre); vueVideos(); };
     $$('[data-vp-demander]', zone).forEach(b => b.onclick = async () => {
