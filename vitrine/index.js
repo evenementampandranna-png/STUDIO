@@ -1,5 +1,15 @@
 window.VITRINE = [
  {
+  "slug": "film-filmmwur3xakisoj",
+  "film": true,
+  "video": "medias/films/filmmwur3xakisoj.mp4",
+  "titre": "INVITATION DE MARIAGE",
+  "type": "Film vidéo",
+  "vignette": "medias/films/filmmwur3xakisoj.jpg",
+  "auteur": "Rova",
+  "date": "2026-11-25"
+ },
+ {
   "slug": "film-filmmwur55mf1uij",
   "film": true,
   "video": "medias/films/filmmwur55mf1uij.mp4",
