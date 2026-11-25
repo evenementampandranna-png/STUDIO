@@ -254,13 +254,13 @@
   <a class="pied-mail" id="pied-mail" hidden>✉ <span id="pied-mail-t"></span></a>
 </div></footer>
 <div id="boite"><button id="fermer" aria-label="Fermer">×</button><div class="lecteur" id="lecteur"><div class="fin-film" id="fin"><button id="revoir">↺ Revoir le film</button><a id="essayer" target="_blank">Essayer l'invitation interactive</a></div></div><div class="barre-lecture"><div id="progression"></div></div></div>
-<script src="config.js?v=202611251203"></script>
-<script src="moteur/langue.js?v=202611251203"></script>
-<script src="moteur/lecteur-plein.js?v=202611251203"></script>
-<script src="moteur/vitrine-en.js?v=202611251203"></script>
-<script src="moteur/moteur.js?v=202611251203"></script>
-<script src="moteur/fabrique.js?v=202611251203"></script>
-<script src="vitrine/index.js?v=202611251203"></script>
+<script src="config.js?v=202611251206"></script>
+<script src="moteur/langue.js?v=202611251206"></script>
+<script src="moteur/lecteur-plein.js?v=202611251206"></script>
+<script src="moteur/vitrine-en.js?v=202611251206"></script>
+<script src="moteur/moteur.js?v=202611251206"></script>
+<script src="moteur/fabrique.js?v=202611251206"></script>
+<script src="vitrine/index.js?v=202611251206"></script>
 <script>
 (async function () {
   const $ = s => document.querySelector(s);
@@ -303,6 +303,10 @@
   await Promise.all(liste.filter(m => !m.film).map(m => charger('projets/' + encodeURIComponent(m.slug) + '.js?v=' + Date.now())));
   const projets = window.PROJETS || {};
   liste = liste.filter(m => m.film ? m.video : projets[m.slug]);
+  // un film dont le fichier ne répond pas n'est pas montré (pas de lecteur vide pour les visiteurs)
+  const filmOk = async m => { try { const r = await Promise.race([fetch(m.video, { headers: { Range: 'bytes=0-1' }, cache: 'no-store' }), new Promise((ok, ko) => setTimeout(() => ko(new Error('délai')), 8000))]); return r.ok || r.status === 206; } catch (e) { return e.message === 'délai'; } };
+  const oks = await Promise.all(liste.map(m => m.film ? filmOk(m) : true));
+  liste = liste.filter((m, i) => oks[i]);
   window.LISTE_VITRINE = liste;
   const box = $('#liste');
   if (!liste.length) { box.innerHTML = '<p style="color:var(--gris)">Les premiers modèles arrivent bientôt.</p>'; return; }

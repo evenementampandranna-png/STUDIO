@@ -1,8 +1,8 @@
 [
  {
-  "slug": "film-filmmwvthlnyqiu3",
+  "slug": "film-filmmwurazp5kfpw",
   "film": true,
-  "video": "https://wckwwupnidcnufnlclbw.supabase.co/storage/v1/object/public/equipe/d29aee1cf2ec46fa937028bb468d3ba7/filmmwvthlnyqiu3.mp4",
+  "video": "medias/films/filmmwurazp5kfpw.mp4",
   "titre": "Mariazin'i Nathan sy Anna — 14 Novambra 2026",
   "type": "Film vidéo",
   "vignette": "medias/films/filmmwvthlnyqiu3.jpg",
@@ -10,9 +10,9 @@
   "date": "2026-11-25"
  },
  {
-  "slug": "film-filmmwvq16pkttnn",
+  "slug": "film-filmmwurfj6soytv",
   "film": true,
-  "video": "https://wckwwupnidcnufnlclbw.supabase.co/storage/v1/object/public/equipe/d29aee1cf2ec46fa937028bb468d3ba7/filmmwvq16pkttnn.mp4",
+  "video": "medias/films/filmmwurfj6soytv.mp4",
   "titre": "INVITATION DE MARIAGE",
   "type": "Film vidéo",
   "vignette": "medias/films/filmmwvq16pkttnn.jpg",
@@ -89,9 +89,9 @@
   "date": "2026-11-25"
  },
  {
-  "slug": "film-filmmwuqzgx3kcco",
+  "slug": "film-filmmwurbof2grq9",
   "film": true,
-  "video": "https://wckwwupnidcnufnlclbw.supabase.co/storage/v1/object/public/equipe/d29aee1cf2ec46fa937028bb468d3ba7/filmmwuqzgx3kcco.mp4",
+  "video": "medias/films/filmmwurbof2grq9.mp4",
   "titre": "FANASANA VODIONDRY",
   "type": "Film vidéo",
   "vignette": "medias/films/filmmwuqzgx3kcco.jpg",

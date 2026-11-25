@@ -814,6 +814,10 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-25-4', date: '25 novembre 2026', titre: 'Films de l\'équipe : réparation', points: [
+      'Les films publiés ne sont plus jamais retirés de l\'espace d\'équipe.',
+      '🔧 Au démarrage, le studio de chaque membre renvoie en ligne les films de l\'équipe dont il a encore une copie (films enregistrés sur cet ordinateur ou déjà regardés).',
+      'Sur le site, un film dont le fichier ne répond pas n\'est plus affiché.'] },
     { id: '2026-11-25-3', date: '25 novembre 2026', titre: 'Gérer tout ce qui est sur le site', points: [
       '🎬 Vidéos → « 🌐 Gérer le site » : la liste de tout ce que montre le site (modèles d\'invitation et films), avec « Retirer la sélection ».',
       '« Cocher les doublons » : coche les éléments en double (même titre, même auteur), on garde le plus récent.',
@@ -4723,6 +4727,40 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     } catch (e) { console.warn('publication auto', e.message); } finally { autoPubEnCours = false; }
   }
   setTimeout(autoPublierFilms, 20000); setInterval(autoPublierFilms, 5 * 60 * 1000);
+  // Réparation : films de l'équipe dont le fichier n'est plus en ligne. Si CET ordinateur en a encore une copie
+  // (film enregistré ici, ou déjà regardé), il est renvoyé dans l'espace d'équipe et le site est corrigé. Tourne chez chaque membre.
+  let reparationFaite = false;
+  async function reparerFilmsEquipe(suivi) {
+    if (reparationFaite || !Equipe.actif() || !navigator.onLine) return { repares: 0, perdus: [] };
+    reparationFaite = true;
+    const enLigne = async u => { try { const r = await fetch(u, { headers: { Range: 'bytes=0-1' }, cache: 'no-store' }); return r.ok || r.status === 206; } catch (e) { return false; } };
+    const court = (pr, ms) => Promise.race([pr, new Promise(ok => setTimeout(() => ok(null), ms))]);
+    await Equipe.charger().catch(() => {});
+    const cle = (reglages.equipe || {}).cle; let repares = 0; const perdus = [], corriges = {};
+    for (const f of (Equipe.items || []).filter(x => x.type === 'film' && x.chemin)) {
+      const ext = (f.chemin.split('.').pop() || 'mp4').toLowerCase(), cheminSb = /^site:/.test(f.chemin) ? cle + '/' + f.id + '.' + ext : f.chemin;
+      if (await enLigne(Equipe.url(f.chemin))) continue;
+      if (/^site:/.test(f.chemin) && await enLigne(Equipe.url(cheminSb))) { await Equipe.rpc('equipe_biblio_deplacer', { p_id: f.id, p_chemin: cheminSb }).catch(() => {}); corriges[f.id] = Equipe.url(cheminSb); continue; }
+      let blob = null;
+      for (const k of ['cache:equipe/' + cheminSb, 'cache:' + Equipe.url(cheminSb).split('/object/public/')[1]]) { try { const b = await court(IDB.lire(k), 5000); if (b && b.size) { blob = b; break; } } catch (e) {} }
+      if (!blob) { const loc = Films.liste().find(x => x.equipe_id === f.id); if (loc) { try { const b = await court(Films.blob(loc), 8000); if (b && b.size) blob = b; } catch (e) {} } }
+      if (!blob) { perdus.push(f); continue; }
+      try {
+        suivi && suivi((f.evenement || f.nom || '').replace(/^Film — /, ''));
+        await Equipe.envoyerFichier(cheminSb, blob.type ? blob : new Blob([blob], { type: 'video/mp4' }), true);
+        await Equipe.rpc('equipe_biblio_deplacer', { p_id: f.id, p_chemin: cheminSb });
+        corriges[f.id] = Equipe.url(cheminSb); repares++;
+      } catch (e) { console.warn('réparation film', f.id, e.message); perdus.push(f); }
+    }
+    // le site pointe vers la bonne adresse
+    if (Object.keys(corriges).length && peutPublierGitHub()) {
+      try { const index = await lireVitrine(); let ch = 0; index.forEach(x => { const id = x.film && x.slug.replace(/^film-/, ''); if (id && corriges[id] && x.video !== corriges[id]) { x.video = corriges[id]; ch++; } }); if (ch) await ecrireVitrine(index, 'Vitrine : ' + ch + ' film(s) réparé(s)'); } catch (e) { console.warn('réparation site', e.message); }
+    }
+    if (repares) { toast('🔧 ' + repares + ' film(s) de l\'équipe remis en ligne depuis cet ordinateur', 7000); Equipe.charger().catch(() => {}); }
+    Stock.ecrire('studio.films.perdus', perdus.map(f => ({ id: f.id, nom: f.nom, auteur: f.auteur })));
+    return { repares, perdus };
+  }
+  setTimeout(() => reparerFilmsEquipe().catch(e => console.warn(e)), 12000);
   // films validés sur cet ordinateur mais jamais partagés (ex. faits avant cette version) : envoyés pour que toute l'équipe les voie
   let filmsRattrapes = false;
   async function rattraperFilms() {
