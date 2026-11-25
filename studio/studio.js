@@ -792,6 +792,9 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-25-1', date: '25 novembre 2026', titre: 'Films publiés sans recopie, invitations de toute l\'équipe', points: [
+      '🎬 Vidéos → « Publier sur le site » : le film déjà rangé dans l\'espace d\'équipe est mis sur le site directement (plus de recopie de 40 Mo qui échouait). Quelques secondes suffisent.',
+      '📁 Événements : nouvelle partie « 👥 Invitations de toute l\'équipe ». Chaque membre voit les invitations des autres, en regarde l\'aperçu et peut en ouvrir une copie (l\'original ne change pas).'] },
     { id: '2026-11-24-4', date: '24 novembre 2026', titre: 'Jeton GitHub : une seule personne le renouvelle', points: [
       'Quand le jeton de publication expire : seul l\'<b>admin</b> le recolle (une fois) ; il est aussitôt partagé avec toute l\'équipe. Les membres ne voient plus la demande de jeton : leur studio reprend tout seul le nouveau.',
       'Conseil : à la création du jeton sur GitHub, choisissez l\'expiration la plus longue (« No expiration » si proposé).'] },
@@ -1223,7 +1226,9 @@
             <div class="ligne evt-actions"><button class="btn petit" data-evt-ouvrir="${p.id}" title="Ouvrir les plans">✎ Modifier</button><button class="btn petit" data-evt-fiche="${p.id}" title="Titre, date, lieux, contacts">ⓘ Infos</button><button class="btn petit" data-evt-dup="${p.id}" title="Faire une copie">⧉ Dupliquer</button><button class="btn petit danger" data-evt-suppr="${p.id}" title="Supprimer (récupérable dans la corbeille)">🗑</button></div></div>
         </div>`).join('')}</div>` : `
         <div class="carte vide"><h2>Aucun événement pour l'instant</h2><p class="muet">Collez le texte d'une invitation : le studio en tire les informations et propose les plans.</p><a class="btn plein" href="#/nouveau">Créer le premier événement</a>
-        <p style="margin-top:14px"><button class="btn" id="demo">Charger l'exemple « Jobily faha-10 taona mariazy — Batemy »</button></p></div>`}`;
+        <p style="margin-top:14px"><button class="btn" id="demo">Charger l'exemple « Jobily faha-10 taona mariazy — Batemy »</button></p></div>`}
+      ${Equipe.actif() ? '<div id="evt-equipe" style="margin-top:26px"></div>' : ''}`;
+    if (Equipe.actif()) evtEquipe($('#evt-equipe'));
     $$('.projet-carte').forEach(c => c.onclick = e => { if (e.target.closest('.evt-actions')) return; location.hash = '#/p/' + c.dataset.id + '/plans'; });
     $$('[data-evt-ouvrir]').forEach(b => b.onclick = () => { location.hash = '#/p/' + b.dataset.evtOuvrir + '/plans'; });
     const er = $('#evt-recherche'); if (er) rechercheCartes(er, '.projet-carte', 'recherche.evt');
@@ -1247,6 +1252,75 @@
     };
     const d = $('#demo');
     if (d) d.onclick = () => { const f = Fabrique.analyserTexte(TEXTE_EXEMPLE); const p = Fabrique.nouveauProjet(f, tousFonds()); projets[p.id] = p; sauverProjets(); location.hash = '#/p/' + p.id + '/plans'; };
+  }
+
+  // Invitations de toute l'équipe (copie en ligne) : chaque membre voit celles des autres, les regarde et en ouvre une copie
+  async function projetsEquipeTous() {
+    try { return await Equipe.rpc('equipe_projets_tous'); }
+    catch (e) {
+      if (Equipe.admin()) return (await Equipe.rpc('equipe_admin')).travaux;
+      if (/equipe_projets_tous|PGRST202|404/.test(e.message)) { const x = new Error('maj'); x.maj = true; throw x; }
+      throw e;
+    }
+  }
+  async function projetEquipeLire(id) {
+    try { return await Equipe.rpc('equipe_projet_voir', { p_projet: id }); }
+    catch (e) { if (Equipe.admin()) return Equipe.rpc('equipe_projet', { p_projet: id }); return Equipe.rpc('equipe_mon_projet', { p_projet: id, p_auteur: Equipe.membre() }); }
+  }
+  async function copierProjetEquipe(id) {
+    const src = await projetEquipeLire(id);
+    if (!src || !src.plans) throw new Error('Invitation introuvable en ligne');
+    const c = JSON.parse(JSON.stringify(src)); c.id = uid(); c.slug = (c.slug || 'copie').replace(/-[a-z0-9]{4}$/, '') + '-' + c.id.slice(0, 4);
+    ['publie', 'cle_hote', 'vitrine', 'vitrine_publiee', 'licence', 'commande', 'retire', 'publie_avant'].forEach(k => delete c[k]);
+    c.fiche.titre = (c.fiche.titre || '') + ' (copie)'; c.statut = 'brouillon'; c.modifie = new Date().toISOString();
+    await recevoirPolices(c);
+    projets[c.id] = c; sauverProjets();
+    return c;
+  }
+  async function evtEquipe(z) {
+    if (!z) return;
+    z.innerHTML = '<h2 style="margin:0 0 6px">👥 Invitations de toute l\'équipe</h2><p class="muet">Chargement…</p>';
+    let l;
+    try { l = await projetsEquipeTous(); }
+    catch (e) {
+      z.innerHTML = '<h2 style="margin:0 0 6px">👥 Invitations de toute l\'équipe</h2><p class="muet">' + (e.maj ? 'Pour voir ici les invitations de tous les membres, l\'admin met la base à jour une fois : Réglages → Supabase → « Mise à jour : invitations de toute l\'équipe » (coller dans Supabase → SQL Editor → Run).' : 'Copie en ligne injoignable pour le moment (' + esc(e.message) + ').') + '</p>';
+      return;
+    }
+    if (!z.isConnected) return;
+    const moi = (Equipe.membre() || '').trim().toLowerCase();
+    l = (l || []).filter(t => !projets[t.projet]);
+    const membres = [...new Set(l.map(t => t.auteur || '—'))].sort();
+    let filtre = Stock.lire('studio.evteq.membre', '');
+    const j = d => d ? new Date(d).toLocaleString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+    const rendre = () => {
+      const vis = l.filter(t => !filtre || (t.auteur || '—') === filtre);
+      z.innerHTML = `<div class="ligne" style="justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px"><div><h2 style="margin:0">👥 Invitations de toute l'équipe <span class="muet" style="font-size:14px">(${l.length})</span></h2><div class="muet">Faites par les autres membres (ou sur un autre ordinateur). Regardez-les, ou ouvrez-en une copie pour travailler dessus : l'original ne change pas.</div></div>
+        <select id="evteq-membre"><option value="">Tous les membres</option>${membres.map(m => `<option ${filtre === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></div>
+        ${vis.length ? `<div class="grille">${vis.map(t => `<div class="carte projet-carte evteq" data-recherche="${esc((t.titre || '') + ' ' + (t.auteur || ''))}">
+          ${t.vignette ? `<img src="${esc(t.vignette)}" alt="" loading="lazy">` : '<div style="aspect-ratio:9/16;background:#efe6dc;border-radius:10px"></div>'}
+          <div><h3>${esc(t.titre || 'Sans titre')}</h3>
+            <div class="muet">par <b>${esc(t.auteur || '—')}</b>${(t.auteur || '').trim().toLowerCase() === moi ? ' (vous, autre ordinateur)' : ''}</div>
+            <div class="muet">${t.plans || 0} plans · modifiée le ${esc(j(t.maj))}</div>
+            <div style="margin-top:6px">${t.publie ? '<span class="badge ok">🌐 Publiée</span>' : '<span class="badge">📁 Non publiée</span>'}</div>
+            <div class="ligne evt-actions"><button class="btn petit" data-eqv="${esc(t.projet)}">👁 Aperçu</button>${t.publie && t.slug ? `<a class="btn petit" target="_blank" href="${esc(urlSite() + 'i/?p=' + encodeURIComponent(t.slug))}">Lien ↗</a>` : ''}<button class="btn petit plein" data-eqc="${esc(t.projet)}">⧉ Ouvrir une copie</button></div></div></div>`).join('')}</div>` : '<p class="muet">Aucune autre invitation dans l\'équipe pour l\'instant.</p>'}`;
+      $('#evteq-membre', z).onchange = e => { filtre = e.target.value; Stock.ecrire('studio.evteq.membre', filtre); rendre(); };
+      $$('[data-eqv]', z).forEach(b => b.onclick = async () => {
+        b.disabled = true;
+        try { const pr = await projetEquipeLire(b.dataset.eqv); if (!pr || !pr.plans) throw new Error('Invitation introuvable en ligne'); Stock.ecrire('studio.apercu', publication(pr, true)); window.open('../i/?apercu=1', '_blank'); }
+        catch (e) { toast(e.message); }
+        b.disabled = false;
+      });
+      $$('[data-eqc]', z).forEach(b => b.onclick = async () => {
+        b.disabled = true; b.textContent = 'Copie…';
+        try {
+          const c = await copierProjetEquipe(b.dataset.eqc);
+          const manque = c.plans.some(pl => /^idb:/.test((pl.fond || {}).media || '') || (pl.calques || []).some(x => /^idb:/.test(x.media || '')));
+          toast(manque ? 'Copie ouverte. Certains fichiers non partagés par le membre ne sont pas sur cet ordinateur.' : 'Copie ouverte dans vos événements');
+          location.hash = '#/p/' + c.id + '/plans';
+        } catch (e) { toast(e.message); b.disabled = false; b.textContent = '⧉ Ouvrir une copie'; }
+      });
+    };
+    rendre();
   }
 
   // Corbeille : un événement supprimé reste récupérable (sur cet ordinateur)
@@ -4516,9 +4590,21 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
   // publier un film gardé sur cet ordinateur dans la rubrique « Nos vidéos réalisées » du site
   async function publierFilmLocal(f) {
     if (!peutPublierGitHub()) throw new Error('publication non reliée');
-    const blob = await Films.blob(f), ext = (f.src.split('.').pop() || 'mp4').toLowerCase(), chemin = 'medias/films/' + f.id + '.' + ext;
-    if (blob.size > 95e6) throw new Error('film trop lourd pour le site (plus de 95 Mo)');
-    await GitHub.envoyer(chemin, blob, 'Film ' + f.titre);
+    const blob = await Films.blob(f), ext = (f.src.split('.').pop() || 'mp4').toLowerCase();
+    let chemin = null;
+    // d'abord dans l'espace d'équipe (Supabase) : le site lit le film là-bas, l'envoi est fiable même pour un gros film
+    if (Equipe.actif()) {
+      try {
+        let it = f.equipe_id && (Equipe.items || []).find(x => x.id === f.equipe_id);
+        if (!it) { const r = await Equipe.ajouterFilm(blob, { titre: f.titre, vignette: f.vignette }); if (r && r.id) { Films.maj(f.id, { equipe_id: r.id }); it = (Equipe.items || []).find(x => x.id === r.id); } }
+        if (it && it.chemin && !/^site:/.test(it.chemin) && await filmEnLigne(Equipe.url(it.chemin))) chemin = Equipe.url(it.chemin);
+      } catch (e) { console.warn('film → équipe', e.message); }
+    }
+    if (!chemin) {
+      if (blob.size > 95e6) throw new Error('film trop lourd pour le site (plus de 95 Mo)');
+      chemin = 'medias/films/' + f.id + '.' + ext;
+      await GitHub.envoyer(chemin, blob, 'Film ' + f.titre);
+    }
     let vignette = 'fonds/fond_2.jpg';
     if (/^data:/.test(f.vignette || '')) { vignette = 'medias/films/' + f.id + '.jpg'; await GitHub.envoyer(vignette, dataURLversBlob(f.vignette), 'Vignette ' + f.titre); }
     const index = (await lireVitrine()).filter(x => x.slug !== 'film-' + f.id);
@@ -4689,11 +4775,23 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     }
     const e = new Error('bloqué'); e.bloque = true; throw e;
   }
+  // le film est déjà en ligne dans l'espace d'équipe ? (alors le site le lit directement là, sans recopie de 40 Mo)
+  async function filmEnLigne(url) {
+    try { const r = await Promise.race([fetch(url, { headers: { Range: 'bytes=0-1' }, cache: 'no-store' }), new Promise((ok, ko) => setTimeout(() => ko(new Error('délai')), 15000))]); return r.ok || r.status === 206; } catch (e) { return false; }
+  }
   async function publierFilmVitrine(f, suivi) {
-    const blob = await blobFilmEquipe(f, suivi);
-    suivi && suivi('Envoi sur le site (' + (blob.size / 1e6).toFixed(1) + ' Mo)…');
-    const ext = (f.chemin.split('.').pop() || 'mp4').toLowerCase(), chemin = 'medias/films/' + f.id + '.' + ext;
-    await GitHub.envoyer(chemin, blob, 'Film ' + f.nom);
+    let chemin = null;
+    if (f.chemin && !/^site:/.test(f.chemin)) {
+      suivi && suivi('Vérification du film en ligne…');
+      const u = Equipe.url(f.chemin); if (await filmEnLigne(u)) chemin = u;
+    }
+    if (!chemin) {
+      const blob = await blobFilmEquipe(f, suivi);
+      suivi && suivi('Envoi sur le site (' + (blob.size / 1e6).toFixed(1) + ' Mo)…');
+      const ext = ((f.chemin || '').split('.').pop() || 'mp4').toLowerCase();
+      chemin = 'medias/films/' + f.id + '.' + ext;
+      await GitHub.envoyer(chemin, blob, 'Film ' + f.nom);
+    }
     let vignette = 'fonds/fond_2.jpg';
     if (/^data:/.test(f.vignette || '')) { vignette = 'medias/films/' + f.id + '.jpg'; await GitHub.envoyer(vignette, dataURLversBlob(f.vignette), 'Vignette ' + f.nom); }
     const index = (await lireVitrine()).filter(x => x.slug !== 'film-' + f.id);
@@ -5775,7 +5873,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     try { const r = await fetch(urlSite() + 'vitrine/index.json?v=' + Date.now(), { cache: 'no-store' }); if (r.ok) { indexSite = await r.json(); surSite = new Set(indexSite.map(x => x.slug)); } } catch (e) {}
     // films déjà publiés sur le site (par n'importe quel membre) : visibles par toute l'équipe, sans passer par la base
     const idsEq = new Set(films.map(f => 'film-' + String(f.id).replace(/^site-/, '')));
-    const filmsSite = indexSite.filter(x => x.film && x.video && !idsEq.has(x.slug)).map(x => ({ id: 'site:' + x.slug, type: 'film', site: true, nom: x.titre, evenement: x.titre, auteur: x.auteur || '—', cree: x.date, url: urlSite() + x.video, vignette: x.vignette ? (/^https?:/.test(x.vignette) ? x.vignette : urlSite() + x.vignette) : '' }));
+    const filmsSite = indexSite.filter(x => x.film && x.video && !idsEq.has(x.slug)).map(x => ({ id: 'site:' + x.slug, type: 'film', site: true, nom: x.titre, evenement: x.titre, auteur: x.auteur || '—', cree: x.date, url: /^https?:/.test(x.video) ? x.video : urlSite() + x.video, vignette: x.vignette ? (/^https?:/.test(x.vignette) ? x.vignette : urlSite() + x.vignette) : '' }));
     films = films.concat(filmsSite).sort((a, b) => String(b.cree || '').localeCompare(String(a.cree || '')));
     tout.push(...filmsSite);
     if (horsLigne && !films.length) { zone.textContent = 'Impossible de lire les vidéos de l\'équipe : ' + horsLigne; return; }
@@ -6128,7 +6226,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
             <li>Dans le projet : <b>SQL Editor</b> → <b>New query</b> → collez le script (bouton ci-dessous) → <b>Run</b>.</li>
             <li><b>Project Settings → API</b> (ou <b>Connect</b>) : copiez la <b>Project URL</b> et la clé <b>anon public</b> (ou « publishable ») dans les deux champs ci-dessus, puis Enregistrer et Tester.</li>
             <li>Republiez vos invitations : le lien organisateur apparaît dans l'onglet Film et publication.</li></ol>
-            <button class="btn petit" id="sb-sql">Copier le script SQL</button> <button class="btn petit" id="sb-sql2" title="Adultes et enfants invités séparément, par famille">Mise à jour adultes / enfants</button> <button class="btn petit" id="sb-sql3" title="Chaque membre peut récupérer ses invitations depuis la copie en ligne">Mise à jour sauvegarde en ligne</button> <button class="btn petit" id="sb-sql4" title="Les membres demandent la publication, l'admin valide">Mise à jour publication par les membres</button>
+            <button class="btn petit" id="sb-sql">Copier le script SQL</button> <button class="btn petit" id="sb-sql2" title="Adultes et enfants invités séparément, par famille">Mise à jour adultes / enfants</button> <button class="btn petit" id="sb-sql3" title="Chaque membre peut récupérer ses invitations depuis la copie en ligne">Mise à jour sauvegarde en ligne</button> <button class="btn petit" id="sb-sql4" title="Les membres demandent la publication, l'admin valide">Mise à jour publication par les membres</button> <button class="btn petit" id="sb-sql5" title="Chaque membre voit les invitations de toute l'équipe">Mise à jour : invitations de toute l'équipe</button>
             <p class="muet">La formule gratuite se met en pause après 7 jours sans aucune visite ; une invitation en cours reçoit des visites, sinon réactivez-la d'un clic dans Supabase.</p></details>
         </div>
         ${reglages.supabase && (!Equipe.actif() || Equipe.admin()) ? `<div class="carte pile" id="nb-carte"><h3>🔁 Changer de base de données (base saturée ou bloquée)</h3>
@@ -6214,6 +6312,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
         reglages.equipe = { id: r.id, nom: r.nom, cle: r.cle, cle_admin: r.cle_admin, membre: nom, auto: true }; sauverReglages(); toast('Équipe créée : envoyez le lien d\'équipe à vos membres'); location.hash = '#/equipe'; }
       catch (e) { toast(/function|schema cache|Could not find/i.test(e.message) ? 'Installez d\'abord le script SQL de l\'équipe dans Supabase' : e.message); }
     };
+    const sbs5 = $('#sb-sql5'); if (sbs5) sbs5.onclick = async () => { try { copier(await (await fetch('../outils/equipe-5.sql?v=' + Date.now())).text()); toast('Script copié : Supabase → SQL Editor → coller → Run'); } catch (e) { toast(e.message); } };
     const sbs4 = $('#sb-sql4'); if (sbs4) sbs4.onclick = async () => { try { copier(await (await fetch('../outils/publications.sql?v=' + Date.now())).text()); toast('Script copié : Supabase → SQL Editor → coller → Run'); } catch (e) { toast(e.message); } };
     const sbs3 = $('#sb-sql3'); if (sbs3) sbs3.onclick = async () => { try { copier(await (await fetch('../outils/sauvegarde.sql?v=' + Date.now())).text()); toast('Script copié : Supabase → SQL Editor → coller → Run'); } catch (e) { toast('Script introuvable'); } };
     const sbs2 = $('#sb-sql2'); if (sbs2) sbs2.onclick = async () => { try { copier(await (await fetch('../outils/invites-2.sql?v=' + Date.now())).text()); toast('Script copié : Supabase → SQL Editor → coller → Run'); } catch (e) { toast('Script introuvable'); } };
