@@ -814,6 +814,10 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-25-3', date: '25 novembre 2026', titre: 'Gérer tout ce qui est sur le site', points: [
+      '🎬 Vidéos → « 🌐 Gérer le site » : la liste de tout ce que montre le site (modèles d\'invitation et films), avec « Retirer la sélection ».',
+      '« Cocher les doublons » : coche les éléments en double (même titre, même auteur), on garde le plus récent.',
+      'Un même film publié depuis l\'ordinateur et depuis l\'équipe n\'apparaît plus deux fois.'] },
     { id: '2026-11-25-2', date: '25 novembre 2026', titre: 'Films enregistrés jamais perdus, fond photo', points: [
       '🎞 Un film enregistré est aussitôt envoyé dans 🎬 Vidéos de l\'équipe (en plus de « Films de cet événement ») : il ne dépend plus d\'un seul onglet ou ordinateur.',
       'Les films et invitations gardés par un ancien onglet du studio sont repris tout seuls au démarrage.',
@@ -4636,7 +4640,8 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     }
     let vignette = 'fonds/fond_2.jpg';
     if (/^data:/.test(f.vignette || '')) { vignette = 'medias/films/' + f.id + '.jpg'; await GitHub.envoyer(vignette, dataURLversBlob(f.vignette), 'Vignette ' + f.titre); }
-    const index = (await lireVitrine()).filter(x => x.slug !== 'film-' + f.id);
+    const eid = (Films.liste().find(x => x.id === f.id) || f).equipe_id;
+    const index = (await lireVitrine()).filter(x => x.slug !== 'film-' + f.id && !(eid && x.slug === 'film-' + eid));
     index.unshift({ slug: 'film-' + f.id, film: true, video: chemin, titre: f.titre, type: 'Film vidéo', vignette, auteur: f.auteur || '', date: new Date().toISOString().slice(0, 10) });
     await ecrireVitrine(index, 'Vitrine : film ' + f.titre);
     Films.maj(f.id, { site: new Date().toISOString() });
@@ -4840,7 +4845,8 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     }
     let vignette = 'fonds/fond_2.jpg';
     if (/^data:/.test(f.vignette || '')) { vignette = 'medias/films/' + f.id + '.jpg'; await GitHub.envoyer(vignette, dataURLversBlob(f.vignette), 'Vignette ' + f.nom); }
-    const index = (await lireVitrine()).filter(x => x.slug !== 'film-' + f.id);
+    const autres = new Set(Films.liste().filter(x => x.equipe_id === f.id).map(x => 'film-' + x.id));   // le même film publié depuis l'ordinateur
+    const index = (await lireVitrine()).filter(x => x.slug !== 'film-' + f.id && !autres.has(x.slug));
     index.unshift({ slug: 'film-' + f.id, film: true, video: chemin, titre: (f.evenement || f.nom.replace(/^Film — /, '')), type: 'Film vidéo', vignette, auteur: f.auteur || '', date: new Date().toISOString().slice(0, 10) });
     suivi && suivi('Ajout à la rubrique…');
     await ecrireVitrine(index, 'Vitrine : film ' + f.nom);
@@ -5877,11 +5883,52 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
 
   /* ---------- Rubrique « Vidéos » : tous les films terminés de l'équipe, à publier sur le site ---------- */
   const vpFiltre = Object.assign({ etat: 'tout', membre: '', type: 'film' }, Stock.lire('studio.vp.filtre', {}));
+  // Tout ce que montre le site (modèles d'invitation et films) : retirer, repérer les doublons
+  async function gererSite() {
+    if (!peutPublierGitHub()) return toast('Publication non reliée (jeton GitHub de l\'équipe)');
+    modale('<h2>🌐 Ce qui est sur le site</h2><p class="muet">Chargement…</p>', () => {});
+    let index; try { index = await lireVitrine(); } catch (e) { toast(e.message); return; }
+    const norm = x => String(x || '').toLowerCase().replace(/\(copie\)/g, '').replace(/[^a-z0-9à-ÿ]+/g, ' ').trim();
+    const cle = x => (x.film ? 'f' : 'm') + '|' + norm(x.titre) + '|' + norm(x.auteur);
+    const compte = {}; index.forEach(x => { compte[cle(x)] = (compte[cle(x)] || 0) + 1; });
+    const vu = {}; const doublon = x => { const k = cle(x); vu[k] = (vu[k] || 0) + 1; return compte[k] > 1 && vu[k] > 1; };   // le plus récent (en haut) est gardé
+    const lignes = index.map(x => ({ x, dbl: doublon(x) }));
+    const img = x => x.vignette ? (/^https?:|^data:/.test(x.vignette) ? x.vignette : urlSite() + x.vignette) : '';
+    modale(`<h2>🌐 Ce qui est sur le site <span class="muet" style="font-size:14px">(${index.length})</span></h2>
+      <p class="muet">Modèles d'invitation et films affichés sur le site. « Retirer » les enlève du site seulement (rien n'est supprimé dans le studio). Les éléments marqués <b>doublon</b> ont le même titre et le même auteur qu'un autre plus récent.</p>
+      <div class="ligne" style="gap:6px;margin:6px 0 10px;flex-wrap:wrap"><button class="btn petit" id="gs-dbl">Cocher les doublons (${lignes.filter(l => l.dbl).length})</button><button class="btn petit danger" id="gs-ret" disabled>Retirer la sélection</button><span class="muet" id="gs-etat"></span></div>
+      <div class="pile" style="max-height:60vh;overflow:auto;gap:6px">${lignes.map(({ x, dbl }, i) => `<label class="ligne" style="gap:10px;border:1px solid ${dbl ? '#e8b9a0' : '#eadfd3'};border-radius:10px;padding:6px 8px;align-items:center;${dbl ? 'background:#fdf3ec' : ''}">
+        <input type="checkbox" data-gs="${i}">${img(x) ? `<img src="${esc(img(x))}" alt="" style="width:40px;height:64px;object-fit:cover;border-radius:6px">` : '<span style="width:40px;height:64px;background:#efe6dc;border-radius:6px;display:inline-block"></span>'}
+        <span style="flex:1;min-width:0"><b>${esc(x.titre || x.slug)}</b><br><span class="muet" style="font-size:12px">${x.film ? '🎬 Film' : '📄 Modèle'}${x.auteur ? ' · ' + esc(x.auteur) : ''}${x.date ? ' · ' + esc(x.date) : ''}</span> ${dbl ? '<span class="badge alerte">doublon</span>' : ''}</span>
+        <a class="btn petit" target="_blank" href="${esc(x.film ? (/^https?:/.test(x.video) ? x.video : urlSite() + x.video) : urlSite() + 'i/?p=' + encodeURIComponent(x.slug))}">Voir ↗</a></label>`).join('') || '<p class="muet">Rien sur le site.</p>'}</div>`, (m, fermer) => {
+      const sel = () => $$('[data-gs]', m).filter(c => c.checked).map(c => index[Number(c.dataset.gs)]);
+      const maj = () => { const n = sel().length, b = $('#gs-ret', m); b.disabled = !n; b.textContent = n ? 'Retirer la sélection (' + n + ')' : 'Retirer la sélection'; };
+      $$('[data-gs]', m).forEach(c => c.onchange = maj);
+      $('#gs-dbl', m).onclick = () => { lignes.forEach((l, i) => { const c = $(`[data-gs="${i}"]`, m); if (c) c.checked = l.dbl; }); maj(); };
+      $('#gs-ret', m).onclick = async () => {
+        const l = sel(); if (!l.length || !confirm('Retirer ' + l.length + ' élément(s) du site ?')) return;
+        const b = $('#gs-ret', m), etat = $('#gs-etat', m); b.disabled = true;
+        try {
+          etat.textContent = 'Mise à jour du site…';
+          const slugs = new Set(l.map(x => x.slug));
+          await ecrireVitrine((await lireVitrine()).filter(x => !slugs.has(x.slug)), 'Vitrine : retrait de ' + l.length + ' élément(s)');
+          let k = 0;
+          for (const x of l) {
+            etat.textContent = 'Nettoyage ' + (++k) + '/' + l.length + '…';
+            const fichiers = x.film ? [x.video, x.vignette].filter(c => c && /^medias\/films\//.test(c)) : ['projets/' + x.slug + '.json', 'projets/' + x.slug + '.js'];
+            for (const c of fichiers) { try { await GitHub.supprimer(c, 'Retrait ' + x.slug); } catch (e) { console.warn(e.message); } }
+            if (x.film) Films.liste().filter(f => 'film-' + f.id === x.slug).forEach(f => Films.maj(f.id, { site: null }));
+          }
+          toast(l.length + ' élément(s) retiré(s) du site (visible dans quelques minutes)', 5000); fermer(); if (/videos/.test(location.hash)) vueVideos();
+        } catch (e) { etat.textContent = 'Échec : ' + e.message; b.disabled = false; }
+      };
+    });
+  }
   async function vueVideos() {
     setTimeout(() => { rattraperFilms(); autoPublierFilms(); }, 1500);
     const app = $('#app');
     app.innerHTML = `<div class="entete"><div><h1>🎬 Vidéos de l'équipe</h1><p>Tous les films terminés de l'équipe, au même endroit : regardez-les, téléchargez-les et publiez-les sur le site, dans la rubrique « Nos vidéos réalisées ».</p></div>
-      <div class="ligne"><a class="btn" target="_blank" href="${esc(urlSite())}#films">Voir la rubrique sur le site ↗</a><label class="btn plein">+ Ajouter un film terminé<input type="file" id="vp-ajout" accept="video/mp4,video/webm,video/quicktime,.mp4,.mov,.webm" multiple hidden></label></div></div>
+      <div class="ligne"><a class="btn" target="_blank" href="${esc(urlSite())}#films">Voir la rubrique sur le site ↗</a><button class="btn" id="vp-site" title="Tout ce qui est affiché sur le site : modèles et films, doublons">🌐 Gérer le site</button><label class="btn plein">+ Ajouter un film terminé<input type="file" id="vp-ajout" accept="video/mp4,video/webm,video/quicktime,.mp4,.mov,.webm" multiple hidden></label></div></div>
       <div class="carte pile" id="vp-locaux" style="margin-bottom:14px"></div>
       <div id="vp-zone" class="muet">Chargement des vidéos de l'équipe…</div>`;
     // mes films (sur cet ordinateur) : publiables sur le site même sans équipe
@@ -5897,6 +5944,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     };
     rendreLocaux();
     const zone = $('#vp-zone');
+    $('#vp-site').onclick = () => gererSite();
     const va = $('#vp-ajout'); va.onchange = async () => {
       for (const f of [...va.files]) {
         const titre = f.name.replace(/\.\w+$/, '').replace(/[-_]+/g, ' ').replace(/\s*film\s*$/i, '').trim();
