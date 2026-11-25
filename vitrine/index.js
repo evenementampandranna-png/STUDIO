@@ -1,5 +1,15 @@
 window.VITRINE = [
  {
+  "slug": "film-filmmwur9nquofkv",
+  "film": true,
+  "video": "medias/films/filmmwur9nquofkv.mp4",
+  "titre": "FANASANA VODIONDRY",
+  "type": "Film vidéo",
+  "vignette": "medias/films/filmmwur9nquofkv.jpg",
+  "auteur": "Rova",
+  "date": "2026-11-25"
+ },
+ {
   "slug": "film-filmmwuraeelsqma",
   "film": true,
   "video": "medias/films/filmmwuraeelsqma.mp4",
