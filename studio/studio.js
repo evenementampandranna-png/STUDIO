@@ -4736,14 +4736,14 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
   let reparationFaite = false;
   async function reparerFilmsEquipe(suivi) {
     if (reparationFaite || !Equipe.actif() || !navigator.onLine) return { repares: 0, perdus: [] };
-    reparationFaite = true;
-    const enLigne = async u => { try { const r = await fetch(u, { headers: { Range: 'bytes=0-1' }, cache: 'no-store' }); return r.ok || r.status === 206; } catch (e) { return false; } };
+    reparationFaite = true; console.info('[films] vérification des films de l\'équipe…');
+    const enLigne = async u => { try { const r = await Promise.race([fetch(u, { headers: { Range: 'bytes=0-1' }, cache: 'no-store' }), new Promise((ok, ko) => setTimeout(() => ko(new Error('délai')), 15000))]); return r.ok || r.status === 206; } catch (e) { return false; } };
     const court = (pr, ms) => Promise.race([pr, new Promise(ok => setTimeout(() => ok(null), ms))]);
     await Equipe.charger().catch(() => {});
     const cle = (reglages.equipe || {}).cle; let repares = 0; const perdus = [], corriges = {};
     for (const f of (Equipe.items || []).filter(x => x.type === 'film' && x.chemin)) {
       const ext = (f.chemin.split('.').pop() || 'mp4').toLowerCase(), cheminSb = /^site:/.test(f.chemin) ? cle + '/' + f.id + '.' + ext : f.chemin;
-      if (await enLigne(Equipe.url(f.chemin))) continue;
+      if (await enLigne(Equipe.url(f.chemin))) { const pl = Stock.lire('studio.films.perdus', []); if (pl.some(x => x.id === f.id)) Stock.ecrire('studio.films.perdus', pl.filter(x => x.id !== f.id)); continue; }
       if (/^site:/.test(f.chemin) && await enLigne(Equipe.url(cheminSb))) { await Equipe.rpc('equipe_biblio_deplacer', { p_id: f.id, p_chemin: cheminSb }).catch(() => {}); corriges[f.id] = Equipe.url(cheminSb); continue; }
       let blob = null;
       for (const k of ['cache:equipe/' + cheminSb, 'cache:' + Equipe.url(cheminSb).split('/object/public/')[1]]) { try { const b = await court(IDB.lire(k), 5000); if (b && b.size) { blob = b; break; } } catch (e) {} }
@@ -4762,6 +4762,8 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     }
     if (repares) { toast('🔧 ' + repares + ' film(s) de l\'équipe remis en ligne depuis cet ordinateur', 7000); Equipe.charger().catch(() => {}); }
     Stock.ecrire('studio.films.perdus', perdus.map(f => ({ id: f.id, nom: f.nom, auteur: f.auteur })));
+    console.info('[films] ' + repares + ' réparé(s), ' + perdus.length + ' introuvable(s)');
+    if (/^#\/videos/.test(location.hash)) vueVideos();
     return { repares, perdus };
   }
   setTimeout(() => reparerFilmsEquipe().catch(e => console.warn(e)), 12000);
