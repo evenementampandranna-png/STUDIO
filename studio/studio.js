@@ -814,6 +814,10 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-25-2', date: '25 novembre 2026', titre: 'Films enregistrés jamais perdus, fond photo', points: [
+      '🎞 Un film enregistré est aussitôt envoyé dans 🎬 Vidéos de l\'équipe (en plus de « Films de cet événement ») : il ne dépend plus d\'un seul onglet ou ordinateur.',
+      'Les films et invitations gardés par un ancien onglet du studio sont repris tout seuls au démarrage.',
+      '🖼 Fond « Photo » : on peut de nouveau le choisir même quand l\'événement n\'a pas encore de photo, puis « Importer une photo ».'] },
     { id: '2026-11-25-1', date: '25 novembre 2026', titre: 'Films publiés sans recopie, invitations de toute l\'équipe', points: [
       '🎬 Vidéos → « Publier sur le site » : le film déjà rangé dans l\'espace d\'équipe est mis sur le site directement (plus de recopie de 40 Mo qui échouait). Quelques secondes suffisent.',
       '📁 Événements : nouvelle partie « 👥 Invitations de toute l\'équipe ». Chaque membre voit les invitations des autres, en regarde l\'aperçu et peut en ouvrir une copie (l\'original ne change pas).',
@@ -2889,8 +2893,9 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       const c = (pl.calques || []).find(x => x.id === E.sel);
       const fondActuel = fonds.find(f => f.src === pl.fond.media);
       const nbMemeFond = p.plans.filter(x => x.fond && x.fond.media === pl.fond.media).length;
-      const typeF = MoteurInfo.typeFond(pl.fond);
-      const photosFond = medias.filter(m => m.type === 'image' && (pourEvt(m, p.id) || m.src === pl.fond.media)).concat(Equipe.medias().filter(m => m.type === 'image'));
+      // « Photo » choisi sans photo encore : on reste sur l'onglet Photo (pour pouvoir en importer une)
+      const typeF = pl.fond.type === 'image' && !pl.fond.media ? 'image' : MoteurInfo.typeFond(pl.fond);
+      const photosFond = recents(medias.filter(m => m.type === 'image' && (pourEvt(m, p.id) || m.src === pl.fond.media)).concat(Equipe.medias().filter(m => m.type === 'image')));
       $('#cadre').classList.toggle('sans-fond', typeF === 'aucun');
       col.innerHTML = `
         <div class="section-titre" style="margin-top:0">Plan ${E.i + 1} · ${ROLES[pl.role]}</div>
@@ -2947,7 +2952,7 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
       $$('[data-ftype]', col).forEach(b => b.onclick = () => {
         const t = b.dataset.ftype; E.modif(true);
         if (t === 'video') { delete pl.fond.type; if (!pl.fond.media || MoteurInfo.typeFond({ media: pl.fond.media }) !== 'video') { const f = fonds[0]; pl.fond.media = f ? f.src : ''; } delete pl.fond.recadrage; }
-        if (t === 'image') { pl.fond.type = 'image'; if (MoteurInfo.typeFond({ media: pl.fond.media }) !== 'image') { pl.fond.media = photosFond[0] ? photosFond[0].src : ''; delete pl.fond.recadrage; } }
+        if (t === 'image') { pl.fond.type = 'image'; if (MoteurInfo.typeFond({ media: pl.fond.media }) !== 'image') { const ph = photosFond[0] || recents(medias.filter(m => m.type === 'image'))[0]; pl.fond.media = ph ? ph.src : ''; delete pl.fond.recadrage; if (!ph) toast('Importez une photo (bouton « Importer une photo »)'); } }
         if (t === 'couleur') { pl.fond.type = 'couleur'; pl.fond.couleur = pl.fond.couleur || '#f4ede2'; }
         if (t === 'aucun') pl.fond.type = 'aucun';
         majFond(true);
@@ -4601,7 +4606,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     async garder(blob, p, o) {
       const ext = /webm/.test(blob.type) ? 'webm' : /quicktime/.test(blob.type) ? 'mov' : 'mp4';
       const id = 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), src = 'idb:film-' + id + '.' + ext;
-      await IDB.mettre(src, blob);
+      await Promise.race([IDB.mettre(src, blob), new Promise((ok, ko) => setTimeout(() => ko(new Error('le stockage du navigateur ne répond pas (un autre onglet du studio l\'occupe ?) — téléchargez le film, puis « + Ajouter un film terminé »')), 120000))]);
       let vignette = '';
       try { const u = URL.createObjectURL(blob); const info = await Promise.race([vignetteVideo(u), new Promise(ok => setTimeout(() => ok({}), 12000))]); URL.revokeObjectURL(u); vignette = info.vignette || ''; } catch (e) {}
       const f = { id, src, projet: p ? p.id : '', titre: o.titre || (p && p.fiche.titre) || 'Film', date: new Date().toISOString(), taille: blob.size, duree: Math.round(o.duree || 0), dossier: o.dossier || 'brouillon', auteur: (reglages.equipe && reglages.equipe.membre) || '', vignette: vignette.length < 150000 ? vignette : '' };
@@ -4740,6 +4745,22 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     return n;
   }
   setTimeout(() => partagerFilmsEquipe().catch(() => {}), 45000);
+  // Reprise de ce qu'un ancien onglet (version d'avant) a encore écrit dans l'ancienne base « studio » :
+  // films, invitations et bibliothèque qui manquent ici (rien n'est écrasé, sauf une invitation plus récente là-bas)
+  async function reprendreAncienneBase() {
+    let db; try { db = await Promise.race([new Promise((ok, ko) => { const r = indexedDB.open('studio', 1); r.onsuccess = () => ok(r.result); r.onerror = () => ko(r.error); }), new Promise((ok, ko) => setTimeout(() => ko(new Error('délai')), 20000))]); } catch (e) { return; }
+    const lire = k => Promise.race([new Promise(ok => { try { const q = db.transaction('fichiers').objectStore('fichiers').get('ls:' + k); q.onsuccess = () => ok(typeof q.result === 'string' ? q.result : null); q.onerror = () => ok(null); } catch (e) { ok(null); } }), new Promise(ok => setTimeout(() => ok(null), 30000))]);
+    const json = t => { try { return t ? JSON.parse(t) : null; } catch (e) { return null; } };
+    let n = 0;
+    const fl = json(await lire('studio.films'));
+    if (Array.isArray(fl)) { const ici = Films.liste(), ids = new Set(ici.map(x => x.id)), plus = fl.filter(x => x && x.id && !ids.has(x.id)); if (plus.length) { Films.ecrire(plus.concat(ici).sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))); n += plus.length; } }
+    const pr = json(await lire('studio.projets')), sup = new Set(Stock.lire('studio.supprimes', []));
+    if (pr && typeof pr === 'object') { let ch = 0; for (const [id, x] of Object.entries(pr)) { if (!x || !x.plans || sup.has(id)) continue; const ici = projets[id]; if (!ici || String(x.modifie || '') > String(ici.modifie || '')) { projets[id] = x; ch++; } } if (ch) { sauverProjets(); n += ch; } }
+    const md = json(await lire('studio.medias'));
+    if (Array.isArray(md)) { const ids = new Set(medias.map(m => m.id || m.src)), plus = md.filter(m => m && !ids.has(m.id || m.src)); if (plus.length) { medias = plus.concat(medias); sauverMedias(); n += plus.length; } }
+    if (n) { toast(n + ' élément(s) repris d\'un ancien onglet (films, invitations, bibliothèque)', 6000); if (/^#\/(|videos)$/.test(location.hash) || /\/publier$/.test(location.hash)) route(); }
+  }
+  setTimeout(() => reprendreAncienneBase().catch(() => {}), 4000);
   // carte d'un film de cet ordinateur (Vidéos et Film et publication)
   function carteFilmLocal(f) {
     const pr = projets[f.projet];
@@ -5015,8 +5036,8 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
         boite(null, 'enregistrement en cours…');
         (async () => {
           try { const est = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate() : null; if (est && est.quota && est.quota - est.usage < r.blob.size * 1.2) throw new Error('plus assez de place dans le navigateur'); } catch (e) { if (/place/.test(e.message)) throw e; }
-          const fl0 = await Films.garder(r.blob, p, { duree: r.duree, dossier: 'videos' }); Films.maj(fl0.id, { a_valider: true }); return Films.liste().find(x => x.id === fl0.id) || fl0;   // un film enregistré va dans 🎬 Vidéos ; les brouillons restent dans l'événement
-        })().then(fl => { filmEnAttente = null; boite(fl); rendreFilmsEvt(); toast('🎞 Film enregistré : Films de cet événement + 🎬 Vidéos', 5000); }).catch(e => { boite(null, e.message); toast('Film non gardé sur cet ordinateur : ' + e.message, 8000); });
+          const fl0 = await Films.garder(r.blob, p, { duree: r.duree, dossier: 'videos' }); Films.maj(fl0.id, { a_valider: true }); return Films.liste().find(x => x.id === fl0.id) || fl0   // un film enregistré va dans 🎬 Vidéos ; les brouillons restent dans l'événement
+        })().then(fl => { filmEnAttente = null; boite(fl); rendreFilmsEvt(); setTimeout(() => partagerFilmsEquipe().catch(() => {}), 1500); toast('🎞 Film enregistré : Films de cet événement + 🎬 Vidéos', 5000); }).catch(e => { boite(null, e.message); toast('Film non gardé sur cet ordinateur : ' + e.message, 8000); });
         $('#film-etat').textContent = `Film prêt en ${dureeTexte(sec)} (film de ${Math.round(r.duree)} s, ${(r.blob.size / 1e6).toFixed(1)} Mo, ${r.extension.toUpperCase()})`;
         Equipe.noter('film', 'Film — ' + (p.fiche.titre || ''), sec, p);
       } catch (e) { console.error(e); $('#film-etat').textContent = 'Erreur : ' + e.message; }
