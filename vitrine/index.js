@@ -91,7 +91,7 @@ window.VITRINE = [
  {
   "slug": "film-filmmwurbof2grq9",
   "film": true,
-  "video": "medias/films/filmmwurbof2grq9.mp4",
+  "video": "https://wckwwupnidcnufnlclbw.supabase.co/storage/v1/object/public/equipe/d29aee1cf2ec46fa937028bb468d3ba7/filmmwurbof2grq9.mp4",
   "titre": "FANASANA VODIONDRY",
   "type": "Film vidéo",
   "vignette": "medias/films/filmmwuqzgx3kcco.jpg",
