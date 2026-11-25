@@ -1,5 +1,15 @@
 [
  {
+  "slug": "film-filmmwurazp5kfpw",
+  "film": true,
+  "video": "medias/films/filmmwurazp5kfpw.mp4",
+  "titre": "Mariazin'i Nathan sy Anna — 14 Novambra 2026",
+  "type": "Film vidéo",
+  "vignette": "medias/films/filmmwurazp5kfpw.jpg",
+  "auteur": "Rova",
+  "date": "2026-11-25"
+ },
+ {
   "slug": "film-filmmwurbof2grq9",
   "film": true,
   "video": "medias/films/filmmwurbof2grq9.mp4",
