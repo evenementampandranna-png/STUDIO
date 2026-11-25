@@ -814,6 +814,10 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-25-5', date: '25 novembre 2026', titre: 'Langues pour les invités, versions de films', points: [
+      '🌐 Invitation : l\'invité peut choisir <b>n\'importe quelle langue</b> (bouton 🌐 en haut à droite). Celles préparées dans le studio sont soignées ; les autres sont traduites automatiquement sur son téléphone.',
+      '🎬 Vidéos : un film enregistré plusieurs fois pour la même invitation n\'apparaît qu\'une fois (la plus récente) ; « Voir les anciennes versions » pour les autres. Publier la nouvelle version remplace l\'ancienne sur le site.',
+      'WhatsApp du site : 038 51 201 42.'] },
     { id: '2026-11-25-4', date: '25 novembre 2026', titre: 'Films de l\'équipe : réparation', points: [
       'Les films publiés ne sont plus jamais retirés de l\'espace d\'équipe.',
       '🔧 Au démarrage, le studio de chaque membre renvoie en ligne les films de l\'équipe dont il a encore une copie (films enregistrés sur cet ordinateur ou déjà regardés).',
@@ -4886,7 +4890,8 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     let vignette = 'fonds/fond_2.jpg';
     if (/^data:/.test(f.vignette || '')) { vignette = 'medias/films/' + f.id + '.jpg'; await GitHub.envoyer(vignette, dataURLversBlob(f.vignette), 'Vignette ' + f.nom); }
     const autres = new Set(Films.liste().filter(x => x.equipe_id === f.id).map(x => 'film-' + x.id));   // le même film publié depuis l'ordinateur
-    const index = (await lireVitrine()).filter(x => x.slug !== 'film-' + f.id && !autres.has(x.slug));
+    const titreN = t => String(t || '').toLowerCase().replace(/\(copie\)/g, '').replace(/[^a-z0-9à-ÿ]+/g, ' ').trim(), monTitre = titreN(f.evenement || f.nom.replace(/^Film — /, '')), monAuteur = titreN(f.auteur);
+    const index = (await lireVitrine()).filter(x => x.slug !== 'film-' + f.id && !autres.has(x.slug) && !(x.film && titreN(x.titre) === monTitre && titreN(x.auteur) === monAuteur));   // nouvelle version : remplace l'ancienne
     index.unshift({ slug: 'film-' + f.id, film: true, video: chemin, titre: (f.evenement || f.nom.replace(/^Film — /, '')), type: 'Film vidéo', vignette, auteur: f.auteur || '', date: new Date().toISOString().slice(0, 10) });
     suivi && suivi('Ajout à la rubrique…');
     await ecrireVitrine(index, 'Vitrine : film ' + f.nom);
@@ -6016,7 +6021,11 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     const g = reglages.github || {}, peutPublier = !!(g.owner && g.repo && g.token);
     const membres = [...new Set(tout.map(x => x.auteur || '—'))].sort();
     const base = vpFiltre.type === 'fond' ? fondsEq : vpFiltre.type === 'tout' ? tout : films;
-    const visibles = base.filter(f => (f.type !== 'film' || vpFiltre.etat === 'tout' || (vpFiltre.etat === 'oui' ? pub(f) : !pub(f))) && (!vpFiltre.membre || (f.auteur || '—') === vpFiltre.membre));
+    // un même film enregistré plusieurs fois (même invitation, même auteur) : seule la version la plus récente est montrée
+    const cleFilm = f => (f.auteur || '').trim().toLowerCase() + '|' + String(f.evenement || f.nom || '').replace(/^Film — /, '').toLowerCase().replace(/[^a-z0-9à-ÿ]+/g, ' ').trim();
+    const recent = {}; films.forEach(f => { const k = cleFilm(f); if (!recent[k] || String(f.cree || '') > String(recent[k].cree || '')) recent[k] = f; });
+    const anciens = new Set(films.filter(f => recent[cleFilm(f)] !== f && !pub(f)).map(f => f.id));
+    const visibles = base.filter(f => (vpFiltre.versions || !anciens.has(f.id)) && (f.type !== 'film' || vpFiltre.etat === 'tout' || (vpFiltre.etat === 'oui' ? pub(f) : !pub(f))) && (!vpFiltre.membre || (f.auteur || '—') === vpFiltre.membre));
     const date = x => x ? new Date(x).toLocaleString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
     const nPub = films.filter(pub).length;
     zone.classList.remove('muet');
@@ -6027,7 +6036,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
       ${peutPublier ? '' : '<div class="carte" style="padding:10px 12px;margin-top:10px;background:#fbf4ec">Pour mettre un film sur le site : « Demander la publication » — l\'admin valide et il est publié. Vous pouvez regarder et télécharger toutes les vidéos de l\'équipe.</div>'}
       <div class="ligne" style="margin:14px 0 10px;gap:6px;flex-wrap:wrap">
         ${[['tout', 'Toutes', films.length], ['non', 'Pas encore sur le site', films.length - nPub], ['oui', 'Sur le site', nPub]].map(([k, n, c]) => `<button class="btn petit ${vpFiltre.etat === k ? 'plein' : ''}" data-vpf="${k}">${n} (${c})</button>`).join('')}
-        <select id="vp-membre"><option value="">Tous les membres</option>${membres.map(m => `<option ${vpFiltre.membre === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select>
+        ${anciens.size ? `<button class="btn petit ${vpFiltre.versions ? 'plein' : ''}" id="vp-versions" title="Le même film enregistré plusieurs fois">${vpFiltre.versions ? 'Cacher' : 'Voir'} les anciennes versions (${anciens.size})</button>` : ''}<select id="vp-membre"><option value="">Tous les membres</option>${membres.map(m => `<option ${vpFiltre.membre === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select>
         ${peutPublier ? `<span style="margin-left:auto" class="ligne"><label class="cases" style="margin:0"><input type="checkbox" id="vp-tous"> Tout cocher</label><button class="btn petit plein" id="vp-pub-sel" disabled>Publier la sélection</button><button class="btn petit" id="vp-pub-tout">Publier tout ce qui manque (${films.length - nPub})</button></span>` : ''}</div>
       <div class="muet" id="vp-etat" style="margin:0 0 8px"></div>
       <div class="grille" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr))">${visibles.map(f => { const u = f.url || Equipe.url(f.chemin), sv = pub(f), estFilm = f.type === 'film'; return `<div class="carte pile" style="padding:10px">
@@ -6039,6 +6048,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     $$('video[data-chemin]', zone).forEach(v => { IDB.lire('cache:' + Equipe.url(v.dataset.chemin).split('/object/public/')[1]).then(b => { if (b && b.size) v.src = URL.createObjectURL(b); }).catch(() => {}); });
     $$('[data-vpt]', zone).forEach(b => b.onclick = () => { vpFiltre.type = b.dataset.vpt; Stock.ecrire('studio.vp.filtre', vpFiltre); vueVideos(); });
     const vr = $('#vp-rattraper', zone); if (vr) vr.onclick = async () => { vr.disabled = true; vr.textContent = 'Partage en cours…'; await Equipe.rattraper(); await partagerFilmsEquipe(t => { vr.textContent = 'Envoi : ' + t.slice(0, 30) + '…'; }); vueVideos(); };
+    const vv = $('#vp-versions', zone); if (vv) vv.onclick = () => { vpFiltre.versions = !vpFiltre.versions; Stock.ecrire('studio.vp.filtre', vpFiltre); vueVideos(); };
     $('#vp-membre', zone).onchange = e => { vpFiltre.membre = e.target.value; Stock.ecrire('studio.vp.filtre', vpFiltre); vueVideos(); };
     $$('[data-vp-demander]', zone).forEach(b => b.onclick = async () => {
       const f = films.find(x => x.id === b.dataset.vpDemander); b.disabled = true;

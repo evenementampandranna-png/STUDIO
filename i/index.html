@@ -37,8 +37,8 @@
   .langues { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 420px; }
   .langues button { font: 600 15px Inter, system-ui, sans-serif; background: rgba(255,255,255,.18); color: #fff; border: 1.5px solid rgba(255,255,255,.65); border-radius: 999px; padding: 7px 14px; cursor: pointer; backdrop-filter: blur(4px); }
   .langues button.actif { background: #fff; color: var(--vin); border-color: #fff; }
-  #btn-langue { position: fixed; z-index: 16; right: 12px; top: 12px; height: 40px; border-radius: 999px; border: 0; background: rgba(255,255,255,.88); color: var(--vin); font: 600 14px Inter, system-ui, sans-serif; padding: 0 14px; display: none; box-shadow: 0 4px 14px rgba(0,0,0,.25); cursor: pointer; }
-  #menu-langue { position: fixed; z-index: 30; right: 12px; top: 58px; background: #fffaf3; border-radius: 14px; padding: 6px; box-shadow: 0 10px 30px rgba(0,0,0,.35); display: none; flex-direction: column; min-width: 170px; }
+  #btn-langue { position: fixed; z-index: 25; right: 12px; top: 12px; height: 40px; border-radius: 999px; border: 0; background: rgba(255,255,255,.88); color: var(--vin); font: 600 14px Inter, system-ui, sans-serif; padding: 0 14px; display: none; box-shadow: 0 4px 14px rgba(0,0,0,.25); cursor: pointer; }
+  #menu-langue { max-height: 70vh; overflow: auto; position: fixed; z-index: 30; right: 12px; top: 58px; background: #fffaf3; border-radius: 14px; padding: 6px; box-shadow: 0 10px 30px rgba(0,0,0,.35); display: none; flex-direction: column; min-width: 170px; }
   #menu-langue button { font: 500 15px Inter, system-ui, sans-serif; background: none; border: 0; text-align: left; padding: 10px 12px; border-radius: 10px; color: #3a2323; cursor: pointer; }
   #menu-langue button.actif { background: var(--vin); color: #fff; }
   #erreur { color: #fff; position: fixed; inset: 0; display: none; align-items: center; justify-content: center; text-align: center; padding: 30px; font-size: 20px; }
@@ -52,10 +52,10 @@
 <button id="son" aria-label="Son">♪</button><button id="pause" aria-label="Pause">❚❚</button>
 <div id="bandeau" role="dialog"></div>
 <div id="erreur"></div>
-<script src="../config.js?v=202611251206"></script>
-<script src="../moteur/moteur.js?v=202611251206"></script>
-<script src="../moteur/fabrique.js?v=202611251206"></script>
-<script src="../moteur/base.js?v=202611251206"></script>
+<script src="../config.js?v=202611251210"></script>
+<script src="../moteur/moteur.js?v=202611251210"></script>
+<script src="../moteur/fabrique.js?v=202611251210"></script>
+<script src="../moteur/base.js?v=202611251210"></script>
 <script>
 (async function () {
   const q = new URLSearchParams(location.search);
@@ -104,12 +104,35 @@
     if (moteurPret) moteurPret.changerLangue(l);
   }
   $('#titre-ouvrir').textContent = fiche.titre || 'Invitation';
-  if (langues.length > 1) {
-    const btns = langues.map(l => `<button type="button" data-l="${l}">${NOMS[l] || l}</button>`).join('');
-    $('#langues-ouvrir').innerHTML = btns; $('#langues-ouvrir').hidden = false;
+  // toutes les langues : celles préparées dans le studio, et les autres traduites à la demande (Google, gardé sur ce téléphone)
+  const toutes = langues.concat(Object.keys(NOMS).filter(l => !langues.includes(l)));
+  async function traduireAuVol(l) {
+    const src = fiche.langue || 'fr', cs = (projet.plans || []).flatMap(x => (x.calques || []).filter(c => c.texte && String(c.texte).trim() && !(c.trad && c.trad[l])));
+    if (!cs.length || l === src) return;
+    let cache = {}; try { cache = JSON.parse(localStorage.getItem('inv.trad.' + l) || '{}') || {}; } catch (e) {}
+    const aFaire = cs.filter(c => !cache[c.texte]);
+    for (let k = 0; k < aFaire.length; k += 12) {
+      const lot = aFaire.slice(k, k + 12);
+      const prot = lot.map(c => { const v = []; return { c, v, t: String(c.texte).replace(/\{[^}]+\}/g, m => { v.push(m); return '⟦' + (v.length - 1) + '⟧'; }) }; });
+      try {
+        const r = await fetch('https://translate.googleapis.com/translate_a/single?client=gtx&dt=t&sl=' + src + '&tl=' + l + '&q=' + encodeURIComponent(prot.map(x => x.t.replace(/\n/g, ' ⏎ ')).join('\n§\n')));
+        const j = await r.json(); const parts = (j[0] || []).map(x => x[0] || '').join('').split(/\s*§\s*/);
+        prot.forEach((x, i) => { let t = parts[i]; if (!t) return; t = t.replace(/\s*⏎\s*/g, '\n').replace(/⟦\s*(\d+)\s*⟧/g, (m, n) => x.v[Number(n)] || m).trim(); if (t) cache[x.c.texte] = t; });
+      } catch (e) { break; }
+    }
+    try { localStorage.setItem('inv.trad.' + l, JSON.stringify(cache)); } catch (e) {}
+    cs.forEach(c => { if (cache[c.texte]) { c.trad = c.trad || {}; c.trad[l] = cache[c.texte]; } });
+  }
+  async function choisirLangue(l) {
+    if (!langues.includes(l) && l !== fiche.langue) { const b = $('#btn-langue'); b.textContent = '🌐 …'; await traduireAuVol(l); }
+    appliquerLangue(l, true);
+  }
+  {
+    const btns = toutes.map(l => `<button type="button" data-l="${l}">${NOMS[l] || l}</button>`).join('');
+    if (langues.length > 1) { $('#langues-ouvrir').innerHTML = langues.map(l => `<button type="button" data-l="${l}">${NOMS[l] || l}</button>`).join(''); $('#langues-ouvrir').hidden = false; }
     $('#menu-langue').innerHTML = btns;
-    $$('#langues-ouvrir button').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); appliquerLangue(b.dataset.l, true); }));
-    $$('#menu-langue button').forEach(b => b.onclick = () => { appliquerLangue(b.dataset.l, true); $('#menu-langue').style.display = 'none'; });
+    $$('#langues-ouvrir button').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); choisirLangue(b.dataset.l); }));
+    $$('#menu-langue button').forEach(b => b.onclick = () => { $('#menu-langue').style.display = 'none'; choisirLangue(b.dataset.l); });
     $('#btn-langue').onclick = e => { e.stopPropagation(); const m = $('#menu-langue'); m.style.display = m.style.display === 'flex' ? 'none' : 'flex'; };
     document.addEventListener('click', () => { $('#menu-langue').style.display = 'none'; });
   }
@@ -177,7 +200,7 @@
     document.body.appendChild(bd);
   }
   window.moteurInvitation = moteur;
-  if (langues.length > 1) $('#btn-langue').style.display = 'block';
+  $('#btn-langue').style.display = 'block';   // toujours : l'invité peut choisir n'importe quelle langue
   moteur.afficherPlan(0, 0.01);
 
   let musique = null;

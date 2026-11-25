@@ -3,5 +3,5 @@
    contact  : numéro WhatsApp affiché sur la vitrine pour les demandes de devis. */
 window.STUDIO_CONFIG = {
   firebase: null,
-  contact: { nom: 'Studio d\'invitations', whatsapp: '', facebook: '' }
+  contact: { nom: 'Studio d\'invitations', whatsapp: '038 51 201 42', facebook: '' }
 };
