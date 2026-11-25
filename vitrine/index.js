@@ -1,5 +1,15 @@
 window.VITRINE = [
  {
+  "slug": "film-filmmwuqifghnwh6",
+  "film": true,
+  "video": "https://wckwwupnidcnufnlclbw.supabase.co/storage/v1/object/public/equipe/d29aee1cf2ec46fa937028bb468d3ba7/filmmwuqifghnwh6.mp4",
+  "titre": "Mariage",
+  "type": "Film vidéo",
+  "vignette": "medias/films/filmmwuqifghnwh6.jpg",
+  "auteur": "JULIA",
+  "date": "2026-11-25"
+ },
+ {
   "slug": "film-filmmwuqipt7v969",
   "film": true,
   "video": "https://wckwwupnidcnufnlclbw.supabase.co/storage/v1/object/public/equipe/d29aee1cf2ec46fa937028bb468d3ba7/filmmwuqipt7v969.mp4",
