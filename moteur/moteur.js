@@ -417,7 +417,9 @@
         el.src = u;
       } else {
         el = document.createElement('video');
-        el.muted = true; el.playsInline = true; el.loop = true; el.preload = 'auto';
+        el.muted = true; el.playsInline = true; el.loop = true;
+        // invitation (téléphone des invités) : seules les vidéos du début se téléchargent tout de suite, les autres au fur et à mesure
+        el.preload = this.mode === 'invitation' && this._prioritaires && !this._prioritaires.has(src) ? 'metadata' : 'auto';
         el.setAttribute('playsinline', ''); el.setAttribute('muted', '');
         if (location.protocol !== 'file:' && /^https?:/.test(new URL(u, location.href).href)) el.crossOrigin = 'anonymous';
         el.src = u;
@@ -426,8 +428,19 @@
       return el;
     }
 
+    // médias des 2 premiers plans de l'invitation (le reste se charge pendant que l'invité regarde)
+    _mediasDesPlans(indices) {
+      const l = new Set();
+      indices.forEach(i => { const p = (this.projet.plans || [])[i]; if (!p) return; if (p.fond && p.fond.media && p.fond.type !== 'couleur' && p.fond.type !== 'aucun') l.add(p.fond.media); (p.calques || []).forEach(c => { if ((c.type === 'image' || c.type === 'video') && c.media) l.add(c.media); }); });
+      return l;
+    }
+    _prechargerSuite() {
+      if (this.mode !== 'invitation' || !this.seq || !this.seq.length) return;
+      this._mediasDesPlans(this.seq.slice(this.pos, this.pos + 3)).forEach(k => { const el = this.medias[k]; if (el && el.tagName === 'VIDEO' && el.preload !== 'auto') { el.preload = 'auto'; if (el.paused && el.readyState < 2) { try { el.load(); } catch (e) {} } } });
+    }
     async precharger() {
       if (!this.projet) return;
+      if (this.mode === 'invitation') this._prioritaires = this._mediasDesPlans(this.plansInvitation().slice(0, 2));
       const polices = new Set();
       const promesses = [];
       (this.projet.plans || []).forEach(p => {
@@ -439,8 +452,9 @@
         });
       });
       const els = await Promise.all(promesses);
-      // les photos doivent être vraiment chargées (sinon elles manquent dans le film)
-      await Promise.all(els.filter(e => e && e.tagName === 'IMG' && !e.complete).map(e => new Promise(ok => { e.addEventListener('load', ok, { once: true }); e.addEventListener('error', ok, { once: true }); setTimeout(ok, 15000); })));
+      // les photos doivent être vraiment chargées (sinon elles manquent dans le film) ; sur l'invitation, seulement celles du début
+      const attendre = this.mode === 'invitation' && this._prioritaires ? els.filter(e => e && e.tagName === 'IMG' && [...this._prioritaires].some(k => this.medias[k] === e)) : els;
+      await Promise.all(attendre.filter(e => e && e.tagName === 'IMG' && !e.complete).map(e => new Promise(ok => { e.addEventListener('load', ok, { once: true }); e.addEventListener('error', ok, { once: true }); setTimeout(ok, 15000); })));
       await chargerPolices([...polices]);
       await Promise.all((this.projet.polices_perso || []).filter(x => x && x.nom && x.src).map(async x => chargerPolicePerso(x.nom, await this.url(x.src))));
       if (document.fonts && document.fonts.load) {
@@ -519,6 +533,7 @@
       const avant = this.projet.plans[this.seq[this.pos - 1]];
       const memeFond = avant && fondMedia(avant) && fondMedia(p) && avant.fond.media === p.fond.media;
       this._lancerVideos(p, !memeFond);
+      this._prechargerSuite();
       this._construireHTML();
     }
 
