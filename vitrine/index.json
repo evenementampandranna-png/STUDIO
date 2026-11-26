@@ -60,15 +60,6 @@
   "date": "2026-11-25"
  },
  {
-  "slug": "demo-my-sweet-18-jmwt",
-  "titre": "MY SWEET 18",
-  "type": "anniversaire",
-  "langue": "fr",
-  "vignette": "medias/eq-mwm32d7jqqxgdh.jpg",
-  "auteur": "Rova",
-  "date": "2026-11-25"
- },
- {
   "slug": "film-filmmwd3tugawbjj",
   "film": true,
   "video": "https://wckwwupnidcnufnlclbw.supabase.co/storage/v1/object/public/equipe/d29aee1cf2ec46fa937028bb468d3ba7/filmmwd3tugawbjj.mp4",
@@ -76,16 +67,6 @@
   "type": "Film vidéo",
   "vignette": "medias/films/filmmwd3tugawbjj.jpg",
   "auteur": "JULIA",
-  "date": "2026-11-25"
- },
- {
-  "slug": "film-filmmwupvaland4c",
-  "film": true,
-  "video": "https://wckwwupnidcnufnlclbw.supabase.co/storage/v1/object/public/equipe/d29aee1cf2ec46fa937028bb468d3ba7/filmmwupvaland4c.mp4",
-  "titre": "MY SWEET 18",
-  "type": "Film vidéo",
-  "vignette": "medias/films/filmmwupvaland4c.jpg",
-  "auteur": "Rova",
   "date": "2026-11-25"
  },
  {
