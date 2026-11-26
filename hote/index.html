@@ -97,8 +97,8 @@
 <div id="erreur" hidden></div>
 <dialog id="dlg"><form method="dialog" id="dlg-form"></form></dialog>
 <div id="toast"></div>
-<script src="../config.js?v=202611260802"></script>
-<script src="../moteur/base.js?v=202611260802"></script>
+<script src="../config.js?v=202611260818"></script>
+<script src="../moteur/base.js?v=202611260818"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
 <script>
 (async function () {
@@ -135,14 +135,12 @@
     w.document.write('<p style="font:16px system-ui;padding:20px">Préparation des invitations…</p>');
     if (!window.qrcode) await new Promise(ok => { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js'; sc.onload = ok; sc.onerror = ok; document.head.appendChild(sc); });
     const qr = t => { try { const q = qrcode(0, 'M'); q.addData(t); q.make(); return q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); } catch (e) { return ''; } };
-    const T = mg ? { invite: 'Manasa anao', vous: 'Ho an\'i', adultes: 'olon-dehibe', enfants: 'ankizy', lieu: 'Toerana', scan: 'Scannez ity QR code ity hijerena ny fanasana sy hamaliana', contact: 'Fifandraisana', rep: 'Valio alohan\'ny' } : { invite: 'Vous êtes invités', vous: 'Pour', adultes: 'adulte(s)', enfants: 'enfant(s)', lieu: 'Lieu', scan: 'Scannez ce QR code pour voir l\'invitation et répondre', contact: 'Contact', rep: 'Merci de répondre avant le' };
-    const dj = fiche.date ? new Date(fiche.date + 'T12:00:00').toLocaleDateString(mg ? 'fr-FR' : 'fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : '';
+    const dj = fiche.date ? new Date(fiche.date + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : '';
     const dl = fiche.date_limite ? new Date(fiche.date_limite + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
-    const lieux = (fiche.lieux || []).filter(l => l && l.nom).map(l => esc(l.nom) + (l.adresse ? '<br><small>' + esc(l.adresse) + '</small>' : '')).join('<br>');
-    const contacts = (fiche.contacts || []).filter(c => c && (c.nom || c.telephone)).map(c => esc([c.nom, c.telephone].filter(Boolean).join(' · '))).join('<br>');
+    // image : photo de fond, sinon une image tirée de la vidéo du premier plan
     const pl = (projet.plans || []).find(x => x.fond && x.fond.type === 'image' && x.fond.media);
     let img = pl ? (/^(https?:|data:)/.test(pl.fond.media) ? pl.fond.media : base + pl.fond.media) : '';
-    if (!img) {   // pas de photo : une image prise dans la vidéo du premier plan
+    if (!img) {
       const pv = (projet.plans || []).find(x => x.fond && x.fond.media && /\.(mp4|webm|mov)(\?|$)/i.test(x.fond.media));
       if (pv) img = await new Promise(ok => {
         const v = document.createElement('video'); v.muted = true; v.crossOrigin = 'anonymous'; v.preload = 'auto'; v.src = /^https?:/.test(pv.fond.media) ? pv.fond.media : base + pv.fond.media;
@@ -153,34 +151,101 @@
       });
     }
     const hotes = typeof fiche.hotes === 'string' ? fiche.hotes : fiche.hotes && typeof fiche.hotes === 'object' ? Object.values(fiche.hotes).filter(x => typeof x === 'string' && x.trim()).join(' & ') : '';
-    const titre = String(fiche.titre || ''), majuscules = titre.length > 3 && titre === titre.toUpperCase();
-    const carte = f => {
-      const lien = f ? lienFamille(f) : lienGeneral;
-      const qui = f ? `<div class="pour">${T.vous}</div><div class="fam">${esc(f.nom)}</div><div class="places">${invA(f)} ${T.adultes}${invE(f) ? ' · ' + invE(f) + ' ' + T.enfants : ''}</div>` : '';
-      return `<section class="carte">${img ? `<div class="bandeau" style="background-image:url('${esc(img)}')"></div>` : ''}<div class="int">
-        <div class="invite">${T.invite}</div><h1 class="${majuscules ? 'maj' : ''}">${esc(titre)}</h1>${hotes ? `<div class="hotes">${esc(hotes)}</div>` : ''}
-        ${qui}<div class="orn">❦</div>
-        <div class="quand">${esc(dj)}${fiche.heure ? ' · ' + esc(fiche.heure) : ''}</div>${lieux ? `<div class="lieu">${lieux}</div>` : ''}
-        <div class="bas"><div class="qr">${qr(lien)}</div><div class="txt"><b>${T.scan}</b>${dl ? `<br>${T.rep} ${esc(dl)}` : ''}${contacts ? `<br><br>${T.contact} :<br>${contacts}` : ''}</div></div></div></section>`;
-    };
+    // texte de l'invitation (plans d'ouverture et intermédiaires, dans la langue principale)
+    const texte = (projet.plans || []).filter(x => x.role === 'ouverture' || x.role === 'intermediaire').flatMap(x => (x.calques || []).filter(c => c.type === 'texte' && c.texte).map(c => String(c.texte)))
+      .map(t => t.replace(/\{[^}]+\}/g, '').replace(/[ \t]+\n/g, '\n').trim()).filter(t => t && t.toLowerCase() !== String(fiche.titre || '').toLowerCase()).join('\n\n').slice(0, 1200);
+    const lieux = (fiche.lieux || []).filter(l => l && l.nom).map(l => l.nom + (l.adresse ? ' — ' + l.adresse : '')).join('\n');
+    const contacts = (fiche.contacts || []).filter(c => c && (c.nom || c.telephone)).map(c => [c.nom, c.telephone].filter(Boolean).join(' · ')).join('\n');
+    const nb = f => (Number(invA(f)) || 0) + (Number(invE(f)) || 0);
+    const cartes = (liste.length ? liste : [null]).map(f => ({ nom: f ? f.nom : '', nb: f ? nb(f) : 0, qr: qr(f ? lienFamille(f) : lienGeneral) }));
+    const D0 = { titre: fiche.titre || '', hotes, texte, quand: dj + (fiche.heure ? ' · ' + fiche.heure : ''), lieux, contacts, limite: dl, img, mg };
     w.document.open();
-    w.document.write(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Invitations — ${esc(fiche.titre || '')}</title>
-      <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,700;1,500&family=Great+Vibes&display=swap" rel="stylesheet">
-      <style>@page { size: A4; margin: 0; } * { box-sizing: border-box; } body { margin: 0; background: #e9e4de; font-family: "Cormorant Garamond", Georgia, serif; color: #3a2a24; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      .barre { position: sticky; top: 0; background: #6b2230; color: #fff; padding: 10px 16px; font: 15px system-ui; display: flex; gap: 12px; align-items: center; z-index: 2; } .barre button { font: 600 15px system-ui; padding: 8px 16px; border-radius: 999px; border: 0; cursor: pointer; }
-      .feuille { width: 210mm; height: 297mm; margin: 10px auto; background: #fff; display: grid; grid-template-rows: 1fr 1fr; page-break-after: always; break-after: page; }
-      .carte { position: relative; margin: 8mm; border: 1.2mm double #b8975a; border-radius: 4mm; overflow: hidden; display: flex; flex-direction: column; background: #fffdf8; }
-      .bandeau { height: 34mm; background-size: cover; background-position: center 35%; } .int { flex: 1; padding: 5mm 9mm 6mm; text-align: center; display: flex; flex-direction: column; }
-      .invite { letter-spacing: .25em; text-transform: uppercase; font-size: 10pt; color: #9a7a45; } h1 { font-family: "Great Vibes", cursive; font-weight: 400; font-size: 30pt; margin: 1mm 0 0; line-height: 1.05; color: #6b2230; }
-      h1.maj { font-family: "Cormorant Garamond", Georgia, serif; font-weight: 700; font-size: 22pt; letter-spacing: .06em; margin-top: 2mm; } .hotes { font-style: italic; font-size: 12pt; } .pour { margin-top: 3mm; font-size: 10pt; letter-spacing: .15em; text-transform: uppercase; color: #9a7a45; } .fam { font-size: 19pt; font-weight: 700; } .places { font-size: 11pt; }
-      .orn { color: #b8975a; font-size: 14pt; margin: 1.5mm 0; } .quand { font-size: 14pt; font-weight: 700; text-transform: capitalize; } .lieu { font-size: 12pt; margin-top: 1mm; }
-      .bas { margin-top: auto; display: flex; gap: 5mm; align-items: center; text-align: left; font-size: 10.5pt; padding-top: 3mm; border-top: .3mm solid #e6d9c2; } .qr { width: 27mm; height: 27mm; flex: none; } .qr svg { width: 100%; height: 100%; }
-      @media print { body { background: #fff; } .barre { display: none; } .feuille { margin: 0; } }</style></head><body>
-      <div class="barre"><button onclick="print()">🖨 Imprimer</button><span>${liste.length} invitation(s) · 2 par feuille A4 (à couper en deux) — ou « Enregistrer en PDF » dans la fenêtre d'impression</span></div>
-      ${Array.from({ length: Math.ceil(liste.length / 2) }, (_, k) => `<div class="feuille">${liste.slice(k * 2, k * 2 + 2).map(carte).join('')}</div>`).join('')}</body></html>`);
+    w.document.write(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Invitations — ${esc(fiche.titre || '')}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,700;1,500&family=Great+Vibes&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>
+@page { size: A4; margin: 0; } * { box-sizing: border-box; }
+body { margin: 0; background: #e9e4de; font-family: "Cormorant Garamond", Georgia, serif; color: #3a2a24; -webkit-print-color-adjust: exact; print-color-adjust: exact; display: flex; }
+#reglages { width: 330px; flex: none; height: 100vh; overflow: auto; position: sticky; top: 0; background: #fff; padding: 14px; font: 14px Inter, system-ui, sans-serif; border-right: 1px solid #e6dccf; }
+#reglages h2 { font: 700 18px Inter, system-ui; margin: 0 0 4px; } #reglages p { color: #7a6a60; margin: 0 0 10px; font-size: 13px; }
+#reglages label { display: block; font-weight: 600; margin: 10px 0 4px; font-size: 13px; } #reglages input[type=text], #reglages textarea { width: 100%; font: 14px Inter, system-ui; padding: 7px 9px; border: 1px solid #d9cfc3; border-radius: 8px; }
+#reglages textarea { min-height: 90px; resize: vertical; } .lig { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; } .lig label { margin: 0; font-weight: 500; }
+.b { font: 600 14px Inter, system-ui; padding: 9px 16px; border-radius: 999px; border: 1px solid #d9cfc3; background: #fff; cursor: pointer; } .b.p { background: #6b2230; color: #fff; border-color: #6b2230; }
+.choix { display: flex; gap: 6px; flex-wrap: wrap; } .choix label { font-weight: 500; border: 1px solid #d9cfc3; border-radius: 8px; padding: 6px 9px; margin: 0; cursor: pointer; } .choix input { margin-right: 4px; }
+#pages { flex: 1; overflow: auto; height: 100vh; padding: 10px 0; }
+.feuille { width: 210mm; height: 297mm; margin: 10px auto; background: #fff; display: grid; page-break-after: always; break-after: page; }
+.feuille.a5 { grid-template-rows: 1fr 1fr; } .feuille.a4 { grid-template-rows: 1fr; }
+.carte { position: relative; margin: 8mm; border: 1.2mm double var(--or); border-radius: 4mm; overflow: hidden; display: flex; flex-direction: column; background: #fffdf8; }
+.bandeau { background-size: cover; background-position: center 35%; flex: none; }
+.a5 .bandeau { height: 34mm; } .a4 .bandeau { height: 95mm; }
+.int { flex: 1; padding: 4mm 9mm 5mm; text-align: center; display: flex; flex-direction: column; min-height: 0; }
+.invite { letter-spacing: .25em; text-transform: uppercase; font-size: 9.5pt; color: var(--or); }
+h1 { font-family: "Great Vibes", cursive; font-weight: 400; font-size: 28pt; margin: 1mm 0 0; line-height: 1.05; color: var(--c); }
+h1.maj { font-family: "Cormorant Garamond", Georgia, serif; font-weight: 700; font-size: 21pt; letter-spacing: .06em; margin-top: 2mm; }
+.a4 h1 { font-size: 40pt; } .a4 h1.maj { font-size: 30pt; }
+.hotes { font-style: italic; font-size: 12pt; } .texte { white-space: pre-line; font-size: 11pt; line-height: 1.25; margin: 1.5mm 0; overflow: hidden; } .a4 .texte { font-size: 13.5pt; }
+.pour { margin-top: 2mm; font-size: 9.5pt; letter-spacing: .15em; text-transform: uppercase; color: var(--or); } .fam { font-size: 18pt; font-weight: 700; color: var(--c); } .places { font-size: 12pt; }
+.orn { color: var(--or); font-size: 13pt; margin: 1mm 0; } .quand { font-size: 13.5pt; font-weight: 700; text-transform: capitalize; } .lieu { font-size: 11.5pt; white-space: pre-line; }
+.bas { margin-top: auto; display: flex; gap: 5mm; align-items: center; text-align: left; font-size: 10.5pt; padding-top: 2.5mm; border-top: .3mm solid #e6d9c2; white-space: pre-line; }
+.bas.centre { justify-content: center; text-align: center; } .qr { width: 26mm; height: 26mm; flex: none; } .qr svg { width: 100%; height: 100%; }
+@media print { body { background: #fff; display: block; } #reglages { display: none; } #pages { height: auto; overflow: visible; padding: 0; } .feuille { margin: 0; } }
+@media (max-width: 800px) { body { display: block; } #reglages { width: auto; height: auto; position: static; } }
+</style></head><body>
+<aside id="reglages">
+  <h2>🖨 Invitations à imprimer</h2><p>Modifiez ce que vous voulez : tout change sur toutes les cartes. Le nom de chaque famille est mis tout seul.</p>
+  <button class="b p" onclick="print()" style="width:100%">🖨 Imprimer / Enregistrer en PDF</button>
+  <label>Réponse des invités</label>
+  <div class="choix"><label><input type="radio" name="mode" value="qr">Avec QR code</label><label><input type="radio" name="mode" value="papier">Sans téléphone (papier)</label></div>
+  <p style="margin-top:6px">« Sans téléphone » : pas de QR code, les invités confirment en appelant le contact.</p>
+  <label>Format</label>
+  <div class="choix"><label><input type="radio" name="format" value="a5">2 par feuille A4</label><label><input type="radio" name="format" value="a4">1 par feuille A4</label></div>
+  <label>Photo</label>
+  <div class="lig"><input type="file" id="photo" accept="image/*"><button class="b" id="photo-sans" type="button">Sans photo</button><button class="b" id="photo-orig" type="button">Image d'origine</button></div>
+  <label>Titre</label><input type="text" id="titre">
+  <label>Hôtes / qui invite</label><input type="text" id="hotes">
+  <label>Texte de l'invitation</label><textarea id="texte" style="min-height:140px"></textarea>
+  <label>Date et heure</label><input type="text" id="quand">
+  <label>Lieu(x)</label><textarea id="lieux" style="min-height:50px"></textarea>
+  <label>Contacts</label><textarea id="contacts" style="min-height:50px"></textarea>
+  <label>Répondre avant le</label><input type="text" id="limite">
+  <label>Couleurs</label><div class="lig"><label><input type="color" id="c"> Titre</label><label><input type="color" id="or"> Ornements</label></div>
+  <p style="margin-top:14px"><button class="b" id="raz" type="button">Revenir au texte d'origine</button></p>
+</aside>
+<main id="pages"></main>
+<script>
+const D0 = ${JSON.stringify(D0).replace(/</g, '\\u003c')}, CARTES = ${JSON.stringify(cartes).replace(/</g, '\\u003c')}, CLE = ${JSON.stringify('hote.impr.' + slug)};
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+let R = Object.assign({ mode: 'qr', format: 'a5', c: '#6b2230', or: '#b8975a' }, D0);
+try { Object.assign(R, JSON.parse(localStorage.getItem(CLE) || '{}')); } catch (e) {}
+const T = D0.mg ? { invite: 'Manasa anareo', pour: 'Ho an\\'i', pers: 'Isan\\'ny olona', scan: 'Scannez ity QR code ity hijerena ny fanasana sy hamaliana.', rep: 'Valio alohan\\'ny', conf: 'Mba antsoy izahay hanamafisana ny fahatongavanareo :' }
+  : { invite: 'Vous êtes invités', pour: 'Pour', pers: 'Nombre de personnes', scan: 'Scannez ce QR code pour voir l\\'invitation et répondre.', rep: 'Merci de répondre avant le', conf: 'Merci de confirmer votre présence en appelant :' };
+function rendre() {
+  document.body.style.setProperty('--c', R.c); document.body.style.setProperty('--or', R.or);
+  const maj = R.titre.length > 3 && R.titre === R.titre.toUpperCase();
+  const carte = k => \`<section class="carte">\${R.img ? \`<div class="bandeau" style="background-image:url('\${esc(R.img)}')"></div>\` : ''}<div class="int">
+    <div class="invite">\${T.invite}</div><h1 class="\${maj ? 'maj' : ''}">\${esc(R.titre)}</h1>\${R.hotes ? \`<div class="hotes">\${esc(R.hotes)}</div>\` : ''}
+    \${R.texte ? \`<div class="texte">\${esc(R.texte)}</div>\` : ''}
+    \${k.nom ? \`<div class="pour">\${T.pour}</div><div class="fam">\${esc(k.nom)}</div>\${k.nb ? \`<div class="places">\${T.pers} : <b>\${k.nb}</b></div>\` : ''}\` : ''}<div class="orn">❦</div>
+    \${R.quand ? \`<div class="quand">\${esc(R.quand)}</div>\` : ''}\${R.lieux ? \`<div class="lieu">\${esc(R.lieux)}</div>\` : ''}
+    \${R.mode === 'papier'
+      ? \`<div class="bas centre"><div>\${R.contacts ? \`<b>\${T.conf}</b>\\n\${esc(R.contacts)}\` : ''}\${R.limite ? \`\\n\${T.rep} \${esc(R.limite)}\` : ''}</div></div>\`
+      : \`<div class="bas"><div class="qr">\${k.qr}</div><div><b>\${T.scan}</b>\${R.limite ? \`\\n\${T.rep} \${esc(R.limite)}\` : ''}\${R.contacts ? \`\\n\\n\${esc(R.contacts)}\` : ''}</div></div>\`}
+    </div></section>\`;
+  const par = R.format === 'a4' ? 1 : 2;
+  document.getElementById('pages').innerHTML = Array.from({ length: Math.ceil(CARTES.length / par) }, (_, i) => \`<div class="feuille \${R.format}">\${CARTES.slice(i * par, i * par + par).map(carte).join('')}</div>\`).join('');
+  try { localStorage.setItem(CLE, JSON.stringify(Object.assign({}, R, { img: R.img && R.img.length > 1500000 ? '' : R.img }))); } catch (e) {}
+}
+const champs = ['titre', 'hotes', 'texte', 'quand', 'lieux', 'contacts', 'limite', 'c', 'or'];
+const remplir = () => { champs.forEach(k => { document.getElementById(k).value = R[k] || ''; }); document.querySelectorAll('[name=mode]').forEach(r => r.checked = r.value === R.mode); document.querySelectorAll('[name=format]').forEach(r => r.checked = r.value === R.format); };
+champs.forEach(k => document.getElementById(k).addEventListener('input', e => { R[k] = e.target.value; rendre(); }));
+document.querySelectorAll('[name=mode],[name=format]').forEach(r => r.addEventListener('change', e => { R[e.target.name] = e.target.value; rendre(); }));
+document.getElementById('photo').onchange = e => { const f = e.target.files[0]; if (!f) return; const fr = new FileReader(); fr.onload = () => { const im = new Image(); im.onload = () => { const c = document.createElement('canvas'), s = Math.min(1, 1400 / im.width); c.width = im.width * s; c.height = im.height * s; c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); R.img = c.toDataURL('image/jpeg', .85); rendre(); }; im.src = fr.result; }; fr.readAsDataURL(f); };
+document.getElementById('photo-sans').onclick = () => { R.img = ''; rendre(); };
+document.getElementById('photo-orig').onclick = () => { R.img = D0.img; rendre(); };
+document.getElementById('raz').onclick = () => { R = Object.assign({ mode: R.mode, format: R.format, c: '#6b2230', or: '#b8975a' }, D0); remplir(); rendre(); };
+remplir(); rendre();
+<\/script></body></html>`);
     w.document.close();
   }
-
   /* ---- Données ---- */
   let D = { familles: [], reponses: [] }, filtre = 'tous', cherche = '', onglet = 'invites';
   let vues = null;   // réponses déjà vues : les nouvelles sont annoncées
