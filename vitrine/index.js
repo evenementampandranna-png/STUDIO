@@ -1,5 +1,15 @@
 window.VITRINE = [
  {
+  "slug": "film-fmwx8216dyz6",
+  "film": true,
+  "video": "https://wckwwupnidcnufnlclbw.supabase.co/storage/v1/object/public/equipe/d29aee1cf2ec46fa937028bb468d3ba7/filmmwx822wn1qm7.mp4",
+  "titre": "FANASANA VODIONDRY",
+  "type": "Film vidéo",
+  "vignette": "medias/films/fmwx8216dyz6.jpg",
+  "auteur": "Rova",
+  "date": "2026-11-26"
+ },
+ {
   "slug": "film-fmww7ka6vwjw",
   "film": true,
   "video": "https://wckwwupnidcnufnlclbw.supabase.co/storage/v1/object/public/equipe/d29aee1cf2ec46fa937028bb468d3ba7/filmmww7kdob86u0.mp4",
