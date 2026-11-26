@@ -1,5 +1,17 @@
 window.VITRINE = [
  {
+  "slug": "film-fmwxfso2bm2v",
+  "film": true,
+  "video": "https://wckwwupnidcnufnlclbw.supabase.co/storage/v1/object/public/equipe/d29aee1cf2ec46fa937028bb468d3ba7/filmmwxfsqcp6ou1.mp4",
+  "titre": "INVITATION DE MARIAGE",
+  "type": "Film vidéo",
+  "vignette": "medias/films/fmwxfso2bm2v.jpg",
+  "auteur": "Rova",
+  "equipe": "filmmwxfsqcp6ou1",
+  "projet": "lj8qh6ps",
+  "date": "2026-11-26"
+ },
+ {
   "slug": "film-fmwxc7qg9wjw",
   "film": true,
   "video": "https://wckwwupnidcnufnlclbw.supabase.co/storage/v1/object/public/equipe/d29aee1cf2ec46fa937028bb468d3ba7/filmmwxc7t1gr8tf.mp4",
