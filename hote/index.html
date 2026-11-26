@@ -97,8 +97,8 @@
 <div id="erreur" hidden></div>
 <dialog id="dlg"><form method="dialog" id="dlg-form"></form></dialog>
 <div id="toast"></div>
-<script src="../config.js?v=202611260742"></script>
-<script src="../moteur/base.js?v=202611260742"></script>
+<script src="../config.js?v=202611260802"></script>
+<script src="../moteur/base.js?v=202611260802"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
 <script>
 (async function () {
@@ -141,12 +141,24 @@
     const lieux = (fiche.lieux || []).filter(l => l && l.nom).map(l => esc(l.nom) + (l.adresse ? '<br><small>' + esc(l.adresse) + '</small>' : '')).join('<br>');
     const contacts = (fiche.contacts || []).filter(c => c && (c.nom || c.telephone)).map(c => esc([c.nom, c.telephone].filter(Boolean).join(' · '))).join('<br>');
     const pl = (projet.plans || []).find(x => x.fond && x.fond.type === 'image' && x.fond.media);
-    const img = pl ? (/^(https?:|data:)/.test(pl.fond.media) ? pl.fond.media : base + pl.fond.media) : '';
+    let img = pl ? (/^(https?:|data:)/.test(pl.fond.media) ? pl.fond.media : base + pl.fond.media) : '';
+    if (!img) {   // pas de photo : une image prise dans la vidéo du premier plan
+      const pv = (projet.plans || []).find(x => x.fond && x.fond.media && /\.(mp4|webm|mov)(\?|$)/i.test(x.fond.media));
+      if (pv) img = await new Promise(ok => {
+        const v = document.createElement('video'); v.muted = true; v.crossOrigin = 'anonymous'; v.preload = 'auto'; v.src = /^https?:/.test(pv.fond.media) ? pv.fond.media : base + pv.fond.media;
+        const fin = setTimeout(() => ok(''), 10000);
+        v.onloadeddata = () => { v.currentTime = Math.min(1.5, (v.duration || 2) / 2); };
+        v.onseeked = () => { try { const c = document.createElement('canvas'); c.width = 720; c.height = Math.round(720 * v.videoHeight / v.videoWidth) || 1280; c.getContext('2d').drawImage(v, 0, 0, c.width, c.height); clearTimeout(fin); ok(c.toDataURL('image/jpeg', .82)); } catch (e) { clearTimeout(fin); ok(''); } };
+        v.onerror = () => { clearTimeout(fin); ok(''); };
+      });
+    }
+    const hotes = typeof fiche.hotes === 'string' ? fiche.hotes : fiche.hotes && typeof fiche.hotes === 'object' ? Object.values(fiche.hotes).filter(x => typeof x === 'string' && x.trim()).join(' & ') : '';
+    const titre = String(fiche.titre || ''), majuscules = titre.length > 3 && titre === titre.toUpperCase();
     const carte = f => {
       const lien = f ? lienFamille(f) : lienGeneral;
       const qui = f ? `<div class="pour">${T.vous}</div><div class="fam">${esc(f.nom)}</div><div class="places">${invA(f)} ${T.adultes}${invE(f) ? ' · ' + invE(f) + ' ' + T.enfants : ''}</div>` : '';
       return `<section class="carte">${img ? `<div class="bandeau" style="background-image:url('${esc(img)}')"></div>` : ''}<div class="int">
-        <div class="invite">${T.invite}</div><h1>${esc(fiche.titre || '')}</h1>${fiche.hotes ? `<div class="hotes">${esc(fiche.hotes)}</div>` : ''}
+        <div class="invite">${T.invite}</div><h1 class="${majuscules ? 'maj' : ''}">${esc(titre)}</h1>${hotes ? `<div class="hotes">${esc(hotes)}</div>` : ''}
         ${qui}<div class="orn">❦</div>
         <div class="quand">${esc(dj)}${fiche.heure ? ' · ' + esc(fiche.heure) : ''}</div>${lieux ? `<div class="lieu">${lieux}</div>` : ''}
         <div class="bas"><div class="qr">${qr(lien)}</div><div class="txt"><b>${T.scan}</b>${dl ? `<br>${T.rep} ${esc(dl)}` : ''}${contacts ? `<br><br>${T.contact} :<br>${contacts}` : ''}</div></div></div></section>`;
@@ -158,9 +170,9 @@
       .barre { position: sticky; top: 0; background: #6b2230; color: #fff; padding: 10px 16px; font: 15px system-ui; display: flex; gap: 12px; align-items: center; z-index: 2; } .barre button { font: 600 15px system-ui; padding: 8px 16px; border-radius: 999px; border: 0; cursor: pointer; }
       .feuille { width: 210mm; height: 297mm; margin: 10px auto; background: #fff; display: grid; grid-template-rows: 1fr 1fr; page-break-after: always; break-after: page; }
       .carte { position: relative; margin: 8mm; border: 1.2mm double #b8975a; border-radius: 4mm; overflow: hidden; display: flex; flex-direction: column; background: #fffdf8; }
-      .bandeau { height: 30mm; background-size: cover; background-position: center; } .int { flex: 1; padding: 5mm 9mm 6mm; text-align: center; display: flex; flex-direction: column; }
+      .bandeau { height: 34mm; background-size: cover; background-position: center 35%; } .int { flex: 1; padding: 5mm 9mm 6mm; text-align: center; display: flex; flex-direction: column; }
       .invite { letter-spacing: .25em; text-transform: uppercase; font-size: 10pt; color: #9a7a45; } h1 { font-family: "Great Vibes", cursive; font-weight: 400; font-size: 30pt; margin: 1mm 0 0; line-height: 1.05; color: #6b2230; }
-      .hotes { font-style: italic; font-size: 12pt; } .pour { margin-top: 3mm; font-size: 10pt; letter-spacing: .15em; text-transform: uppercase; color: #9a7a45; } .fam { font-size: 19pt; font-weight: 700; } .places { font-size: 11pt; }
+      h1.maj { font-family: "Cormorant Garamond", Georgia, serif; font-weight: 700; font-size: 22pt; letter-spacing: .06em; margin-top: 2mm; } .hotes { font-style: italic; font-size: 12pt; } .pour { margin-top: 3mm; font-size: 10pt; letter-spacing: .15em; text-transform: uppercase; color: #9a7a45; } .fam { font-size: 19pt; font-weight: 700; } .places { font-size: 11pt; }
       .orn { color: #b8975a; font-size: 14pt; margin: 1.5mm 0; } .quand { font-size: 14pt; font-weight: 700; text-transform: capitalize; } .lieu { font-size: 12pt; margin-top: 1mm; }
       .bas { margin-top: auto; display: flex; gap: 5mm; align-items: center; text-align: left; font-size: 10.5pt; padding-top: 3mm; border-top: .3mm solid #e6d9c2; } .qr { width: 27mm; height: 27mm; flex: none; } .qr svg { width: 100%; height: 100%; }
       @media print { body { background: #fff; } .barre { display: none; } .feuille { margin: 0; } }</style></head><body>
