@@ -56,5 +56,10 @@ window.DICO_VITRINE_EN = {
   "Français": "French", "Malgache et français": "Malagasy and French", "Malgache": "Malagasy", "Anglais": "English", "Sur mesure": "Custom", "Sans modèle (sur mesure)": "No template (custom)",
   "Ex. : Mariage de Hery et Fanja": "E.g.: Wedding of Hery and Fanja", "Ex. : RAKOTO Hery et RASOA Fanja": "E.g.: RAKOTO Hery and RASOA Fanja",
   "Ex. : champêtre, chic doré, fleurs blanches, bord de mer…": "E.g.: rustic, golden chic, white flowers, seaside…",
-  "Copiez ici tout le texte : versets, phrases, programme, remerciements…": "Paste the whole text here: verses, phrases, programme, thanks…"
+  "Copiez ici tout le texte : versets, phrases, programme, remerciements…": "Paste the whole text here: verses, phrases, programme, thanks…",
+  "Aucun modèle ne correspond. Essayez un autre mot, ou écrivez-nous sur WhatsApp.": "No template matches. Try another word, or write to us on WhatsApp.",
+  "🔍 Rechercher : mariage, anniversaire, baptême…": "🔍 Search: wedding, birthday, baptism…",
+  "Rechercher un modèle": "Search a template",
+  "résultat": "result",
+  "résultats": "results"
 };
