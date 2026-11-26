@@ -1,5 +1,15 @@
 window.VITRINE = [
  {
+  "slug": "film-fmww7ka6vwjw",
+  "film": true,
+  "video": "https://wckwwupnidcnufnlclbw.supabase.co/storage/v1/object/public/equipe/d29aee1cf2ec46fa937028bb468d3ba7/filmmww7kdob86u0.mp4",
+  "titre": "MY FIRST BIRTHDAY",
+  "type": "Film vidéo",
+  "vignette": "medias/films/fmww7ka6vwjw.jpg",
+  "auteur": "Rova",
+  "date": "2026-11-26"
+ },
+ {
   "slug": "film-filmmww2b4ew1ktm",
   "film": true,
   "video": "https://wckwwupnidcnufnlclbw.supabase.co/storage/v1/object/public/equipe/d29aee1cf2ec46fa937028bb468d3ba7/filmmww2b4ew1ktm.mp4",
