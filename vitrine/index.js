@@ -1,5 +1,15 @@
 window.VITRINE = [
  {
+  "slug": "film-fmwx67yc7idn",
+  "film": true,
+  "video": "https://wckwwupnidcnufnlclbw.supabase.co/storage/v1/object/public/equipe/d29aee1cf2ec46fa937028bb468d3ba7/filmmwx8sp5o55uj.mp4",
+  "titre": "MY SWEET 18",
+  "type": "Film vidéo",
+  "vignette": "medias/films/fmwx67yc7idn.jpg",
+  "auteur": "Rova",
+  "date": "2026-11-26"
+ },
+ {
   "slug": "film-fmwx8216dyz6",
   "film": true,
   "video": "https://wckwwupnidcnufnlclbw.supabase.co/storage/v1/object/public/equipe/d29aee1cf2ec46fa937028bb468d3ba7/filmmwx822wn1qm7.mp4",
