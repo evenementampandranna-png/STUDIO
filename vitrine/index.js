@@ -1,5 +1,15 @@
 window.VITRINE = [
  {
+  "slug": "film-fmww6kkm33qi",
+  "film": true,
+  "video": "https://wckwwupnidcnufnlclbw.supabase.co/storage/v1/object/public/equipe/d29aee1cf2ec46fa937028bb468d3ba7/filmmww6kml9aygm.mp4",
+  "titre": "Invitation de mariage de VONITIANA Joro & AMBOARA Tina",
+  "type": "Film vidéo",
+  "vignette": "medias/films/fmww6kkm33qi.jpg",
+  "auteur": "JULIA",
+  "date": "2026-11-26"
+ },
+ {
   "slug": "film-fmwvpi3ubrr9",
   "film": true,
   "video": "https://wckwwupnidcnufnlclbw.supabase.co/storage/v1/object/public/equipe/d29aee1cf2ec46fa937028bb468d3ba7/filmmwvq16pkttnn.mp4",
