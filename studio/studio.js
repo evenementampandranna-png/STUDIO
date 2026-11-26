@@ -438,7 +438,7 @@
         catch (e) { dernier = e; if (/\(4\d\d\)/.test(e.message) && !/\(409\)/.test(e.message)) break; await new Promise(ok => setTimeout(ok, 2000 * (essai + 1))); }
       }
       if (dernier) throw dernier;
-      await this.rpc('equipe_biblio_ajouter', { p_item: { id, auteur: this.membre(), type: 'film', nom: 'Film — ' + (o.titre || 'Sans titre'), chemin, vignette: vignette.length < 150000 ? vignette : '', description: droitsTexte(o.droits), duree, secondes_creation: o.secondes || null, evenement: o.titre || '' } });
+      await this.rpc('equipe_biblio_ajouter', { p_item: { id, auteur: this.membre(), type: 'film', nom: 'Film — ' + (o.titre || 'Sans titre'), chemin, vignette: vignette.length < 150000 ? vignette : '', description: droitsTexte(o.droits, o.projet), duree, secondes_creation: o.secondes || null, evenement: o.titre || '' } });
       await this.charger(); this._dernierFilm = id; return { id };
     },
     // fichiers d'une invitation envoyés dans l'espace d'équipe (une seule fois chacun), pour que l'admin ait tout
@@ -815,6 +815,9 @@
   /* ================= Nouveautés : affichées à chaque mise à jour ================= */
   // À chaque mise à jour du studio, ajouter une entrée EN HAUT de cette liste (identifiant = date-numéro).
   const NOUVEAUTES = [
+    { id: '2026-11-26-1', date: '26 novembre 2026', titre: '« Publié » toujours juste', points: [
+      '🎬 Vidéos : « ✓ publié sur le site » est vérifié dans la liste réelle du site, pour les films de l\'équipe comme pour ceux de cet ordinateur.',
+      'Publier un film ne retire plus un autre film qui porte le même titre (deux clients peuvent avoir « INVITATION DE MARIAGE ») : seule une nouvelle version de la même invitation remplace l\'ancienne.'] },
     { id: '2026-11-25-7', date: '25 novembre 2026', titre: 'Droits d\'auteur des musiques', points: [
       '🎵 À chaque musique ajoutée (Film et publication → Musique), le studio vérifie ses droits : étiquettes du fichier (artiste, maison de disques) et, avec une clé AudD (Réglages → 🎵 Droits des musiques), reconnaissance de la chanson.',
       'Chanson protégée : alerte, puis confirmation avant de fabriquer le film et avant de le publier ; badge « ⚠ musique protégée » dans 🎬 Vidéos. Case « Nous avons l\'autorisation » si vous avez la licence.'] },
@@ -3777,8 +3780,8 @@ Sary: Jobily faha-10 taona mariazy — Batemy`;
     return res;
   }
   const droitsAlerte = d => !!d && (d.statut === 'protege' || d.statut === 'probable') && !d.autorise;
-  const droitsTexte = d => d && d.statut ? 'droits:' + JSON.stringify({ s: d.statut, a: d.artiste || '', t: d.titre || '', ok: !!d.autorise }).slice(0, 900) : '';
-  const droitsDe = it => { try { const m = String(it && it.description || '').match(/^droits:(.*)$/); if (!m) return null; const j = JSON.parse(m[1]); return { statut: j.s, artiste: j.a, titre: j.t, autorise: j.ok }; } catch (e) { return null; } };
+  const droitsTexte = (d, projet) => (d && d.statut) || projet ? 'droits:' + JSON.stringify({ s: (d && d.statut) || '', a: (d && d.artiste) || '', t: (d && d.titre) || '', ok: !!(d && d.autorise), p: projet || '' }).slice(0, 900) : '';
+  const droitsDe = it => { try { const m = String(it && it.description || '').match(/^droits:(.*)$/); if (!m) return null; const j = JSON.parse(m[1]); return { statut: j.s, artiste: j.a, titre: j.t, autorise: j.ok, projet: j.p || '' }; } catch (e) { return null; } };
   function blocDroits(d) {
     if (!d) return '';
     const qui = [d.artiste, d.titre].filter(Boolean).join(' — ') + (d.label ? ' (' + d.label + ')' : '');
@@ -4699,7 +4702,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     if (Equipe.actif()) {
       try {
         let it = f.equipe_id && (Equipe.items || []).find(x => x.id === f.equipe_id);
-        if (!it) { const r = await Equipe.ajouterFilm(blob, { titre: f.titre, vignette: f.vignette, droits: f.droits }); if (r && r.id) { Films.maj(f.id, { equipe_id: r.id }); it = (Equipe.items || []).find(x => x.id === r.id); } }
+        if (!it) { const r = await Equipe.ajouterFilm(blob, { titre: f.titre, vignette: f.vignette, droits: f.droits, projet: f.projet }); if (r && r.id) { Films.maj(f.id, { equipe_id: r.id }); it = (Equipe.items || []).find(x => x.id === r.id); } }
         if (it && it.chemin && !/^site:/.test(it.chemin) && await filmEnLigne(Equipe.url(it.chemin))) chemin = Equipe.url(it.chemin);
       } catch (e) { console.warn('film → équipe', e.message); }
     }
@@ -4711,8 +4714,8 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     let vignette = 'fonds/fond_2.jpg';
     if (/^data:/.test(f.vignette || '')) { vignette = 'medias/films/' + f.id + '.jpg'; await GitHub.envoyer(vignette, dataURLversBlob(f.vignette), 'Vignette ' + f.titre); }
     const eid = (Films.liste().find(x => x.id === f.id) || f).equipe_id;
-    const index = (await lireVitrine()).filter(x => x.slug !== 'film-' + f.id && !(eid && x.slug === 'film-' + eid));
-    index.unshift({ slug: 'film-' + f.id, film: true, video: chemin, titre: f.titre, type: 'Film vidéo', vignette, auteur: f.auteur || '', date: new Date().toISOString().slice(0, 10) });
+    const index = (await lireVitrine()).filter(x => x.slug !== 'film-' + f.id && !(eid && (x.slug === 'film-' + eid || x.equipe === eid)));
+    index.unshift({ slug: 'film-' + f.id, film: true, video: chemin, titre: f.titre, type: 'Film vidéo', vignette, auteur: f.auteur || '', equipe: eid || '', projet: f.projet || '', date: new Date().toISOString().slice(0, 10) });
     await ecrireVitrine(index, 'Vitrine : film ' + f.titre);
     Films.maj(f.id, { site: new Date().toISOString() });
   }
@@ -4733,7 +4736,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
       $('#ap-reg', m).onclick = () => fermer();
       const d = $('#ap-dem', m); if (d) d.onclick = async () => {
         d.disabled = true; d.textContent = 'Envoi…';
-        try { const it = f.equipe_id ? { id: f.equipe_id } : await Equipe.ajouterFilm(await Films.blob(f), { titre: f.titre, vignette: f.vignette, droits: f.droits }); if (it && it.id) Films.maj(f.id, { equipe_id: it.id, dossier: 'videos' }); await demanderPublication('film', (it && it.id) || f.id, f.titre); toast('Demande envoyée à l\'admin'); fermer(); if (apres) apres(); }
+        try { const it = f.equipe_id ? { id: f.equipe_id } : await Equipe.ajouterFilm(await Films.blob(f), { titre: f.titre, vignette: f.vignette, droits: f.droits, projet: f.projet }); if (it && it.id) Films.maj(f.id, { equipe_id: it.id, dossier: 'videos' }); await demanderPublication('film', (it && it.id) || f.id, f.titre); toast('Demande envoyée à l\'admin'); fermer(); if (apres) apres(); }
         catch (e) { d.disabled = false; d.textContent = 'Réessayer'; toast(e.message); }
       };
     });
@@ -4759,7 +4762,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
       toast('✅ Validé · envoi pour publication…', 6000);
       try {
         let eid = f.equipe_id;
-        if (!eid) { const it = await Equipe.ajouterFilm(await Films.blob(f), { titre: f.titre, vignette: f.vignette, droits: f.droits }); eid = it && it.id; if (eid) Films.maj(id, { equipe_id: eid }); }
+        if (!eid) { const it = await Equipe.ajouterFilm(await Films.blob(f), { titre: f.titre, vignette: f.vignette, droits: f.droits, projet: f.projet }); eid = it && it.id; if (eid) Films.maj(id, { equipe_id: eid }); }
         if (eid) await demanderPublication('film', eid, f.titre);
         toast('✅ Film validé : il sera publié sur le site automatiquement (par le studio de l\'admin)', 8000);
       } catch (e) { toast('Film validé, mais l\'envoi a échoué : ' + e.message, 9000); }
@@ -4893,7 +4896,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
           const blob = await Films.blob(f); if (!blob) continue;
           if (blob.size > 200e6) { Films.maj(f.id, { equipe_refus: 'plus de 200 Mo' }); continue; }
           if (suivi) suivi(f.titre);
-          const it = await Equipe.ajouterFilm(blob, { titre: f.titre, vignette: f.vignette, droits: f.droits });
+          const it = await Equipe.ajouterFilm(blob, { titre: f.titre, vignette: f.vignette, droits: f.droits, projet: f.projet });
           if (it && it.id) { Films.maj(f.id, { equipe_id: it.id }); n++; }
         } catch (e) { console.warn('partage film', f.titre, e.message); if (/bloqu|402|restricted/i.test(e.message)) break; }
       }
@@ -4999,9 +5002,9 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     let vignette = 'fonds/fond_2.jpg';
     if (/^data:/.test(f.vignette || '')) { vignette = 'medias/films/' + f.id + '.jpg'; await GitHub.envoyer(vignette, dataURLversBlob(f.vignette), 'Vignette ' + f.nom); }
     const autres = new Set(Films.liste().filter(x => x.equipe_id === f.id).map(x => 'film-' + x.id));   // le même film publié depuis l'ordinateur
-    const titreN = t => String(t || '').toLowerCase().replace(/\(copie\)/g, '').replace(/[^a-z0-9à-ÿ]+/g, ' ').trim(), monTitre = titreN(f.evenement || f.nom.replace(/^Film — /, '')), monAuteur = titreN(f.auteur);
-    const index = (await lireVitrine()).filter(x => x.slug !== 'film-' + f.id && !autres.has(x.slug) && !(x.film && titreN(x.titre) === monTitre && titreN(x.auteur) === monAuteur));   // nouvelle version : remplace l'ancienne
-    index.unshift({ slug: 'film-' + f.id, film: true, video: chemin, titre: (f.evenement || f.nom.replace(/^Film — /, '')), type: 'Film vidéo', vignette, auteur: f.auteur || '', date: new Date().toISOString().slice(0, 10) });
+    const monProjet = (droitsDe(f) || {}).projet;   // nouvelle version de la même invitation : remplace l'ancienne (jamais un autre client au même titre)
+    const index = (await lireVitrine()).filter(x => x.slug !== 'film-' + f.id && !autres.has(x.slug) && x.equipe !== f.id && !(monProjet && x.film && x.projet === monProjet));
+    index.unshift({ slug: 'film-' + f.id, film: true, video: chemin, titre: (f.evenement || f.nom.replace(/^Film — /, '')), type: 'Film vidéo', vignette, auteur: f.auteur || '', equipe: f.id, projet: monProjet || '', date: new Date().toISOString().slice(0, 10) });
     suivi && suivi('Ajout à la rubrique…');
     await ecrireVitrine(index, 'Vitrine : film ' + f.nom);
   }
@@ -5201,7 +5204,7 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
                  ${Equipe.actif() ? '<div class="ligne"><button class="btn petit plein" data-film-equipe>☁ Envoyer à l\'équipe (🎬 Vidéos)</button></div>' : ''}`}
           </div>`;
           const dl = $('[data-film-dl]', z); if (dl) dl.onclick = () => telecharger(nomFichier, r.blob);
-          const eq = $('[data-film-equipe]', z); if (eq) eq.onclick = async () => { eq.disabled = true; eq.textContent = 'Envoi…'; try { await Equipe.ajouterFilm(r.blob, { droits: p.musique && p.musique.droits, titre: p.fiche.titre || '' }); filmEnAttente = null; toast('Film envoyé : visible dans 🎬 Vidéos pour toute l\'équipe'); eq.textContent = '✓ Envoyé'; } catch (e) { eq.disabled = false; eq.textContent = '☁ Réessayer l\'envoi'; toast('Envoi impossible : ' + e.message, 6000); } };
+          const eq = $('[data-film-equipe]', z); if (eq) eq.onclick = async () => { eq.disabled = true; eq.textContent = 'Envoi…'; try { await Equipe.ajouterFilm(r.blob, { projet: p.id, droits: p.musique && p.musique.droits, titre: p.fiche.titre || '' }); filmEnAttente = null; toast('Film envoyé : visible dans 🎬 Vidéos pour toute l\'équipe'); eq.textContent = '✓ Envoyé'; } catch (e) { eq.disabled = false; eq.textContent = '☁ Réessayer l\'envoi'; toast('Envoi impossible : ' + e.message, 6000); } };
           $$('[data-ranger]', z).forEach(b => b.onclick = async () => { filmEnAttente = null; z.innerHTML = ''; if (b.dataset.ranger === 'videos') { await validerFilm(fl.id); } else { Films.maj(fl.id, { dossier: 'brouillon' }); toast('📁 Film mis en brouillon : il reste dans « Films de cet événement »', 6000); } ongletPublier(p); });
         };
         boite(null, 'enregistrement en cours…');
@@ -6133,6 +6136,8 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     const aPartager = medias.filter(m => (m.type === 'fond' || m.type === 'video' || m.anime) && !m.equipe_id && !m.brouillon && /^idb:/.test(m.src || '')).length + (Equipe.actif() ? Films.liste().filter(x => !x.equipe_id && !x.equipe_refus).length : 0);
     let indexSite = [];
     try { const r = await fetch(urlSite() + 'vitrine/index.json?v=' + Date.now(), { cache: 'no-store' }); if (r.ok) { indexSite = await r.json(); surSite = new Set(indexSite.map(x => x.slug)); } } catch (e) {}
+    // les films de cet ordinateur : « sur le site » = vraiment dans la liste du site (le repère gardé ici peut être ancien)
+    if (surSite.size) { const eqs = new Set(indexSite.map(x => x.equipe).filter(Boolean)); Films.liste().forEach(f => { const vu = surSite.has('film-' + f.id) || (!!f.equipe_id && (surSite.has('film-' + f.equipe_id) || eqs.has(f.equipe_id))); if (!!f.site !== vu) Films.maj(f.id, { site: vu ? (f.site || new Date().toISOString()) : null }); }); }
     // films déjà publiés sur le site (par n'importe quel membre) : visibles par toute l'équipe, sans passer par la base
     const idsEq = new Set(films.map(f => 'film-' + String(f.id).replace(/^site-/, '')));
     const filmsSite = indexSite.filter(x => x.film && x.video && !idsEq.has(x.slug)).map(x => ({ id: 'site:' + x.slug, type: 'film', site: true, nom: x.titre, evenement: x.titre, auteur: x.auteur || '—', cree: x.date, url: /^https?:/.test(x.video) ? x.video : urlSite() + x.video, vignette: x.vignette ? (/^https?:/.test(x.vignette) ? x.vignette : urlSite() + x.vignette) : '' }));
@@ -6141,13 +6146,15 @@ Important : écris comme un traducteur natif qui rédige un vrai faire-part dans
     if (horsLigne && !films.length) { zone.textContent = 'Impossible de lire les vidéos de l\'équipe : ' + horsLigne; return; }
     // « publié » = vraiment dans la liste du site (et fichier en ligne) ; le chemin « site: » ne suffit pas
     const perdus = new Set(Stock.lire('studio.films.perdus', []).map(x => x.id));
-    const pub = f => !perdus.has(f.id) && (surSite.size ? surSite.has('film-' + f.id) : !!f.site);
+    const parEquipe = new Set((indexSite || []).map(x => x.equipe).filter(Boolean));
+    const videosSite = new Set((indexSite || []).map(x => x.video).filter(Boolean));
+    const pub = f => !perdus.has(f.id) && (surSite.size ? surSite.has('film-' + f.id) || parEquipe.has(f.id) || (!!f.chemin && videosSite.has(Equipe.url(f.chemin))) : !!f.site);
     const demandesFilms = {}; try { (await mesDemandes()).filter(d => d.type === 'film').forEach(d => { if (!demandesFilms[d.objet] || d.statut === 'attente') demandesFilms[d.objet] = d.statut; }); } catch (e) {}
     const g = reglages.github || {}, peutPublier = !!(g.owner && g.repo && g.token);
     const membres = [...new Set(tout.map(x => x.auteur || '—'))].sort();
     const base = vpFiltre.type === 'fond' ? fondsEq : vpFiltre.type === 'tout' ? tout : films;
     // un même film enregistré plusieurs fois (même invitation, même auteur) : seule la version la plus récente est montrée
-    const cleFilm = f => (f.auteur || '').trim().toLowerCase() + '|' + String(f.evenement || f.nom || '').replace(/^Film — /, '').toLowerCase().replace(/[^a-z0-9à-ÿ]+/g, ' ').trim();
+    const cleFilm = f => { const pr = (droitsDe(f) || {}).projet; return pr ? 'p|' + pr : 'f|' + f.id; };   // même invitation seulement (deux clients peuvent avoir le même titre)
     const recent = {}; films.forEach(f => { const k = cleFilm(f); if (!recent[k] || String(f.cree || '') > String(recent[k].cree || '')) recent[k] = f; });
     const anciens = new Set(films.filter(f => recent[cleFilm(f)] !== f && !surSite.has('film-' + f.id)).map(f => f.id));
     const visibles = base.filter(f => (vpFiltre.versions || !anciens.has(f.id)) && (f.type !== 'film' || vpFiltre.etat === 'tout' || (vpFiltre.etat === 'oui' ? pub(f) : !pub(f))) && (!vpFiltre.membre || (f.auteur || '—') === vpFiltre.membre));
