@@ -97,8 +97,8 @@
 <div id="erreur" hidden></div>
 <dialog id="dlg"><form method="dialog" id="dlg-form"></form></dialog>
 <div id="toast"></div>
-<script src="../config.js?v=202611251539"></script>
-<script src="../moteur/base.js?v=202611251539"></script>
+<script src="../config.js?v=202611260742"></script>
+<script src="../moteur/base.js?v=202611260742"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
 <script>
 (async function () {
@@ -128,6 +128,46 @@
   const tel = n => String(n || '').replace(/\D/g, '').replace(/^0/, '261');
   const MSG = mg ? 'Salama {famille}! Faly manasa anareo izahay. Ity ny fanasana: {lien}' : 'Bonjour {famille} ! Nous avons le plaisir de vous inviter. Voici votre invitation : {lien}';
   let modele = localStorage.getItem('hote.msg.' + slug) || MSG;
+
+  /* ---- Invitations à imprimer : une carte par famille (A5, 2 par feuille A4) avec son QR code ---- */
+  async function imprimer(liste) {
+    const w = window.open('', '_blank'); if (!w) return toast('Autorisez les fenêtres (pop-up) pour imprimer');
+    w.document.write('<p style="font:16px system-ui;padding:20px">Préparation des invitations…</p>');
+    if (!window.qrcode) await new Promise(ok => { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js'; sc.onload = ok; sc.onerror = ok; document.head.appendChild(sc); });
+    const qr = t => { try { const q = qrcode(0, 'M'); q.addData(t); q.make(); return q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); } catch (e) { return ''; } };
+    const T = mg ? { invite: 'Manasa anao', vous: 'Ho an\'i', adultes: 'olon-dehibe', enfants: 'ankizy', lieu: 'Toerana', scan: 'Scannez ity QR code ity hijerena ny fanasana sy hamaliana', contact: 'Fifandraisana', rep: 'Valio alohan\'ny' } : { invite: 'Vous êtes invités', vous: 'Pour', adultes: 'adulte(s)', enfants: 'enfant(s)', lieu: 'Lieu', scan: 'Scannez ce QR code pour voir l\'invitation et répondre', contact: 'Contact', rep: 'Merci de répondre avant le' };
+    const dj = fiche.date ? new Date(fiche.date + 'T12:00:00').toLocaleDateString(mg ? 'fr-FR' : 'fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : '';
+    const dl = fiche.date_limite ? new Date(fiche.date_limite + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+    const lieux = (fiche.lieux || []).filter(l => l && l.nom).map(l => esc(l.nom) + (l.adresse ? '<br><small>' + esc(l.adresse) + '</small>' : '')).join('<br>');
+    const contacts = (fiche.contacts || []).filter(c => c && (c.nom || c.telephone)).map(c => esc([c.nom, c.telephone].filter(Boolean).join(' · '))).join('<br>');
+    const pl = (projet.plans || []).find(x => x.fond && x.fond.type === 'image' && x.fond.media);
+    const img = pl ? (/^(https?:|data:)/.test(pl.fond.media) ? pl.fond.media : base + pl.fond.media) : '';
+    const carte = f => {
+      const lien = f ? lienFamille(f) : lienGeneral;
+      const qui = f ? `<div class="pour">${T.vous}</div><div class="fam">${esc(f.nom)}</div><div class="places">${invA(f)} ${T.adultes}${invE(f) ? ' · ' + invE(f) + ' ' + T.enfants : ''}</div>` : '';
+      return `<section class="carte">${img ? `<div class="bandeau" style="background-image:url('${esc(img)}')"></div>` : ''}<div class="int">
+        <div class="invite">${T.invite}</div><h1>${esc(fiche.titre || '')}</h1>${fiche.hotes ? `<div class="hotes">${esc(fiche.hotes)}</div>` : ''}
+        ${qui}<div class="orn">❦</div>
+        <div class="quand">${esc(dj)}${fiche.heure ? ' · ' + esc(fiche.heure) : ''}</div>${lieux ? `<div class="lieu">${lieux}</div>` : ''}
+        <div class="bas"><div class="qr">${qr(lien)}</div><div class="txt"><b>${T.scan}</b>${dl ? `<br>${T.rep} ${esc(dl)}` : ''}${contacts ? `<br><br>${T.contact} :<br>${contacts}` : ''}</div></div></div></section>`;
+    };
+    w.document.open();
+    w.document.write(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Invitations — ${esc(fiche.titre || '')}</title>
+      <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,700;1,500&family=Great+Vibes&display=swap" rel="stylesheet">
+      <style>@page { size: A4; margin: 0; } * { box-sizing: border-box; } body { margin: 0; background: #e9e4de; font-family: "Cormorant Garamond", Georgia, serif; color: #3a2a24; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .barre { position: sticky; top: 0; background: #6b2230; color: #fff; padding: 10px 16px; font: 15px system-ui; display: flex; gap: 12px; align-items: center; z-index: 2; } .barre button { font: 600 15px system-ui; padding: 8px 16px; border-radius: 999px; border: 0; cursor: pointer; }
+      .feuille { width: 210mm; height: 297mm; margin: 10px auto; background: #fff; display: grid; grid-template-rows: 1fr 1fr; page-break-after: always; break-after: page; }
+      .carte { position: relative; margin: 8mm; border: 1.2mm double #b8975a; border-radius: 4mm; overflow: hidden; display: flex; flex-direction: column; background: #fffdf8; }
+      .bandeau { height: 30mm; background-size: cover; background-position: center; } .int { flex: 1; padding: 5mm 9mm 6mm; text-align: center; display: flex; flex-direction: column; }
+      .invite { letter-spacing: .25em; text-transform: uppercase; font-size: 10pt; color: #9a7a45; } h1 { font-family: "Great Vibes", cursive; font-weight: 400; font-size: 30pt; margin: 1mm 0 0; line-height: 1.05; color: #6b2230; }
+      .hotes { font-style: italic; font-size: 12pt; } .pour { margin-top: 3mm; font-size: 10pt; letter-spacing: .15em; text-transform: uppercase; color: #9a7a45; } .fam { font-size: 19pt; font-weight: 700; } .places { font-size: 11pt; }
+      .orn { color: #b8975a; font-size: 14pt; margin: 1.5mm 0; } .quand { font-size: 14pt; font-weight: 700; text-transform: capitalize; } .lieu { font-size: 12pt; margin-top: 1mm; }
+      .bas { margin-top: auto; display: flex; gap: 5mm; align-items: center; text-align: left; font-size: 10.5pt; padding-top: 3mm; border-top: .3mm solid #e6d9c2; } .qr { width: 27mm; height: 27mm; flex: none; } .qr svg { width: 100%; height: 100%; }
+      @media print { body { background: #fff; } .barre { display: none; } .feuille { margin: 0; } }</style></head><body>
+      <div class="barre"><button onclick="print()">🖨 Imprimer</button><span>${liste.length} invitation(s) · 2 par feuille A4 (à couper en deux) — ou « Enregistrer en PDF » dans la fenêtre d'impression</span></div>
+      ${Array.from({ length: Math.ceil(liste.length / 2) }, (_, k) => `<div class="feuille">${liste.slice(k * 2, k * 2 + 2).map(carte).join('')}</div>`).join('')}</body></html>`);
+    w.document.close();
+  }
 
   /* ---- Données ---- */
   let D = { familles: [], reponses: [] }, filtre = 'tous', cherche = '', onglet = 'invites';
@@ -249,17 +289,18 @@
     $$('[data-cc]').forEach(b => b.onclick = () => { const c = b.dataset.cc; filtreCat = filtreCat === c || (c === '∅' && filtreCat === '∅') ? '' : c; onglet = 'invites'; rendre(); const l = $('.liste'); if (l) l.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
     const v = $('#vue');
     if (onglet === 'invites') {
-      v.innerHTML = `<div class="outils"><button class="btn plein" id="ajouter">+ Ajouter une famille</button><button class="btn" id="gerer-cat">Catégories</button><button class="btn" id="importer">Importer Excel</button><button class="btn danger" id="tout-suppr">Supprimer toute la liste</button><button class="btn" id="exporter">Exporter Excel</button>
+      v.innerHTML = `<div class="outils"><button class="btn plein" id="ajouter">+ Ajouter une famille</button><button class="btn" id="gerer-cat">Catégories</button><button class="btn" id="importer">Importer Excel</button><button class="btn danger" id="tout-suppr">Supprimer toute la liste</button><button class="btn" id="exporter">Exporter Excel</button><button class="btn" id="imprimer" title="Une carte par famille, avec son QR code personnel">🖨 Invitations à imprimer</button>
           <input type="search" id="cherche" placeholder="Rechercher un nom, une table…" value="${esc(cherche)}"></div>
         <div class="puces" style="margin-bottom:10px">${[['tous', 'Tous'], ['vient', 'Viennent'], ['non', 'Ne viennent pas'], ['attente', 'En attente']].concat(gereEnvoi() ? [['pasenvoye', 'Pas encore envoyée']] : []).map(([k, t]) => `<button class="puce ${filtre === k ? 'actif' : ''}" data-f="${k}">${t}</button>`).join('')}${fs.some(f => f.cote) ? ' <span class="muet" style="margin:0 4px">·</span>' + [['', 'Tous les côtés']].concat(COTES.filter(c => fs.some(f => f.cote === c)).map(c => [c, c]), fs.some(f => !f.cote) ? [['∅', 'À classer']] : []).map(([k, t]) => `<button class="puce ${filtreCote === k ? 'actif' : ''}" data-co="${esc(k)}">${esc(t)}</button>`).join('') : ''}</div>
         <div class="liste">${visibles.map(f => `<div class="fam" data-code="${esc(f.code)}">
             <div><div class="nom">${esc(f.nom)}</div><div class="details">${[f.cote, f.envoye ? '📨 envoyée' : (gereEnvoi() ? 'pas encore envoyée' : ''), f.categorie, 'Invités : ' + invA(f) + ' adulte(s)' + (invE(f) ? ', ' + invE(f) + ' enfant(s)' : ''), f.statut === 'vient' ? '✓ Viennent : ' + (f.adultes || 0) + ' adulte(s), ' + (f.enfants || 0) + ' enfant(s)' : '', f.repondu ? 'répondu le ' + new Date(f.repondu).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '', f.table ? 'Table ' + f.table : '', f.telephone].filter(Boolean).map(esc).join(' · ')}</div>
               ${f.message ? `<div class="details">« ${esc(f.message)} »</div>` : ''}</div>
             <span class="badge ${f.statut === 'vient' || f.statut === 'non' ? f.statut : 'attente'}">${STAT[f.statut] || STAT.attente}</span>
-            <div class="actions">${f.telephone ? '<button class="btn petit wa" data-a="wa">Envoyer sur WhatsApp</button>' : ''}<button class="btn petit" data-a="copier">Copier son lien</button><button class="btn petit" data-a="partager">📤 Partager</button><button class="btn petit" data-a="modifier">Modifier</button><button class="btn petit danger" data-a="suppr">Supprimer</button></div>
+            <div class="actions">${f.telephone ? '<button class="btn petit wa" data-a="wa">Envoyer sur WhatsApp</button>' : ''}<button class="btn petit" data-a="copier">Copier son lien</button><button class="btn petit" data-a="partager">📤 Partager</button><button class="btn petit" data-a="imprimer" title="Imprimer l'invitation de cette famille">🖨</button><button class="btn petit" data-a="modifier">Modifier</button><button class="btn petit danger" data-a="suppr">Supprimer</button></div>
           </div>`).join('') || `<div class="vide">${fs.length ? 'Aucune famille ne correspond.' : 'Aucun invité pour l\'instant. Ajoutez vos familles une par une (avec le nombre d\'adultes et d\'enfants invités), ou importez un fichier Excel (colonnes : Famille, Catégorie, Adultes, Enfants, Téléphone, Table).'}</div>`}</div>`;
       $('#ajouter').onclick = () => formulaire(null);
       $('#importer').onclick = importer;
+      $('#imprimer').onclick = () => { const l = visibles.length ? visibles : fs; if (!l.length) return imprimer([null]); if (l.length > 1 && !confirm('Imprimer ' + l.length + ' invitation(s) (' + (visibles.length < fs.length ? 'les familles affichées' : 'toutes les familles') + ') ?')) return; imprimer(l); };
       $('#tout-suppr').onclick = toutSupprimer;
       $$('[data-co]').forEach(b => b.onclick = () => { filtreCote = b.dataset.co; rendre(); });
       $('#exporter').onclick = exporter;
@@ -272,6 +313,7 @@
         $$('[data-a]', el).forEach(b => b.onclick = async () => {
           const a = b.dataset.a;
           if (a === 'copier' || a === 'partager' || a === 'wa') marquerEnvoye(f);
+          if (a === 'imprimer') { imprimer([f]); return; }
           if (a === 'copier') { await copier(lienFamille(f)); }
           if (a === 'partager') Base.partager(b, lienFamille(f), modele.replace('{famille}', f.nom).replace('{lien}', '').trim());
           if (a === 'wa') window.open('https://wa.me/' + tel(f.telephone) + '?text=' + encodeURIComponent(modele.replace('{famille}', f.nom).replace('{lien}', lienFamille(f))), '_blank');
