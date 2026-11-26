@@ -109,26 +109,6 @@ window.VITRINE = [
   "date": "2026-11-25"
  },
  {
-  "slug": "film-filmmwuqkdqb9rgh",
-  "film": true,
-  "video": "https://wckwwupnidcnufnlclbw.supabase.co/storage/v1/object/public/equipe/d29aee1cf2ec46fa937028bb468d3ba7/filmmwuqkdqb9rgh.mp4",
-  "titre": "Invitation",
-  "type": "Film vidéo",
-  "vignette": "medias/films/filmmwuqkdqb9rgh.jpg",
-  "auteur": "JULIA",
-  "date": "2026-11-25"
- },
- {
-  "slug": "film-filmmwurbof2grq9",
-  "film": true,
-  "video": "https://wckwwupnidcnufnlclbw.supabase.co/storage/v1/object/public/equipe/d29aee1cf2ec46fa937028bb468d3ba7/filmmwurbof2grq9.mp4",
-  "titre": "FANASANA VODIONDRY",
-  "type": "Film vidéo",
-  "vignette": "medias/films/filmmwuqzgx3kcco.jpg",
-  "auteur": "Rova",
-  "date": "2026-11-25"
- },
- {
   "slug": "demo-notre-mariage-0evs",
   "titre": "NOTRE MARIAGE",
   "type": "mariage",
